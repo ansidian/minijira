@@ -1,13 +1,13 @@
 services:
-    - type: web
-      name: minijira
-      runtime: node
-      buildCommand: npm install && npm run build && npm run db:init
-      startCommand: npm start
-      envVars:
-          - key: NODE_ENV
-            value: production
-      disk:
-          name: minijira-data
-          mountPath: /opt/render/project/src/server/db
-          sizeGB: 1
+  - type: web
+    name: minijira
+    runtime: node
+    buildCommand: npm install && npm run build && npm run db:init
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
