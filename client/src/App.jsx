@@ -232,6 +232,94 @@ function App() {
 				</div>
 			</main>
 
+			{/* Footer */}
+			<footer className="footer">
+				<div className="footer-content">
+					<div className="footer-section">
+						<span className="footer-label">Built by</span>
+						<a
+							href="https://github.com/ansidian"
+							target="_blank"
+							rel="noopener noreferrer"
+							className="footer-link"
+						>
+							<svg
+								className="footer-icon"
+								viewBox="0 0 16 16"
+								fill="currentColor"
+							>
+								<path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+							</svg>
+							Andy Su
+						</a>
+					</div>
+					<div className="footer-divider">•</div>
+					<div className="footer-section">
+						<span className="footer-label">Made with</span>
+						<a
+							href="https://react.dev"
+							target="_blank"
+							rel="noopener noreferrer"
+							className="footer-link"
+						>
+							<svg
+								className="footer-icon"
+								viewBox="0 0 24 24"
+								fill="currentColor"
+							>
+								<circle cx="12" cy="12" r="2" />
+								<path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4.5C13.25,4.5 14.31,4.94 15.11,5.75C15.81,6.55 16.5,7.63 16.5,9C16.5,10.38 15.81,11.45 15.11,12.25C14.31,13.06 13.25,13.5 12,13.5C10.75,13.5 9.69,13.06 8.89,12.25C8.19,11.45 7.5,10.38 7.5,9C7.5,7.63 8.19,6.55 8.89,5.75C9.69,4.94 10.75,4.5 12,4.5M12,19.5C10.75,19.5 9.69,19.06 8.89,18.25C8.19,17.45 7.5,16.38 7.5,15C7.5,13.63 8.19,12.55 8.89,11.75C9.69,10.94 10.75,10.5 12,10.5C13.25,10.5 14.31,10.94 15.11,11.75C15.81,12.55 16.5,13.63 16.5,15C16.5,16.38 15.81,17.45 15.11,18.25C14.31,19.06 13.25,19.5 12,19.5Z" />
+							</svg>
+							React
+						</a>
+						<span className="footer-text">+</span>
+						<a
+							href="https://vitejs.dev"
+							target="_blank"
+							rel="noopener noreferrer"
+							className="footer-link"
+						>
+							<svg
+								className="footer-icon"
+								viewBox="0 0 24 24"
+								fill="currentColor"
+							>
+								<path d="M12,2L2,7V17L12,22L22,17V7M12,4.18L19.82,8L12,11.82L4.18,8M4,9.42L11,13V20.58L4,17M20,9.42V17L13,20.58V13" />
+							</svg>
+							Vite
+						</a>
+					</div>
+					<div className="footer-divider">•</div>
+					<div className="footer-section">
+						<span className="footer-label">Hosted on</span>
+						<a
+							href="https://render.com"
+							target="_blank"
+							rel="noopener noreferrer"
+							className="footer-link"
+						>
+							Render
+						</a>
+					</div>
+					<div className="footer-divider">•</div>
+					<div className="footer-section">
+						<span className="footer-label">DB on</span>
+						<a
+							href="https://turso.tech"
+							target="_blank"
+							rel="noopener noreferrer"
+							className="footer-link"
+						>
+							Turso
+						</a>
+					</div>
+					<div className="footer-divider">•</div>
+					<div className="footer-section">
+						<span className="footer-version">v1.0.0</span>
+					</div>
+				</div>
+			</footer>
+
 			{/* Create Modal */}
 			{showCreateModal && (
 				<CreateIssueModal
