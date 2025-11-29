@@ -394,7 +394,7 @@ function Column({ column, issues, onIssueClick, onAddClick, onDrop }) {
 				)}
 			</div>
 			<button className="add-issue-btn" onClick={onAddClick}>
-				+ Add issue
+				+ Add {column.title}
 			</button>
 		</div>
 	);
@@ -453,8 +453,15 @@ function CreateIssueModal({ users, currentUserId, createStatus, onClose, onCreat
 	const [assigneeId, setAssigneeId] = useState("");
 	const [shake, setShake] = useState(false);
 	const [confirmingCancel, setConfirmingCancel] = useState(false);
+	const [flashStatus, setFlashStatus] = useState(true);
 
 	const isDirty = title.trim() || description.trim();
+
+	// Flash the status dropdown on mount to draw attention
+	useEffect(() => {
+		const timer = setTimeout(() => setFlashStatus(false), 1000);
+		return () => clearTimeout(timer);
+	}, []);
 
 	function handleSubmit(e) {
 		e.preventDefault();
@@ -525,7 +532,7 @@ function CreateIssueModal({ users, currentUserId, createStatus, onClose, onCreat
 						<div className="form-group">
 							<label className="form-label">Status</label>
 							<select
-								className="form-select"
+								className={`form-select ${flashStatus ? "flash-select" : ""}`}
 								value={status}
 								onChange={(e) => setStatus(e.target.value)}
 							>

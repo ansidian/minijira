@@ -734,6 +734,30 @@ body {
 	animation: shake 0.5s ease-in-out;
 }
 
+/* flash animation for status dropdown */
+@keyframes flash {
+	0%,
+	100% {
+		background: var(--bg-tertiary);
+		border-color: var(--border-primary);
+	}
+	25%,
+	75% {
+		background: var(--bg-card);
+		border-color: var(--accent);
+		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+	}
+	50% {
+		background: var(--bg-tertiary);
+		border-color: var(--accent);
+		box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3);
+	}
+}
+
+.flash-select {
+	animation: flash 1s ease-in-out;
+}
+
 /* user selection prompt overlay */
 .user-prompt-overlay {
 	position: fixed;
