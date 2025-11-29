@@ -47,6 +47,46 @@ function formatDate(dateStr) {
 	return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+// Linkify text - convert URLs to clickable links
+function linkifyText(text) {
+	if (!text) return [];
+
+	const urlRegex = /(https?:\/\/[^\s]+)/g;
+	const parts = [];
+	let lastIndex = 0;
+	let match;
+
+	while ((match = urlRegex.exec(text)) !== null) {
+		// Add text before the URL
+		if (match.index > lastIndex) {
+			parts.push({
+				type: "text",
+				content: text.slice(lastIndex, match.index),
+			});
+		}
+
+		// Add the URL as a link
+		parts.push({
+			type: "link",
+			content: match[0],
+			url: match[0],
+		});
+
+		lastIndex = match.index + match[0].length;
+	}
+
+	// Add remaining text
+	if (lastIndex < text.length) {
+		parts.push({
+			type: "text",
+			content: text.slice(lastIndex),
+		});
+	}
+
+	// If no URLs found, return the original text as a single part
+	return parts.length === 0 ? [{ type: "text", content: text }] : parts;
+}
+
 // Column configuration
 const COLUMNS = [
 	{ id: "todo", title: "To Do", status: "todo" },
@@ -511,10 +551,7 @@ function CreateIssueModal({
 
 	return (
 		<div className="modal-overlay" onClick={handleOverlayClick}>
-			<div
-				className={`modal ${shake ? "shake" : ""}`}
-				onClick={(e) => e.stopPropagation()}
-			>
+			<div className={`modal ${shake ? "shake" : ""}`}>
 				<div className="modal-header">
 					<h2 className="modal-title">Create Issue</h2>
 					<button className="modal-close" onClick={onClose}>
@@ -787,11 +824,35 @@ function IssueDetailModal({
 								className={`issue-detail-description ${
 									!issue.description ? "empty" : ""
 								}`}
-								onClick={() => setEditing(true)}
+								onClick={(e) => {
+									if (e.target.tagName !== 'A') {
+										setEditing(true);
+									}
+								}}
 								style={{ cursor: "pointer" }}
 							>
-								{issue.description ||
-									"Click to add a description..."}
+								{issue.description ? (
+									linkifyText(issue.description).map(
+										(part, index) =>
+											part.type === "link" ? (
+												<a
+													key={index}
+													href={part.url}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="comment-link"
+												>
+													{part.content}
+												</a>
+											) : (
+												<span key={index}>
+													{part.content}
+												</span>
+											)
+									)
+								) : (
+									"Click to add a description..."
+								)}
 							</div>
 						</>
 					)}
@@ -882,7 +943,27 @@ function IssueDetailModal({
 									</span>
 								</div>
 								<div className="comment-body">
-									{comment.body}
+									{linkifyText(comment.body).map(
+										(part, index) =>
+											part.type === "link" ? (
+												<a
+													key={index}
+													href={part.url}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="comment-link"
+													onClick={(e) =>
+														e.stopPropagation()
+													}
+												>
+													{part.content}
+												</a>
+											) : (
+												<span key={index}>
+													{part.content}
+												</span>
+											)
+									)}
 								</div>
 							</div>
 						))}

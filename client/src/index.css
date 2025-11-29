@@ -561,6 +561,7 @@ body {
 	padding: 16px;
 	background: var(--bg-tertiary);
 	border-radius: 6px;
+	white-space: pre-wrap;
 }
 
 .issue-detail-description.empty {
@@ -647,6 +648,20 @@ body {
 	font-size: 13px;
 	color: var(--text-secondary);
 	line-height: 1.5;
+	word-break: break-word;
+	white-space: pre-wrap;
+}
+
+.comment-link {
+	color: var(--accent);
+	text-decoration: none;
+	border-bottom: 1px solid transparent;
+	transition: all 0.15s ease;
+}
+
+.comment-link:hover {
+	color: var(--accent-hover);
+	border-bottom-color: var(--accent-hover);
 }
 
 .comment-form {
