@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { version } from "../package.json";
 
 const API_BASE = "/api";
 
@@ -179,7 +180,11 @@ function App() {
 							<span>done</span>
 						</div>
 					</div>
-					<div className={`user-selector ${!currentUserId ? "unselected" : ""}`}>
+					<div
+						className={`user-selector ${
+							!currentUserId ? "unselected" : ""
+						}`}
+					>
 						{currentUser && (
 							<div
 								className="current-user-avatar"
@@ -312,7 +317,7 @@ function App() {
 					</div>
 					<div className="footer-divider">•</div>
 					<div className="footer-section">
-						<span className="footer-version">v1.0.0</span>
+						<span className="footer-version">v{version}</span>
 					</div>
 				</div>
 			</footer>
@@ -445,7 +450,13 @@ function IssueCard({ issue, onClick }) {
 }
 
 // Create Issue Modal
-function CreateIssueModal({ users, currentUserId, createStatus, onClose, onCreate }) {
+function CreateIssueModal({
+	users,
+	currentUserId,
+	createStatus,
+	onClose,
+	onCreate,
+}) {
 	const [title, setTitle] = useState("");
 	const [description, setDescription] = useState("");
 	const [status, setStatus] = useState(createStatus);
@@ -500,7 +511,10 @@ function CreateIssueModal({ users, currentUserId, createStatus, onClose, onCreat
 
 	return (
 		<div className="modal-overlay" onClick={handleOverlayClick}>
-			<div className={`modal ${shake ? "shake" : ""}`} onClick={(e) => e.stopPropagation()}>
+			<div
+				className={`modal ${shake ? "shake" : ""}`}
+				onClick={(e) => e.stopPropagation()}
+			>
 				<div className="modal-header">
 					<h2 className="modal-title">Create Issue</h2>
 					<button className="modal-close" onClick={onClose}>
@@ -532,7 +546,9 @@ function CreateIssueModal({ users, currentUserId, createStatus, onClose, onCreat
 						<div className="form-group">
 							<label className="form-label">Status</label>
 							<select
-								className={`form-select ${flashStatus ? "flash-select" : ""}`}
+								className={`form-select ${
+									flashStatus ? "flash-select" : ""
+								}`}
 								value={status}
 								onChange={(e) => setStatus(e.target.value)}
 							>
@@ -637,7 +653,8 @@ function IssueDetailModal({
 	const [shake, setShake] = useState(false);
 
 	const isEditDirty =
-		editing && (title !== issue.title || description !== (issue.description || ""));
+		editing &&
+		(title !== issue.title || description !== (issue.description || ""));
 
 	useEffect(() => {
 		loadComments();
@@ -681,7 +698,10 @@ function IssueDetailModal({
 
 	return (
 		<div className="modal-overlay" onClick={handleOverlayClick}>
-			<div className={`modal ${shake ? "shake" : ""}`} onClick={(e) => e.stopPropagation()}>
+			<div
+				className={`modal ${shake ? "shake" : ""}`}
+				onClick={(e) => e.stopPropagation()}
+			>
 				<div className="modal-header">
 					<span className="issue-detail-key">{issue.key}</span>
 					<button className="modal-close" onClick={onClose}>
@@ -744,7 +764,9 @@ function IssueDetailModal({
 										</button>
 										<button
 											className="btn btn-primary"
-											onClick={() => setConfirmingCancel(false)}
+											onClick={() =>
+												setConfirmingCancel(false)
+											}
 										>
 											Keep Editing
 										</button>
