@@ -134,7 +134,7 @@ minijira/
 
 ### Change Project Key Prefix
 
-Edit `server/index.js` and `server/db/init.js`, change `MJ-` to your preferred prefix.
+Edit `server/index.js` and `server/db/init.js`, change `JPL-` to your preferred prefix.
 
 ### Add/Remove Team Members
 
