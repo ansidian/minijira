@@ -306,11 +306,23 @@ function App() {
 						>
 							<svg
 								className="footer-icon"
-								viewBox="0 0 24 24"
-								fill="currentColor"
+								viewBox="-11.5 -10.23174 23 20.46348"
+								fill="none"
 							>
-								<circle cx="12" cy="12" r="2" />
-								<path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4.5C13.25,4.5 14.31,4.94 15.11,5.75C15.81,6.55 16.5,7.63 16.5,9C16.5,10.38 15.81,11.45 15.11,12.25C14.31,13.06 13.25,13.5 12,13.5C10.75,13.5 9.69,13.06 8.89,12.25C8.19,11.45 7.5,10.38 7.5,9C7.5,7.63 8.19,6.55 8.89,5.75C9.69,4.94 10.75,4.5 12,4.5M12,19.5C10.75,19.5 9.69,19.06 8.89,18.25C8.19,17.45 7.5,16.38 7.5,15C7.5,13.63 8.19,12.55 8.89,11.75C9.69,10.94 10.75,10.5 12,10.5C13.25,10.5 14.31,10.94 15.11,11.75C15.81,12.55 16.5,13.63 16.5,15C16.5,16.38 15.81,17.45 15.11,18.25C14.31,19.06 13.25,19.5 12,19.5Z" />
+								<circle cx="0" cy="0" r="2.05" fill="#61dafb" />
+								<g stroke="#61dafb" strokeWidth="1" fill="none">
+									<ellipse rx="11" ry="4.2" />
+									<ellipse
+										rx="11"
+										ry="4.2"
+										transform="rotate(60)"
+									/>
+									<ellipse
+										rx="11"
+										ry="4.2"
+										transform="rotate(120)"
+									/>
+								</g>
 							</svg>
 							React
 						</a>
@@ -323,10 +335,45 @@ function App() {
 						>
 							<svg
 								className="footer-icon"
-								viewBox="0 0 24 24"
-								fill="currentColor"
+								viewBox="0 0 410 404"
+								fill="none"
 							>
-								<path d="M12,2L2,7V17L12,22L22,17V7M12,4.18L19.82,8L12,11.82L4.18,8M4,9.42L11,13V20.58L4,17M20,9.42V17L13,20.58V13" />
+								<path
+									d="M399.641 59.5246L215.643 388.545C211.844 395.338 202.084 395.378 198.228 388.618L10.5817 59.5563C6.38087 52.1896 12.6802 43.2665 21.0281 44.7586L205.223 77.6824C206.398 77.8924 207.601 77.8904 208.776 77.6763L389.119 44.8058C397.439 43.2894 403.768 52.1434 399.641 59.5246Z"
+									fill="url(#paint0_linear)"
+								/>
+								<path
+									d="M292.965 1.5744L156.801 28.2552C154.563 28.6937 152.906 30.5903 152.771 32.8664L144.395 174.33C144.198 177.662 147.258 180.248 150.51 179.498L188.42 170.749C191.967 169.931 195.172 173.055 194.443 176.622L183.18 231.775C182.422 235.487 185.907 238.661 189.532 237.56L212.947 230.446C216.577 229.344 220.065 232.527 219.297 236.242L201.398 322.875C200.278 328.294 207.486 331.249 210.492 326.603L212.5 323.5L323.454 102.072C325.312 98.3645 322.108 94.137 318.036 94.9228L279.014 102.454C275.347 103.161 272.227 99.746 273.262 96.1583L298.731 7.86689C299.767 4.27314 296.636 0.855181 292.965 1.5744Z"
+									fill="url(#paint1_linear)"
+								/>
+								<defs>
+									<linearGradient
+										id="paint0_linear"
+										x1="6.00017"
+										y1="32.9999"
+										x2="235"
+										y2="344"
+										gradientUnits="userSpaceOnUse"
+									>
+										<stop stopColor="#41D1FF" />
+										<stop offset="1" stopColor="#BD34FE" />
+									</linearGradient>
+									<linearGradient
+										id="paint1_linear"
+										x1="194.651"
+										y1="8.81818"
+										x2="236.076"
+										y2="292.989"
+										gradientUnits="userSpaceOnUse"
+									>
+										<stop stopColor="#FFEA83" />
+										<stop
+											offset="0.0833333"
+											stopColor="#FFDD35"
+										/>
+										<stop offset="1" stopColor="#FFA800" />
+									</linearGradient>
+								</defs>
 							</svg>
 							Vite
 						</a>
@@ -825,34 +872,32 @@ function IssueDetailModal({
 									!issue.description ? "empty" : ""
 								}`}
 								onClick={(e) => {
-									if (e.target.tagName !== 'A') {
+									if (e.target.tagName !== "A") {
 										setEditing(true);
 									}
 								}}
 								style={{ cursor: "pointer" }}
 							>
-								{issue.description ? (
-									linkifyText(issue.description).map(
-										(part, index) =>
-											part.type === "link" ? (
-												<a
-													key={index}
-													href={part.url}
-													target="_blank"
-													rel="noopener noreferrer"
-													className="comment-link"
-												>
-													{part.content}
-												</a>
-											) : (
-												<span key={index}>
-													{part.content}
-												</span>
-											)
-									)
-								) : (
-									"Click to add a description..."
-								)}
+								{issue.description
+									? linkifyText(issue.description).map(
+											(part, index) =>
+												part.type === "link" ? (
+													<a
+														key={index}
+														href={part.url}
+														target="_blank"
+														rel="noopener noreferrer"
+														className="comment-link"
+													>
+														{part.content}
+													</a>
+												) : (
+													<span key={index}>
+														{part.content}
+													</span>
+												)
+									  )
+									: "Click to add a description..."}
 							</div>
 						</>
 					)}
