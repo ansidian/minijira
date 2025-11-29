@@ -111,10 +111,7 @@ function App() {
 
 	// Create issue
 	async function handleCreateIssue(data) {
-		const newIssue = await api.post("/issues", {
-			...data,
-			status: createStatus,
-		});
+		const newIssue = await api.post("/issues", data);
 		setIssues((prev) => [newIssue, ...prev]);
 		setStats(await api.get("/stats"));
 		setShowCreateModal(false);
@@ -325,6 +322,7 @@ function App() {
 				<CreateIssueModal
 					users={users}
 					currentUserId={currentUserId}
+					createStatus={createStatus}
 					onClose={() => setShowCreateModal(false)}
 					onCreate={handleCreateIssue}
 				/>
@@ -447,12 +445,14 @@ function IssueCard({ issue, onClick }) {
 }
 
 // Create Issue Modal
-function CreateIssueModal({ users, currentUserId, onClose, onCreate }) {
+function CreateIssueModal({ users, currentUserId, createStatus, onClose, onCreate }) {
 	const [title, setTitle] = useState("");
 	const [description, setDescription] = useState("");
+	const [status, setStatus] = useState(createStatus);
 	const [priority, setPriority] = useState("medium");
 	const [assigneeId, setAssigneeId] = useState("");
 	const [shake, setShake] = useState(false);
+	const [confirmingCancel, setConfirmingCancel] = useState(false);
 
 	const isDirty = title.trim() || description.trim();
 
@@ -462,6 +462,7 @@ function CreateIssueModal({ users, currentUserId, onClose, onCreate }) {
 		onCreate({
 			title: title.trim(),
 			description: description.trim(),
+			status,
 			priority,
 			assignee_id: assigneeId || null,
 			reporter_id: currentUserId || null,
@@ -478,9 +479,15 @@ function CreateIssueModal({ users, currentUserId, onClose, onCreate }) {
 	}
 
 	function handleCancel() {
-		if (isDirty && !confirm("Discard your changes?")) {
-			return;
+		if (isDirty) {
+			setConfirmingCancel(true);
+		} else {
+			onClose();
 		}
+	}
+
+	function handleConfirmCancel() {
+		setConfirmingCancel(false);
 		onClose();
 	}
 
@@ -516,6 +523,18 @@ function CreateIssueModal({ users, currentUserId, onClose, onCreate }) {
 					</div>
 					<div className="form-row">
 						<div className="form-group">
+							<label className="form-label">Status</label>
+							<select
+								className="form-select"
+								value={status}
+								onChange={(e) => setStatus(e.target.value)}
+							>
+								<option value="todo">To Do</option>
+								<option value="in_progress">In Progress</option>
+								<option value="done">Done</option>
+							</select>
+						</div>
+						<div className="form-group">
 							<label className="form-label">Priority</label>
 							<select
 								className="form-select"
@@ -527,6 +546,8 @@ function CreateIssueModal({ users, currentUserId, onClose, onCreate }) {
 								<option value="high">High</option>
 							</select>
 						</div>
+					</div>
+					<div className="form-row">
 						<div className="form-group">
 							<label className="form-label">Assignee</label>
 							<select
@@ -544,20 +565,44 @@ function CreateIssueModal({ users, currentUserId, onClose, onCreate }) {
 						</div>
 					</div>
 					<div className="modal-actions">
-						<button
-							type="button"
-							className="btn btn-secondary"
-							onClick={handleCancel}
-						>
-							Cancel
-						</button>
-						<button
-							type="submit"
-							className="btn btn-primary"
-							disabled={!title.trim()}
-						>
-							Create Issue
-						</button>
+						{!isDirty || !confirmingCancel ? (
+							<>
+								<button
+									type="button"
+									className="btn btn-secondary"
+									onClick={handleCancel}
+								>
+									Cancel
+								</button>
+								<button
+									type="submit"
+									className="btn btn-primary"
+									disabled={!title.trim()}
+								>
+									Create Issue
+								</button>
+							</>
+						) : (
+							<div className="cancel-confirm">
+								<span className="cancel-confirm-text">
+									Discard changes?
+								</span>
+								<button
+									type="button"
+									className="btn btn-warning"
+									onClick={handleConfirmCancel}
+								>
+									Yes, Discard
+								</button>
+								<button
+									type="button"
+									className="btn btn-primary"
+									onClick={() => setConfirmingCancel(false)}
+								>
+									Keep Editing
+								</button>
+							</div>
+						)}
 					</div>
 				</form>
 			</div>
