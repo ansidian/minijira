@@ -2,16 +2,16 @@
 
 A minimal, no-nonsense project management tool for small teams. Built with the KISS principle in mind.
 
-![MiniJira](https://img.shields.io/badge/version-1.0.1-blue)
+![MiniJira](https://img.shields.io/badge/version-2.0.0-blue)
 
 ## Features
 
--   **Kanban Board**: Drag-and-drop between To Do, In Progress, and Done
--   **Issues**: Create, edit, delete, assign, prioritize
--   **Comments**: Discuss issues with your team
--   **User Selection**: Pick who you are from the dropdown (persists in browser)
--   **12 Team Members**: Pre-seeded for your capstone project
--   **Zero Config Auth**: Trust your small team
+- **Kanban Board**: Drag-and-drop between To Do, In Progress, and Done
+- **Issues**: Create, edit, delete, assign, prioritize
+- **Comments**: Discuss issues with your team
+- **User Selection**: Pick who you are from the dropdown (persists in browser)
+- **12 Team Members**: Pre-seeded for your capstone project
+- **Zero Config Auth**: Trust your small team
 
 ## Tech Stack
 
@@ -37,8 +37,8 @@ npm run dev
 
 The app will be available at:
 
--   **Frontend**: http://localhost:5173
--   **API**: http://localhost:3001
+- **Frontend**: http://localhost:5173
+- **API**: http://localhost:3001
 
 ## Deploy to Production
 
@@ -49,10 +49,10 @@ The app will be available at:
 3. Login: `turso auth login`
 4. Create database: `turso db create minijira`
 5. Get your credentials:
-    ```bash
-    turso db show minijira --url      # Copy this URL
-    turso db tokens create minijira   # Copy this token
-    ```
+   ```bash
+   turso db show minijira --url      # Copy this URL
+   turso db tokens create minijira   # Copy this token
+   ```
 
 ### Step 2: Deploy to Render
 
@@ -61,8 +61,8 @@ The app will be available at:
 3. Connect your GitHub repo
 4. Render will detect the `render.yaml` config
 5. **Add environment variables** (in Render dashboard):
-    - `TURSO_DATABASE_URL` → paste your Turso URL (starts with `libsql://`)
-    - `TURSO_AUTH_TOKEN` → paste your Turso token
+   - `TURSO_DATABASE_URL` → paste your Turso URL (starts with `libsql://`)
+   - `TURSO_AUTH_TOKEN` → paste your Turso token
 6. Click **Create Web Service**
 
 ### Step 3: Initialize Production Database
@@ -84,32 +84,32 @@ To use `minijira.yourdomain.com`:
 1. In Render dashboard → Settings → Custom Domains
 2. Add `minijira.yourdomain.com`
 3. Add a CNAME record in your DNS:
-    - Name: `minijira`
-    - Value: `your-service-name.onrender.com`
+   - Name: `minijira`
+   - Value: `your-service-name.onrender.com`
 
 ## API Endpoints
 
 ### Users
 
--   `GET /api/users` - List all users
--   `GET /api/users/:id` - Get single user
+- `GET /api/users` - List all users
+- `GET /api/users/:id` - Get single user
 
 ### Issues
 
--   `GET /api/issues` - List issues (supports `?status=`, `?assignee_id=`, `?priority=`)
--   `GET /api/issues/:id` - Get single issue
--   `POST /api/issues` - Create issue
--   `PATCH /api/issues/:id` - Update issue
--   `DELETE /api/issues/:id` - Delete issue
+- `GET /api/issues` - List issues (supports `?status=`, `?assignee_id=`, `?priority=`)
+- `GET /api/issues/:id` - Get single issue
+- `POST /api/issues` - Create issue
+- `PATCH /api/issues/:id` - Update issue
+- `DELETE /api/issues/:id` - Delete issue
 
 ### Comments
 
--   `GET /api/issues/:id/comments` - Get comments for issue
--   `POST /api/issues/:id/comments` - Add comment
+- `GET /api/issues/:id/comments` - Get comments for issue
+- `POST /api/issues/:id/comments` - Add comment
 
 ### Stats
 
--   `GET /api/stats` - Get issue counts by status
+- `GET /api/stats` - Get issue counts by status
 
 ## Project Structure
 
@@ -148,13 +148,13 @@ Edit the `seedUsers` array in `server/db/init.js` and re-run `npm run db:init`.
 
 ## What's NOT Included (by design)
 
--   ❌ Authentication/Authorization
--   ❌ Sprints/Velocity tracking
--   ❌ Time tracking
--   ❌ Complex workflows
--   ❌ Epics, Components, Versions
--   ❌ Notifications
--   ❌ Integrations
+- ❌ Authentication/Authorization
+- ❌ Sprints/Velocity tracking
+- ❌ Time tracking
+- ❌ Complex workflows
+- ❌ Epics, Components, Versions
+- ❌ Notifications
+- ❌ Integrations
 
 ## License
 
