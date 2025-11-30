@@ -119,7 +119,7 @@ app.get("/api/issues/:id", async (req, res) => {
 // Create issue
 app.post("/api/issues", async (req, res) => {
 	try {
-		const { title, description, priority, assignee_id, reporter_id } =
+		const { title, description, status, priority, assignee_id, reporter_id } =
 			req.body;
 
 		if (!title) {
@@ -136,12 +136,13 @@ app.post("/api/issues", async (req, res) => {
 		const key = `JPL-${counterRows[0].value}`;
 
 		const result = await db.execute({
-			sql: `INSERT INTO issues (key, title, description, priority, assignee_id, reporter_id)
-            VALUES (?, ?, ?, ?, ?, ?)`,
+			sql: `INSERT INTO issues (key, title, description, status, priority, assignee_id, reporter_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
 			args: [
 				key,
 				title,
 				description || null,
+				status || "todo",
 				priority || "medium",
 				assignee_id || null,
 				reporter_id || null,
