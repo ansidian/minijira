@@ -14,9 +14,15 @@ import {
   Progress,
   Paper,
   Stack,
+  Checkbox,
+  Tooltip,
+  Collapse,
+  ActionIcon,
 } from "@mantine/core";
 import { Notifications, notifications } from "@mantine/notifications";
 import "@mantine/notifications/styles.css";
+import { ContextMenuProvider, useContextMenu } from "mantine-contextmenu";
+import "mantine-contextmenu/styles.css";
 
 const API_BASE = "/api";
 
@@ -112,6 +118,13 @@ function App() {
     const saved = localStorage.getItem("minijira_user");
     return saved ? parseInt(saved) : null;
   });
+  const [expandedIssues, setExpandedIssues] = useState(new Set());
+  const [subtasksCache, setSubtasksCache] = useState({});
+  const [autoShowSubtaskForm, setAutoShowSubtaskForm] = useState(false);
+
+  // Detect if this is a touch device
+  const isTouchDevice =
+    "ontouchstart" in window || navigator.maxTouchPoints > 0;
 
   // Persist user selection
   useEffect(() => {
@@ -138,9 +151,11 @@ function App() {
     setLoading(false);
   }
 
-  // Group issues by status
+  // Group issues by status - only show parent issues (not subtasks)
   const issuesByStatus = COLUMNS.reduce((acc, col) => {
-    acc[col.status] = issues.filter((i) => i.status === col.status);
+    acc[col.status] = issues.filter(
+      (i) => i.status === col.status && !i.parent_id
+    );
     return acc;
   }, {});
 
@@ -153,6 +168,18 @@ function App() {
     setStats(await api.get("/stats"));
     if (selectedIssue?.id === issueId) {
       setSelectedIssue(updated);
+    }
+
+    // If this issue has subtasks and is expanded, refresh them
+    if (updated.subtask_count > 0 && expandedIssues.has(issueId)) {
+      const subtasks = await api.get(`/issues/${issueId}/subtasks`);
+      setSubtasksCache((prev) => ({ ...prev, [issueId]: subtasks }));
+    }
+
+    // If this is a subtask, refresh its parent's cache if expanded
+    if (updated.parent_id && expandedIssues.has(updated.parent_id)) {
+      const subtasks = await api.get(`/issues/${updated.parent_id}/subtasks`);
+      setSubtasksCache((prev) => ({ ...prev, [updated.parent_id]: subtasks }));
     }
   }
 
@@ -168,35 +195,141 @@ function App() {
   async function handleUpdateIssue(issueId, data) {
     const updated = await api.patch(`/issues/${issueId}`, data);
     setIssues((prev) => prev.map((i) => (i.id === issueId ? updated : i)));
-    setSelectedIssue(updated);
+
+    // Update selected issue if it's currently open
+    if (selectedIssue?.id === issueId) {
+      setSelectedIssue(updated);
+    }
+
+    // If this is a subtask, refresh its parent's cache if expanded
+    if (updated.parent_id && expandedIssues.has(updated.parent_id)) {
+      const subtasks = await api.get(`/issues/${updated.parent_id}/subtasks`);
+      setSubtasksCache((prev) => ({ ...prev, [updated.parent_id]: subtasks }));
+    }
   }
 
   // Delete issue
   async function handleDeleteIssue(issueId) {
     await api.delete(`/issues/${issueId}`);
-    setIssues((prev) => prev.filter((i) => i.id !== issueId));
-    setStats(await api.get("/stats"));
+
+    // Reload all issues to ensure subtask counts are updated
+    const [issuesData, statsData] = await Promise.all([
+      api.get("/issues"),
+      api.get("/stats"),
+    ]);
+
+    setIssues(issuesData);
+    setStats(statsData);
     setSelectedIssue(null);
+
+    // Refresh all expanded subtask caches to ensure they reflect the deletion
+    const newCache = {};
+    for (const expandedId of expandedIssues) {
+      // Skip the deleted issue itself
+      if (expandedId !== issueId) {
+        const subtasks = await api.get(`/issues/${expandedId}/subtasks`);
+        newCache[expandedId] = subtasks;
+      }
+    }
+    setSubtasksCache(newCache);
+
+    // If this was a parent issue with expanded subtasks, clean it from expanded set
+    if (expandedIssues.has(issueId)) {
+      setExpandedIssues((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(issueId);
+        return newSet;
+      });
+    }
+
     notifications.show({
-      title: 'Issue deleted',
-      message: 'The issue has been removed',
-      color: 'red',
+      title: "Issue deleted",
+      message: "The issue has been removed",
+      color: "red",
     });
+  }
+
+  // Handle viewing a different issue (for subtask navigation)
+  async function handleViewIssue(issueId) {
+    const issue = await api.get(`/issues/${issueId}`);
+    setSelectedIssue(issue);
+  }
+
+  // Refresh issues after subtask changes
+  async function handleSubtaskChange() {
+    const issuesData = await api.get("/issues");
+    setIssues(issuesData);
+
+    // Refresh all expanded subtasks caches
+    const newCache = {};
+    for (const issueId of expandedIssues) {
+      const subtasks = await api.get(`/issues/${issueId}/subtasks`);
+      newCache[issueId] = subtasks;
+    }
+    setSubtasksCache(newCache);
+
+    // Refresh selected issue to get updated subtask counts
+    if (selectedIssue) {
+      const updated = await api.get(`/issues/${selectedIssue.id}`);
+      setSelectedIssue(updated);
+    }
+  }
+
+  // Toggle subtask expansion and fetch if needed
+  async function handleToggleSubtasks(issueId) {
+    const newExpanded = new Set(expandedIssues);
+
+    if (newExpanded.has(issueId)) {
+      // Collapse
+      newExpanded.delete(issueId);
+    } else {
+      // Expand - fetch subtasks if not cached
+      newExpanded.add(issueId);
+      if (!subtasksCache[issueId]) {
+        const subtasks = await api.get(`/issues/${issueId}/subtasks`);
+        setSubtasksCache((prev) => ({ ...prev, [issueId]: subtasks }));
+      }
+    }
+
+    setExpandedIssues(newExpanded);
+  }
+
+  // Toggle all subtasks at once
+  async function handleToggleAllSubtasks() {
+    const parentsWithSubtasks = issues.filter(
+      (i) => !i.parent_id && i.subtask_count > 0
+    );
+
+    // If all are expanded, collapse all. Otherwise, expand all.
+    const allExpanded = parentsWithSubtasks.every((i) =>
+      expandedIssues.has(i.id)
+    );
+
+    if (allExpanded) {
+      // Collapse all
+      setExpandedIssues(new Set());
+    } else {
+      // Expand all - fetch any missing subtasks
+      const newExpanded = new Set(parentsWithSubtasks.map((i) => i.id));
+      const newCache = { ...subtasksCache };
+
+      for (const issue of parentsWithSubtasks) {
+        if (!subtasksCache[issue.id]) {
+          const subtasks = await api.get(`/issues/${issue.id}/subtasks`);
+          newCache[issue.id] = subtasks;
+        }
+      }
+
+      setSubtasksCache(newCache);
+      setExpandedIssues(newExpanded);
+    }
   }
 
   const currentUser = users.find((u) => u.id === currentUserId);
 
-  if (loading) {
-    return (
-      <Center h="100vh">
-        <Loader size="lg" />
-      </Center>
-    );
-  }
-
   return (
-    <>
-      <Notifications position="top-right" />
+    <ContextMenuProvider submenuDelay={150}>
+      <Notifications position="top-right" autoClose={2000} />
       <div className="app">
         {/* User Selection Prompt Overlay */}
         {!currentUserId && (
@@ -209,248 +342,324 @@ function App() {
 
         {/* Header */}
         <header className="header">
-        <div className="logo">
-          <div className="logo-icon">MJ</div>
-          <span>MiniJira</span>
-        </div>
-        <div className="header-right">
-          <div className="header-stats">
-            <div className="stat">
-              <span style={{ minWidth: "60px" }}>
-                <span className="stat-value">{stats.todo}</span> to do
-              </span>
-              <Progress
-                value={stats.total > 0 ? (stats.todo / stats.total) * 100 : 0}
-                color="gray"
-                size="sm"
-                style={{ flex: 1, minWidth: "80px" }}
-              />
-            </div>
-            <div className="stat">
-              <span style={{ minWidth: "80px" }}>
-                <span className="stat-value">{stats.in_progress}</span> in
-                progress
-              </span>
-              <Progress
-                value={
-                  stats.total > 0 ? (stats.in_progress / stats.total) * 100 : 0
-                }
-                color="blue"
-                size="sm"
-                style={{ flex: 1, minWidth: "80px" }}
-              />
-            </div>
-            <div className="stat">
-              <span style={{ minWidth: "60px" }}>
-                <span className="stat-value">{stats.done}</span> done
-              </span>
-              <Progress
-                value={stats.total > 0 ? (stats.done / stats.total) * 100 : 0}
-                color="green"
-                size="sm"
-                style={{ flex: 1, minWidth: "80px" }}
-              />
-            </div>
+          <div className="logo">
+            <div className="logo-icon">MJ</div>
+            <span>MiniJira</span>
           </div>
-          <div
-            className={`user-selector ${!currentUserId ? "unselected" : ""}`}
-          >
-            {currentUser && (
-              <Avatar
-                color={currentUser.avatar_color}
-                name={currentUser.name}
-                size="md"
-              />
-            )}
-            <select
-              className="user-select"
-              value={currentUserId || ""}
-              onChange={(e) =>
-                setCurrentUserId(
-                  e.target.value ? parseInt(e.target.value) : null
-                )
+          <div className="header-right">
+            <div className="header-stats">
+              <div className="stat">
+                <span style={{ minWidth: "60px" }}>
+                  <span className="stat-value">{stats.todo}</span> to do
+                </span>
+                <Progress
+                  value={stats.total > 0 ? (stats.todo / stats.total) * 100 : 0}
+                  color="gray"
+                  size="sm"
+                  style={{ flex: 1, minWidth: "80px" }}
+                />
+              </div>
+              <div className="stat">
+                <span style={{ minWidth: "80px" }}>
+                  <span className="stat-value">{stats.in_progress}</span> in
+                  progress
+                </span>
+                <Progress
+                  value={
+                    stats.total > 0
+                      ? (stats.in_progress / stats.total) * 100
+                      : 0
+                  }
+                  color="blue"
+                  size="sm"
+                  style={{ flex: 1, minWidth: "80px" }}
+                />
+              </div>
+              <div className="stat">
+                <span style={{ minWidth: "60px" }}>
+                  <span className="stat-value">{stats.done}</span> done
+                </span>
+                <Progress
+                  value={stats.total > 0 ? (stats.done / stats.total) * 100 : 0}
+                  color="green"
+                  size="sm"
+                  style={{ flex: 1, minWidth: "80px" }}
+                />
+              </div>
+            </div>
+
+            <Button
+              variant="light"
+              size="sm"
+              color="blue"
+              onClick={handleToggleAllSubtasks}
+              leftSection={
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{
+                    transform: issues
+                      .filter((i) => !i.parent_id && i.subtask_count > 0)
+                      .every((i) => expandedIssues.has(i.id))
+                      ? "rotate(180deg)"
+                      : "rotate(0deg)",
+                    transition: "transform 0.2s ease",
+                  }}
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
               }
+              style={{ marginLeft: "1rem" }}
             >
-              <option value="">Select yourself...</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </header>
+              {issues
+                .filter((i) => !i.parent_id && i.subtask_count > 0)
+                .every((i) => expandedIssues.has(i.id))
+                ? "Hide All Subtasks"
+                : "Show All Subtasks"}
+            </Button>
 
-      {/* Board */}
-      <main className="main">
-        <div className="board">
-          {COLUMNS.map((column) => (
-            <Column
-              key={column.id}
-              column={column}
-              issues={issuesByStatus[column.status]}
-              onIssueClick={setSelectedIssue}
-              onAddClick={() => {
-                setCreateStatus(column.status);
-                setShowCreateModal(true);
-              }}
-              onDrop={handleStatusChange}
-            />
-          ))}
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="footer">
-        <div className="footer-content">
-          <div className="footer-section">
-            <span className="footer-label">Built by</span>
-            <a
-              href="https://github.com/ansidian"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="footer-link"
+            <div
+              className={`user-selector ${!currentUserId ? "unselected" : ""}`}
             >
-              <svg
-                className="footer-icon"
-                viewBox="0 0 16 16"
-                fill="currentColor"
-              >
-                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-              </svg>
-              Andy Su
-            </a>
-          </div>
-          <div className="footer-divider">•</div>
-          <div className="footer-section">
-            <span className="footer-label">Made with</span>
-            <a
-              href="https://react.dev"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="footer-link"
-            >
-              <svg
-                className="footer-icon"
-                viewBox="-11.5 -10.23174 23 20.46348"
-                fill="none"
-              >
-                <circle cx="0" cy="0" r="2.05" fill="#61dafb" />
-                <g stroke="#61dafb" strokeWidth="1" fill="none">
-                  <ellipse rx="11" ry="4.2" />
-                  <ellipse rx="11" ry="4.2" transform="rotate(60)" />
-                  <ellipse rx="11" ry="4.2" transform="rotate(120)" />
-                </g>
-              </svg>
-              React
-            </a>
-            <span className="footer-text">+</span>
-            <a
-              href="https://vitejs.dev"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="footer-link"
-            >
-              <svg className="footer-icon" viewBox="0 0 410 404" fill="none">
-                <path
-                  d="M399.641 59.5246L215.643 388.545C211.844 395.338 202.084 395.378 198.228 388.618L10.5817 59.5563C6.38087 52.1896 12.6802 43.2665 21.0281 44.7586L205.223 77.6824C206.398 77.8924 207.601 77.8904 208.776 77.6763L389.119 44.8058C397.439 43.2894 403.768 52.1434 399.641 59.5246Z"
-                  fill="url(#paint0_linear)"
+              {currentUser && (
+                <Avatar
+                  color={currentUser.avatar_color}
+                  name={currentUser.name}
+                  size="md"
                 />
-                <path
-                  d="M292.965 1.5744L156.801 28.2552C154.563 28.6937 152.906 30.5903 152.771 32.8664L144.395 174.33C144.198 177.662 147.258 180.248 150.51 179.498L188.42 170.749C191.967 169.931 195.172 173.055 194.443 176.622L183.18 231.775C182.422 235.487 185.907 238.661 189.532 237.56L212.947 230.446C216.577 229.344 220.065 232.527 219.297 236.242L201.398 322.875C200.278 328.294 207.486 331.249 210.492 326.603L212.5 323.5L323.454 102.072C325.312 98.3645 322.108 94.137 318.036 94.9228L279.014 102.454C275.347 103.161 272.227 99.746 273.262 96.1583L298.731 7.86689C299.767 4.27314 296.636 0.855181 292.965 1.5744Z"
-                  fill="url(#paint1_linear)"
-                />
-                <defs>
-                  <linearGradient
-                    id="paint0_linear"
-                    x1="6.00017"
-                    y1="32.9999"
-                    x2="235"
-                    y2="344"
-                    gradientUnits="userSpaceOnUse"
-                  >
-                    <stop stopColor="#41D1FF" />
-                    <stop offset="1" stopColor="#BD34FE" />
-                  </linearGradient>
-                  <linearGradient
-                    id="paint1_linear"
-                    x1="194.651"
-                    y1="8.81818"
-                    x2="236.076"
-                    y2="292.989"
-                    gradientUnits="userSpaceOnUse"
-                  >
-                    <stop stopColor="#FFEA83" />
-                    <stop offset="0.0833333" stopColor="#FFDD35" />
-                    <stop offset="1" stopColor="#FFA800" />
-                  </linearGradient>
-                </defs>
-              </svg>
-              Vite
-            </a>
+              )}
+              <select
+                className="user-select"
+                value={currentUserId || ""}
+                onChange={(e) =>
+                  setCurrentUserId(
+                    e.target.value ? parseInt(e.target.value) : null
+                  )
+                }
+              >
+                <option value="">Select yourself...</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-          <div className="footer-divider">•</div>
-          <div className="footer-section">
-            <span className="footer-label">Hosted on</span>
-            <a
-              href="https://render.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="footer-link"
-            >
-              Render
-            </a>
-          </div>
-          <div className="footer-divider">•</div>
-          <div className="footer-section">
-            <span className="footer-label">DB on</span>
-            <a
-              href="https://turso.tech"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="footer-link"
-            >
-              Turso
-            </a>
-          </div>
-          <div className="footer-divider">•</div>
-          <div className="footer-section">
-            <span className="footer-version">v{version}</span>
-          </div>
-        </div>
-      </footer>
+        </header>
 
-      {/* Create Modal */}
-      {showCreateModal && (
-        <CreateIssueModal
-          users={users}
-          currentUserId={currentUserId}
-          createStatus={createStatus}
-          onClose={() => setShowCreateModal(false)}
-          onCreate={handleCreateIssue}
-        />
-      )}
+        {/* Board */}
+        <main className="main">
+          <div className="board">
+            {COLUMNS.map((column) => (
+              <Column
+                key={column.id}
+                column={column}
+                issues={issuesByStatus[column.status]}
+                users={users}
+                onIssueClick={setSelectedIssue}
+                onAddClick={() => {
+                  setCreateStatus(column.status);
+                  setShowCreateModal(true);
+                }}
+                onDrop={handleStatusChange}
+                onStatusChange={handleStatusChange}
+                onUpdateIssue={handleUpdateIssue}
+                onDeleteIssue={handleDeleteIssue}
+                onSubtaskChange={handleSubtaskChange}
+                expandedIssues={expandedIssues}
+                subtasksCache={subtasksCache}
+                onToggleSubtasks={handleToggleSubtasks}
+                onRequestAddSubtask={(issue) => {
+                  setAutoShowSubtaskForm(true);
+                  setSelectedIssue(issue);
+                }}
+                isTouchDevice={isTouchDevice}
+              />
+            ))}
+          </div>
+        </main>
 
-      {/* Issue Detail Modal */}
-      {selectedIssue && (
-        <IssueDetailModal
-          issue={selectedIssue}
-          users={users}
-          currentUserId={currentUserId}
-          onClose={() => setSelectedIssue(null)}
-          onUpdate={handleUpdateIssue}
-          onDelete={handleDeleteIssue}
-          onStatusChange={handleStatusChange}
-        />
-      )}
-    </div>
-    </>
+        {/* Footer */}
+        <footer className="footer">
+          <div className="footer-content">
+            <div className="footer-section">
+              <span className="footer-label">Built by</span>
+              <a
+                href="https://github.com/ansidian"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="footer-link"
+              >
+                <svg
+                  className="footer-icon"
+                  viewBox="0 0 16 16"
+                  fill="currentColor"
+                >
+                  <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+                </svg>
+                Andy Su
+              </a>
+            </div>
+            <div className="footer-divider">•</div>
+            <div className="footer-section">
+              <span className="footer-label">Made with</span>
+              <a
+                href="https://react.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="footer-link"
+              >
+                <svg
+                  className="footer-icon"
+                  viewBox="-11.5 -10.23174 23 20.46348"
+                  fill="none"
+                >
+                  <circle cx="0" cy="0" r="2.05" fill="#61dafb" />
+                  <g stroke="#61dafb" strokeWidth="1" fill="none">
+                    <ellipse rx="11" ry="4.2" />
+                    <ellipse rx="11" ry="4.2" transform="rotate(60)" />
+                    <ellipse rx="11" ry="4.2" transform="rotate(120)" />
+                  </g>
+                </svg>
+                React
+              </a>
+              <span className="footer-text">+</span>
+              <a
+                href="https://vitejs.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="footer-link"
+              >
+                <svg className="footer-icon" viewBox="0 0 410 404" fill="none">
+                  <path
+                    d="M399.641 59.5246L215.643 388.545C211.844 395.338 202.084 395.378 198.228 388.618L10.5817 59.5563C6.38087 52.1896 12.6802 43.2665 21.0281 44.7586L205.223 77.6824C206.398 77.8924 207.601 77.8904 208.776 77.6763L389.119 44.8058C397.439 43.2894 403.768 52.1434 399.641 59.5246Z"
+                    fill="url(#paint0_linear)"
+                  />
+                  <path
+                    d="M292.965 1.5744L156.801 28.2552C154.563 28.6937 152.906 30.5903 152.771 32.8664L144.395 174.33C144.198 177.662 147.258 180.248 150.51 179.498L188.42 170.749C191.967 169.931 195.172 173.055 194.443 176.622L183.18 231.775C182.422 235.487 185.907 238.661 189.532 237.56L212.947 230.446C216.577 229.344 220.065 232.527 219.297 236.242L201.398 322.875C200.278 328.294 207.486 331.249 210.492 326.603L212.5 323.5L323.454 102.072C325.312 98.3645 322.108 94.137 318.036 94.9228L279.014 102.454C275.347 103.161 272.227 99.746 273.262 96.1583L298.731 7.86689C299.767 4.27314 296.636 0.855181 292.965 1.5744Z"
+                    fill="url(#paint1_linear)"
+                  />
+                  <defs>
+                    <linearGradient
+                      id="paint0_linear"
+                      x1="6.00017"
+                      y1="32.9999"
+                      x2="235"
+                      y2="344"
+                      gradientUnits="userSpaceOnUse"
+                    >
+                      <stop stopColor="#41D1FF" />
+                      <stop offset="1" stopColor="#BD34FE" />
+                    </linearGradient>
+                    <linearGradient
+                      id="paint1_linear"
+                      x1="194.651"
+                      y1="8.81818"
+                      x2="236.076"
+                      y2="292.989"
+                      gradientUnits="userSpaceOnUse"
+                    >
+                      <stop stopColor="#FFEA83" />
+                      <stop offset="0.0833333" stopColor="#FFDD35" />
+                      <stop offset="1" stopColor="#FFA800" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                Vite
+              </a>
+            </div>
+            <div className="footer-divider">•</div>
+            <div className="footer-section">
+              <span className="footer-label">Hosted on</span>
+              <a
+                href="https://render.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="footer-link"
+              >
+                Render
+              </a>
+            </div>
+            <div className="footer-divider">•</div>
+            <div className="footer-section">
+              <span className="footer-label">DB on</span>
+              <a
+                href="https://turso.tech"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="footer-link"
+              >
+                Turso
+              </a>
+            </div>
+            <div className="footer-divider">•</div>
+            <div className="footer-section">
+              <span className="footer-version">v{version}</span>
+            </div>
+          </div>
+        </footer>
+
+        {/* Create Modal */}
+        {showCreateModal && (
+          <CreateIssueModal
+            users={users}
+            currentUserId={currentUserId}
+            createStatus={createStatus}
+            onClose={() => setShowCreateModal(false)}
+            onCreate={handleCreateIssue}
+          />
+        )}
+
+        {/* Issue Detail Modal */}
+        {selectedIssue && (
+          <IssueDetailModal
+            issue={selectedIssue}
+            users={users}
+            currentUserId={currentUserId}
+            onClose={() => {
+              setSelectedIssue(null);
+              setAutoShowSubtaskForm(false);
+            }}
+            onUpdate={handleUpdateIssue}
+            onDelete={handleDeleteIssue}
+            onStatusChange={handleStatusChange}
+            onViewIssue={handleViewIssue}
+            onSubtaskChange={handleSubtaskChange}
+            autoShowSubtaskForm={autoShowSubtaskForm}
+            onSubtaskFormShown={() => setAutoShowSubtaskForm(false)}
+            isTouchDevice={isTouchDevice}
+          />
+        )}
+      </div>
+    </ContextMenuProvider>
   );
 }
 
 // Column component
-function Column({ column, issues, onIssueClick, onAddClick, onDrop }) {
+function Column({
+  column,
+  issues,
+  users,
+  onIssueClick,
+  onAddClick,
+  onDrop,
+  onStatusChange,
+  onUpdateIssue,
+  onDeleteIssue,
+  onSubtaskChange,
+  expandedIssues,
+  subtasksCache,
+  onToggleSubtasks,
+  onRequestAddSubtask,
+  isTouchDevice,
+}) {
   const [dragOver, setDragOver] = useState(false);
 
   function handleDragOver(e) {
@@ -505,7 +714,17 @@ function Column({ column, issues, onIssueClick, onAddClick, onDrop }) {
             <IssueCard
               key={issue.id}
               issue={issue}
-              onClick={() => onIssueClick(issue)}
+              users={users}
+              onClick={onIssueClick}
+              onStatusChange={onStatusChange}
+              onUpdateIssue={onUpdateIssue}
+              onDeleteIssue={onDeleteIssue}
+              onSubtaskChange={onSubtaskChange}
+              isExpanded={expandedIssues.has(issue.id)}
+              subtasks={subtasksCache[issue.id] || []}
+              onToggleSubtasks={onToggleSubtasks}
+              onRequestAddSubtask={onRequestAddSubtask}
+              isTouchDevice={isTouchDevice}
             />
           ))
         )}
@@ -518,9 +737,23 @@ function Column({ column, issues, onIssueClick, onAddClick, onDrop }) {
 }
 
 // Issue Card component
-function IssueCard({ issue, onClick }) {
+function IssueCard({
+  issue,
+  users,
+  onClick,
+  onStatusChange,
+  onUpdateIssue,
+  onDeleteIssue,
+  onSubtaskChange,
+  isExpanded,
+  subtasks,
+  onToggleSubtasks,
+  onRequestAddSubtask,
+  isTouchDevice,
+}) {
   const [dragging, setDragging] = useState(false);
   const [hovering, setHovering] = useState(false);
+  const { showContextMenu } = useContextMenu();
 
   function handleDragStart(e) {
     setDragging(true);
@@ -532,101 +765,440 @@ function IssueCard({ issue, onClick }) {
     setDragging(false);
   }
 
+  const hasSubtasks = issue.subtask_count > 0;
+  const isSubtask = !!issue.parent_id;
+
+  function handleSubtaskBadgeClick(e) {
+    e.stopPropagation();
+    onToggleSubtasks(issue.id);
+  }
+
+  function handleContextMenu(e) {
+    // Don't show context menu on touch devices (preserve mobile drag & drop)
+    if (isTouchDevice) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    showContextMenu([
+      {
+        key: "view",
+        title: "View Details",
+        onClick: () => onClick(issue),
+      },
+      { key: "divider-1" },
+      {
+        key: "status",
+        title: "Change Status",
+        items: [
+          {
+            key: "status-todo",
+            title: "To Do",
+            onClick: () => onStatusChange(issue.id, "todo"),
+          },
+          {
+            key: "status-in_progress",
+            title: "In Progress",
+            onClick: () => onStatusChange(issue.id, "in_progress"),
+          },
+          {
+            key: "status-done",
+            title: "Done",
+            onClick: () => onStatusChange(issue.id, "done"),
+          },
+        ],
+      },
+      {
+        key: "priority",
+        title: "Change Priority",
+        items: [
+          {
+            key: "priority-low",
+            title: "Low",
+            onClick: () => onUpdateIssue(issue.id, { priority: "low" }),
+          },
+          {
+            key: "priority-medium",
+            title: "Medium",
+            onClick: () => onUpdateIssue(issue.id, { priority: "medium" }),
+          },
+          {
+            key: "priority-high",
+            title: "High",
+            onClick: () => onUpdateIssue(issue.id, { priority: "high" }),
+          },
+        ],
+      },
+      {
+        key: "assignee",
+        title: "Assign To",
+        items: [
+          {
+            key: "assignee-unassigned",
+            title: "Unassigned",
+            onClick: () => onUpdateIssue(issue.id, { assignee_id: null }),
+          },
+          { key: "assignee-divider" },
+          ...users.map((user) => ({
+            key: `assignee-${user.id}`,
+            title: user.name,
+            onClick: () => onUpdateIssue(issue.id, { assignee_id: user.id }),
+          })),
+        ],
+      },
+      ...(!isSubtask
+        ? [
+            { key: "divider-2" },
+            {
+              key: "add-subtask",
+              title: "Add Subtask",
+              onClick: () => {
+                onRequestAddSubtask(issue);
+              },
+            },
+          ]
+        : []),
+      { key: "divider-3" },
+      {
+        key: "delete",
+        title: "Delete Issue",
+        color: "red",
+        onClick: async () => {
+          await onDeleteIssue(issue.id);
+        },
+      },
+    ])(e);
+  }
+
   return (
-    <Paper
-      className={dragging ? "dragging" : ""}
-      onClick={onClick}
-      draggable
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => setHovering(false)}
-      p="md"
-      mb="sm"
-      withBorder
-      style={{
-        cursor: "pointer",
-        transition: "all 0.2s ease",
-        backgroundColor: hovering ? "var(--bg-hover)" : undefined,
-        transform: hovering ? "translateY(-2px)" : undefined,
-        boxShadow: hovering ? "0 4px 8px rgba(0, 0, 0, 0.3)" : undefined,
-      }}
-    >
-      <Stack gap="xs">
-        <div
-          style={{
-            fontSize: "0.75rem",
-            color: "var(--text-secondary)",
-            fontWeight: 500,
-          }}
-        >
-          {issue.key}
-        </div>
-        <div
-          style={{
-            fontSize: "0.875rem",
-            lineHeight: 1.4,
-            wordWrap: "break-word",
-            overflowWrap: "break-word",
-          }}
-        >
-          {issue.title}
-        </div>
-        {issue.description && (
+    <div style={{ marginBottom: "0.5rem" }}>
+      <Paper
+        data-issue-card
+        className={dragging ? "dragging" : ""}
+        onClick={() => onClick(issue)}
+        onContextMenu={handleContextMenu}
+        draggable
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onMouseEnter={() => setHovering(true)}
+        onMouseLeave={() => setHovering(false)}
+        p="md"
+        withBorder
+        style={{
+          cursor: "pointer",
+          transition: "all 0.2s ease",
+          backgroundColor: hovering ? "var(--bg-hover)" : undefined,
+          transform: hovering ? "translateY(-2px)" : undefined,
+          boxShadow: hovering ? "0 4px 8px rgba(0, 0, 0, 0.3)" : undefined,
+        }}
+      >
+        <Stack gap="xs">
+          <Group justify="space-between" gap="xs">
+            <div
+              style={{
+                fontSize: "0.75rem",
+                color: "var(--text-secondary)",
+                fontWeight: 500,
+              }}
+            >
+              {issue.key}
+            </div>
+          </Group>
           <div
             style={{
-              fontSize: "0.75rem",
-              lineHeight: 1.5,
-              color: "var(--text-secondary)",
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
+              fontSize: "0.875rem",
+              lineHeight: 1.4,
               wordWrap: "break-word",
               overflowWrap: "break-word",
-              whiteSpace: "pre-wrap",
             }}
           >
-            {issue.description}
+            {issue.title}
           </div>
-        )}
-        <Group justify="space-between" mt="xs">
-          <Badge
-            color={
-              issue.priority === "high"
-                ? "red"
-                : issue.priority === "medium"
-                ? "yellow"
-                : "gray"
-            }
-            size="sm"
-            variant="light"
-          >
-            {issue.priority}
-          </Badge>
-          {issue.assignee_name ? (
-            <Avatar
-              color={issue.assignee_color}
-              name={issue.assignee_name}
-              size="sm"
-              title={issue.assignee_name}
-              variant="filled"
-            />
-          ) : (
+          {issue.description && (
             <div
-              title="Unassigned"
               style={{
-                width: "26px",
-                height: "26px",
-                borderRadius: "50%",
-                border: "2px dashed var(--mantine-color-gray-6)",
-                backgroundColor: "transparent",
+                fontSize: "0.75rem",
+                lineHeight: 1.5,
+                color: "var(--text-secondary)",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+                wordWrap: "break-word",
+                overflowWrap: "break-word",
+                whiteSpace: "pre-wrap",
               }}
-            />
+            >
+              {issue.description}
+            </div>
           )}
-        </Group>
-      </Stack>
-    </Paper>
+          <Group justify="space-between" mt="xs">
+            <Group gap="xs">
+              <Badge
+                color={
+                  issue.priority === "high"
+                    ? "red"
+                    : issue.priority === "medium"
+                    ? "yellow"
+                    : "gray"
+                }
+                size="sm"
+                variant="light"
+              >
+                {issue.priority}
+              </Badge>
+              {/* Subtask progress indicator - now clickable */}
+              {hasSubtasks && (
+                <Tooltip
+                  label={
+                    isExpanded
+                      ? "Click to collapse subtasks"
+                      : `${issue.subtask_done_count} of ${issue.subtask_count} subtasks done - Click to expand`
+                  }
+                >
+                  <Badge
+                    size="sm"
+                    variant="light"
+                    color={
+                      issue.subtask_done_count === issue.subtask_count
+                        ? "green"
+                        : "blue"
+                    }
+                    style={{ cursor: "pointer" }}
+                    onClick={handleSubtaskBadgeClick}
+                  >
+                    {isExpanded ? "▼" : "▶"} {issue.subtask_done_count}/
+                    {issue.subtask_count}
+                  </Badge>
+                </Tooltip>
+              )}
+            </Group>
+            {issue.assignee_name ? (
+              <Avatar
+                color={issue.assignee_color}
+                name={issue.assignee_name}
+                size="sm"
+                title={issue.assignee_name}
+                variant="filled"
+              />
+            ) : (
+              <div
+                title="Unassigned"
+                style={{
+                  width: "26px",
+                  height: "26px",
+                  borderRadius: "50%",
+                  border: "2px dashed var(--mantine-color-gray-6)",
+                  backgroundColor: "transparent",
+                }}
+              />
+            )}
+          </Group>
+        </Stack>
+      </Paper>
+
+      {/* Expanded subtasks */}
+      {hasSubtasks && (
+        <Collapse in={isExpanded}>
+          <div className="subtasks-container">
+            {subtasks.map((subtask) => {
+              const handleSubtaskContextMenu = (e) => {
+                // Don't show context menu on touch devices (preserve mobile drag & drop)
+                if (isTouchDevice) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  return;
+                }
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                showContextMenu([
+                  {
+                    key: "view",
+                    title: "View Details",
+                    onClick: () => onClick(subtask),
+                  },
+                  { key: "divider-1" },
+                  {
+                    key: "status",
+                    title: "Change Status",
+                    items: [
+                      {
+                        key: "status-todo",
+                        title: "To Do",
+                        onClick: () => onStatusChange(subtask.id, "todo"),
+                      },
+                      {
+                        key: "status-in_progress",
+                        title: "In Progress",
+                        onClick: () =>
+                          onStatusChange(subtask.id, "in_progress"),
+                      },
+                      {
+                        key: "status-done",
+                        title: "Done",
+                        onClick: () => onStatusChange(subtask.id, "done"),
+                      },
+                    ],
+                  },
+                  {
+                    key: "priority",
+                    title: "Change Priority",
+                    items: [
+                      {
+                        key: "priority-low",
+                        title: "Low",
+                        onClick: () =>
+                          onUpdateIssue(subtask.id, { priority: "low" }),
+                      },
+                      {
+                        key: "priority-medium",
+                        title: "Medium",
+                        onClick: () =>
+                          onUpdateIssue(subtask.id, { priority: "medium" }),
+                      },
+                      {
+                        key: "priority-high",
+                        title: "High",
+                        onClick: () =>
+                          onUpdateIssue(subtask.id, { priority: "high" }),
+                      },
+                    ],
+                  },
+                  {
+                    key: "assignee",
+                    title: "Assign To",
+                    items: [
+                      {
+                        key: "assignee-unassigned",
+                        title: "Unassigned",
+                        onClick: () =>
+                          onUpdateIssue(subtask.id, { assignee_id: null }),
+                      },
+                      { key: "assignee-divider" },
+                      ...users.map((user) => ({
+                        key: `assignee-${user.id}`,
+                        title: user.name,
+                        onClick: () =>
+                          onUpdateIssue(subtask.id, { assignee_id: user.id }),
+                      })),
+                    ],
+                  },
+                  { key: "divider-2" },
+                  {
+                    key: "delete",
+                    title: "Delete Subtask",
+                    color: "red",
+                    onClick: async () => {
+                      await onDeleteIssue(subtask.id);
+                    },
+                  },
+                ])(e);
+              };
+
+              return (
+                <div key={subtask.id} className="subtask-item">
+                  <div className="subtask-connector" />
+                  <Paper
+                    p="sm"
+                    withBorder
+                    className="subtask-card"
+                    style={{
+                      cursor: "pointer",
+                      backgroundColor: "var(--bg-tertiary)",
+                      borderLeft: "3px solid var(--mantine-color-blue-6)",
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClick(subtask);
+                    }}
+                    onContextMenu={handleSubtaskContextMenu}
+                  >
+                    <Stack gap="xs">
+                      <Group justify="space-between" gap="xs">
+                        <div
+                          style={{
+                            fontSize: "0.7rem",
+                            color: "var(--text-secondary)",
+                            fontWeight: 500,
+                          }}
+                        >
+                          {subtask.key}
+                        </div>
+                        <Badge
+                          size="xs"
+                          variant="dot"
+                          color={
+                            subtask.status === "done"
+                              ? "green"
+                              : subtask.status === "in_progress"
+                              ? "blue"
+                              : "gray"
+                          }
+                        >
+                          {subtask.status === "done"
+                            ? "Done"
+                            : subtask.status === "in_progress"
+                            ? "In Progress"
+                            : "To Do"}
+                        </Badge>
+                      </Group>
+                      <div
+                        style={{
+                          fontSize: "0.8rem",
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {subtask.title}
+                      </div>
+                      <Group justify="space-between" gap="xs">
+                        <Badge
+                          color={
+                            subtask.priority === "high"
+                              ? "red"
+                              : subtask.priority === "medium"
+                              ? "yellow"
+                              : "gray"
+                          }
+                          size="xs"
+                          variant="light"
+                        >
+                          {subtask.priority}
+                        </Badge>
+                        {subtask.assignee_name ? (
+                          <Avatar
+                            color={subtask.assignee_color}
+                            name={subtask.assignee_name}
+                            size="xs"
+                            title={subtask.assignee_name}
+                          />
+                        ) : (
+                          <div
+                            title="Unassigned"
+                            style={{
+                              width: "20px",
+                              height: "20px",
+                              borderRadius: "50%",
+                              border: "2px dashed var(--mantine-color-gray-6)",
+                              backgroundColor: "transparent",
+                            }}
+                          />
+                        )}
+                      </Group>
+                    </Stack>
+                  </Paper>
+                </div>
+              );
+            })}
+          </div>
+        </Collapse>
+      )}
+    </div>
   );
 }
 
@@ -637,6 +1209,7 @@ function CreateIssueModal({
   createStatus,
   onClose,
   onCreate,
+  parentIssue = null,
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -648,6 +1221,7 @@ function CreateIssueModal({
   const [flashStatus, setFlashStatus] = useState(true);
 
   const isDirty = title.trim() || description.trim();
+  const isSubtask = !!parentIssue;
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -659,6 +1233,7 @@ function CreateIssueModal({
       priority,
       assignee_id: assigneeId || null,
       reporter_id: currentUserId || null,
+      parent_id: parentIssue?.id || null,
     });
   }
 
@@ -696,7 +1271,9 @@ function CreateIssueModal({
         }
       }}
       withCloseButton={true}
-      title="Create Issue"
+      title={
+        isSubtask ? `Create Subtask for ${parentIssue.key}` : "Create Issue"
+      }
       classNames={{ content: shake ? "shake" : "" }}
       size="lg"
     >
@@ -760,7 +1337,7 @@ function CreateIssueModal({
                 Cancel
               </Button>
               <Button type="submit" disabled={!title.trim()}>
-                Create Issue
+                {isSubtask ? "Create Subtask" : "Create Issue"}
               </Button>
             </>
           ) : (
@@ -793,6 +1370,437 @@ function CreateIssueModal({
   );
 }
 
+// Subtask Row component
+function SubtaskRow({
+  subtask,
+  users,
+  onStatusToggle,
+  onClick,
+  onUpdate,
+  onDelete,
+  isTouchDevice,
+}) {
+  const { showContextMenu } = useContextMenu();
+
+  function handleContextMenu(e) {
+    // Don't show context menu on touch devices (preserve mobile drag & drop)
+    if (isTouchDevice) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    showContextMenu([
+      {
+        key: "view",
+        title: "View Details",
+        onClick: () => onClick(),
+      },
+      { key: "divider-1" },
+      {
+        key: "status",
+        title: "Change Status",
+        items: [
+          {
+            key: "status-todo",
+            title: "To Do",
+            onClick: () => onStatusToggle(subtask.id, "todo"),
+          },
+          {
+            key: "status-in_progress",
+            title: "In Progress",
+            onClick: () => onStatusToggle(subtask.id, "in_progress"),
+          },
+          {
+            key: "status-done",
+            title: "Done",
+            onClick: () => onStatusToggle(subtask.id, "done"),
+          },
+        ],
+      },
+      {
+        key: "priority",
+        title: "Change Priority",
+        items: [
+          {
+            key: "priority-low",
+            title: "Low",
+            onClick: () => onUpdate(subtask.id, { priority: "low" }),
+          },
+          {
+            key: "priority-medium",
+            title: "Medium",
+            onClick: () => onUpdate(subtask.id, { priority: "medium" }),
+          },
+          {
+            key: "priority-high",
+            title: "High",
+            onClick: () => onUpdate(subtask.id, { priority: "high" }),
+          },
+        ],
+      },
+      {
+        key: "assignee",
+        title: "Assign To",
+        items: [
+          {
+            key: "assignee-unassigned",
+            title: "Unassigned",
+            onClick: () => onUpdate(subtask.id, { assignee_id: null }),
+          },
+          { key: "assignee-divider" },
+          ...users.map((user) => ({
+            key: `assignee-${user.id}`,
+            title: user.name,
+            onClick: () => onUpdate(subtask.id, { assignee_id: user.id }),
+          })),
+        ],
+      },
+      { key: "divider-2" },
+      {
+        key: "delete",
+        title: "Delete Subtask",
+        color: "red",
+        onClick: async () => {
+          await onDelete(subtask.id);
+        },
+      },
+    ])(e);
+  }
+
+  return (
+    <Group
+      gap="sm"
+      p="xs"
+      style={{
+        backgroundColor: "var(--mantine-color-dark-6)",
+        borderRadius: "4px",
+        cursor: "pointer",
+        transition: "background-color 0.15s ease",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = "var(--mantine-color-dark-5)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = "var(--mantine-color-dark-6)";
+      }}
+      onClick={onClick}
+      onContextMenu={handleContextMenu}
+    >
+      <Checkbox
+        checked={subtask.status === "done"}
+        onChange={(e) => {
+          e.stopPropagation();
+          onStatusToggle(subtask.id, e.currentTarget.checked ? "done" : "todo");
+        }}
+        size="sm"
+        onClick={(e) => e.stopPropagation()}
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: "0.8rem",
+            color: "var(--text-secondary)",
+            marginBottom: "2px",
+          }}
+        >
+          {subtask.key}
+        </div>
+        <div
+          style={{
+            textDecoration: subtask.status === "done" ? "line-through" : "none",
+            color:
+              subtask.status === "done" ? "var(--text-secondary)" : "inherit",
+            fontSize: "0.875rem",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {subtask.title}
+        </div>
+      </div>
+      <Badge
+        size="xs"
+        variant="light"
+        color={
+          subtask.priority === "high"
+            ? "red"
+            : subtask.priority === "medium"
+            ? "yellow"
+            : "gray"
+        }
+      >
+        {subtask.priority}
+      </Badge>
+      {subtask.assignee_name ? (
+        <Tooltip label={subtask.assignee_name}>
+          <Avatar
+            color={subtask.assignee_color}
+            name={subtask.assignee_name}
+            size="sm"
+          />
+        </Tooltip>
+      ) : (
+        <div
+          title="Unassigned"
+          style={{
+            width: "24px",
+            height: "24px",
+            borderRadius: "50%",
+            border: "2px dashed var(--mantine-color-gray-6)",
+            backgroundColor: "transparent",
+            flexShrink: 0,
+          }}
+        />
+      )}
+    </Group>
+  );
+}
+
+// Subtasks Section component
+function SubtasksSection({
+  parentIssue,
+  users,
+  currentUserId,
+  onViewIssue,
+  onSubtaskChange,
+  autoShowSubtaskForm,
+  onSubtaskFormShown,
+  isTouchDevice,
+}) {
+  const [subtasks, setSubtasks] = useState([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newAssignee, setNewAssignee] = useState("");
+  const [newPriority, setNewPriority] = useState("medium");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadSubtasks();
+  }, [parentIssue.id]);
+
+  // Auto-show the form when requested via context menu
+  useEffect(() => {
+    if (autoShowSubtaskForm && !showAddForm) {
+      setShowAddForm(true);
+      onSubtaskFormShown?.();
+    }
+  }, [autoShowSubtaskForm, showAddForm, onSubtaskFormShown]);
+
+  async function loadSubtasks() {
+    setLoading(true);
+    const data = await api.get(`/issues/${parentIssue.id}/subtasks`);
+    setSubtasks(data);
+    setLoading(false);
+  }
+
+  async function handleCreateSubtask() {
+    if (!newTitle.trim()) return;
+
+    const newSubtask = await api.post("/issues", {
+      title: newTitle.trim(),
+      parent_id: parentIssue.id,
+      status: "todo",
+      priority: newPriority,
+      assignee_id: newAssignee || null,
+      reporter_id: currentUserId,
+    });
+
+    setSubtasks([...subtasks, newSubtask]);
+    setNewTitle("");
+    setNewAssignee("");
+    setNewPriority("medium");
+    setShowAddForm(false);
+    onSubtaskChange?.();
+
+    notifications.show({
+      title: "Subtask created",
+      message: `${newSubtask.key} has been added`,
+      color: "green",
+    });
+  }
+
+  async function handleStatusToggle(subtaskId, newStatus) {
+    const updated = await api.patch(`/issues/${subtaskId}`, {
+      status: newStatus,
+    });
+    setSubtasks((prev) =>
+      prev.map((s) => (s.id === subtaskId ? { ...s, ...updated } : s))
+    );
+    onSubtaskChange?.();
+  }
+
+  async function handleUpdate(subtaskId, data) {
+    const updated = await api.patch(`/issues/${subtaskId}`, data);
+    setSubtasks((prev) =>
+      prev.map((s) => (s.id === subtaskId ? { ...s, ...updated } : s))
+    );
+    onSubtaskChange?.();
+  }
+
+  async function handleDelete(subtaskId) {
+    await api.delete(`/issues/${subtaskId}`);
+    setSubtasks((prev) => prev.filter((s) => s.id !== subtaskId));
+    onSubtaskChange?.();
+    notifications.show({
+      title: "Subtask deleted",
+      message: "The subtask has been removed",
+      color: "red",
+    });
+  }
+
+  const doneCount = subtasks.filter((s) => s.status === "done").length;
+
+  if (loading) {
+    return (
+      <Center py="md">
+        <Loader size="sm" />
+      </Center>
+    );
+  }
+
+  return (
+    <div>
+      <Group justify="space-between" mb="sm">
+        <h3
+          style={{
+            fontSize: "0.875rem",
+            fontWeight: 600,
+            margin: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+          }}
+        >
+          Subtasks
+          <Badge size="sm" variant="light" color="gray">
+            {doneCount}/{subtasks.length}
+          </Badge>
+        </h3>
+        {!showAddForm && (
+          <Button
+            size="xs"
+            variant="subtle"
+            onClick={() => setShowAddForm(true)}
+          >
+            + Add Subtask
+          </Button>
+        )}
+      </Group>
+
+      {subtasks.length > 0 && (
+        <Progress
+          value={subtasks.length > 0 ? (doneCount / subtasks.length) * 100 : 0}
+          size="sm"
+          mb="sm"
+          color="green"
+          animated={doneCount < subtasks.length}
+        />
+      )}
+
+      <Stack gap="xs">
+        {subtasks.map((subtask) => (
+          <SubtaskRow
+            key={subtask.id}
+            subtask={subtask}
+            users={users}
+            onStatusToggle={handleStatusToggle}
+            onClick={() => onViewIssue(subtask.id)}
+            onUpdate={handleUpdate}
+            onDelete={handleDelete}
+            isTouchDevice={isTouchDevice}
+          />
+        ))}
+      </Stack>
+
+      {subtasks.length === 0 && !showAddForm && (
+        <div
+          style={{
+            padding: "1rem",
+            textAlign: "center",
+            color: "var(--text-secondary)",
+            fontSize: "0.875rem",
+            backgroundColor: "var(--mantine-color-dark-6)",
+            borderRadius: "4px",
+          }}
+        >
+          No subtasks yet. Click "+ Add Subtask" to break this issue down.
+        </div>
+      )}
+
+      {showAddForm && (
+        <Paper p="sm" mt="sm" withBorder>
+          <TextInput
+            placeholder="Subtask title"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && newTitle.trim()) {
+                handleCreateSubtask();
+              } else if (e.key === "Escape") {
+                setShowAddForm(false);
+                setNewTitle("");
+              }
+            }}
+            mb="sm"
+            autoFocus
+          />
+          <Group gap="sm">
+            <Select
+              placeholder="Assignee"
+              value={newAssignee}
+              onChange={(value) => setNewAssignee(value || "")}
+              data={users.map((u) => ({
+                value: u.id.toString(),
+                label: u.name,
+              }))}
+              clearable
+              size="sm"
+              style={{ flex: 1 }}
+            />
+            <Select
+              value={newPriority}
+              onChange={(value) => setNewPriority(value)}
+              data={[
+                { value: "low", label: "Low" },
+                { value: "medium", label: "Medium" },
+                { value: "high", label: "High" },
+              ]}
+              size="sm"
+              style={{ width: "110px" }}
+            />
+          </Group>
+          <Group justify="flex-end" mt="sm">
+            <Button
+              size="sm"
+              variant="subtle"
+              onClick={() => {
+                setShowAddForm(false);
+                setNewTitle("");
+                setNewAssignee("");
+                setNewPriority("medium");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleCreateSubtask}
+              disabled={!newTitle.trim()}
+            >
+              Add Subtask
+            </Button>
+          </Group>
+        </Paper>
+      )}
+    </div>
+  );
+}
+
 function IssueDetailModal({
   issue,
   users,
@@ -801,6 +1809,11 @@ function IssueDetailModal({
   onUpdate,
   onDelete,
   onStatusChange,
+  onViewIssue,
+  onSubtaskChange,
+  autoShowSubtaskForm,
+  onSubtaskFormShown,
+  isTouchDevice,
 }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(issue.title);
@@ -816,6 +1829,17 @@ function IssueDetailModal({
     editing &&
     (title !== issue.title || description !== (issue.description || ""));
 
+  const isSubtask = !!issue.parent_id;
+
+  // Reset state when issue changes (for subtask navigation)
+  useEffect(() => {
+    setTitle(issue.title);
+    setDescription(issue.description || "");
+    setEditing(false);
+    setConfirmingDelete(false);
+    setConfirmingCancel(false);
+  }, [issue.id]);
+
   useEffect(() => {
     loadComments();
   }, [issue.id]);
@@ -824,10 +1848,11 @@ function IssueDetailModal({
   useEffect(() => {
     if (editing && fieldToFocus) {
       const focusTextarea = () => {
-        const modal = document.querySelector('.mantine-Modal-content');
+        const modal = document.querySelector(".mantine-Modal-content");
         if (modal) {
-          const textareas = modal.querySelectorAll('textarea');
-          const textarea = fieldToFocus === 'title' ? textareas[0] : textareas[1];
+          const textareas = modal.querySelectorAll("textarea");
+          const textarea =
+            fieldToFocus === "title" ? textareas[0] : textareas[1];
           if (textarea) {
             textarea.focus();
             const length = textarea.value.length;
@@ -861,9 +1886,9 @@ function IssueDetailModal({
     await onUpdate(issue.id, { title, description });
     setEditing(false);
     notifications.show({
-      title: 'Issue updated',
-      message: 'Your changes have been saved',
-      color: 'green',
+      title: "Issue updated",
+      message: "Your changes have been saved",
+      color: "green",
     });
   }
 
@@ -904,11 +1929,33 @@ function IssueDetailModal({
           onClose();
         }
       }}
-      title={issue.key}
+      title={
+        <Group gap="xs">
+          {issue.key}
+          {isSubtask && (
+            <Badge size="sm" variant="light" color="blue">
+              Subtask
+            </Badge>
+          )}
+        </Group>
+      }
       withCloseButton={true}
       classNames={{ content: shake ? "shake" : "" }}
       size="lg"
     >
+      {/* Parent issue link for subtasks */}
+      {isSubtask && issue.parent_key && (
+        <Button
+          variant="subtle"
+          size="xs"
+          mb="md"
+          onClick={() => onViewIssue(issue.parent_id)}
+          style={{ marginLeft: "-0.5rem" }}
+        >
+          ← Back to {issue.parent_key}
+        </Button>
+      )}
+
       {editing ? (
         // Editing mode - editable inputs
         <>
@@ -985,7 +2032,7 @@ function IssueDetailModal({
               cursor: "pointer",
             }}
             onClick={() => {
-              setFieldToFocus('title');
+              setFieldToFocus("title");
               setEditing(true);
             }}
           >
@@ -1018,7 +2065,7 @@ function IssueDetailModal({
             }}
             onClick={(e) => {
               if (e.target.tagName !== "A") {
-                setFieldToFocus('description');
+                setFieldToFocus("description");
                 setEditing(true);
               }
             }}
@@ -1042,29 +2089,29 @@ function IssueDetailModal({
                 wordWrap: "break-word",
                 fontSize: "0.875rem",
                 lineHeight: "1.5",
-                color: issue.description ? "inherit" : "var(--mantine-color-dimmed)",
+                color: issue.description
+                  ? "inherit"
+                  : "var(--mantine-color-dimmed)",
               }}
             >
-              {issue.description ? (
-                linkifyText(issue.description).map((part, index) =>
-                  part.type === "link" ? (
-                    <a
-                      key={index}
-                      href={part.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="comment-link"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {part.content}
-                    </a>
-                  ) : (
-                    <span key={index}>{part.content}</span>
+              {issue.description
+                ? linkifyText(issue.description).map((part, index) =>
+                    part.type === "link" ? (
+                      <a
+                        key={index}
+                        href={part.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="comment-link"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {part.content}
+                      </a>
+                    ) : (
+                      <span key={index}>{part.content}</span>
+                    )
                   )
-                )
-              ) : (
-                "Click to add a description..."
-              )}
+                : "Click to add a description..."}
             </div>
           </div>
         </>
@@ -1120,6 +2167,29 @@ function IssueDetailModal({
           }}
         />
       </Group>
+
+      {/* Subtasks Section - only show for parent issues */}
+      {!isSubtask && (
+        <div
+          style={{
+            marginTop: "1.5rem",
+            marginBottom: "1.5rem",
+            paddingTop: "1rem",
+            borderTop: "1px solid var(--mantine-color-dark-4)",
+          }}
+        >
+          <SubtasksSection
+            parentIssue={issue}
+            users={users}
+            currentUserId={currentUserId}
+            onViewIssue={onViewIssue}
+            onSubtaskChange={onSubtaskChange}
+            autoShowSubtaskForm={autoShowSubtaskForm}
+            onSubtaskFormShown={onSubtaskFormShown}
+            isTouchDevice={isTouchDevice}
+          />
+        </div>
+      )}
 
       {/* Comments */}
       <h3
@@ -1177,7 +2247,9 @@ function IssueDetailModal({
           placeholder="Add a comment..."
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleAddComment()}
+          onKeyDown={(e) =>
+            e.key === "Enter" && !e.shiftKey && handleAddComment()
+          }
           autosize
           minRows={1}
           style={{ flex: 1 }}
@@ -1200,7 +2272,7 @@ function IssueDetailModal({
             color="red"
             onClick={() => setConfirmingDelete(true)}
           >
-            Delete Issue
+            Delete {isSubtask ? "Subtask" : "Issue"}
           </Button>
         ) : (
           <>

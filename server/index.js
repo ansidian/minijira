@@ -15,7 +15,7 @@ app.use(express.json());
 
 // Serve static files in production
 if (process.env.NODE_ENV === "production") {
-	app.use(express.static(join(__dirname, "../client/dist")));
+  app.use(express.static(join(__dirname, "../client/dist")));
 }
 
 // ============================================
@@ -24,222 +24,311 @@ if (process.env.NODE_ENV === "production") {
 
 // Get all users
 app.get("/api/users", async (req, res) => {
-	try {
-		const { rows } = await db.execute("SELECT * FROM users ORDER BY name");
-		res.json(rows);
-	} catch (err) {
-		res.status(500).json({ error: err.message });
-	}
+  try {
+    const { rows } = await db.execute("SELECT * FROM users ORDER BY name");
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Get single user
 app.get("/api/users/:id", async (req, res) => {
-	try {
-		const { rows } = await db.execute({
-			sql: "SELECT * FROM users WHERE id = ?",
-			args: [req.params.id],
-		});
-		if (rows.length === 0)
-			return res.status(404).json({ error: "User not found" });
-		res.json(rows[0]);
-	} catch (err) {
-		res.status(500).json({ error: err.message });
-	}
+  try {
+    const { rows } = await db.execute({
+      sql: "SELECT * FROM users WHERE id = ?",
+      args: [req.params.id],
+    });
+    if (rows.length === 0)
+      return res.status(404).json({ error: "User not found" });
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ============================================
 // ISSUES
 // ============================================
 
-// Get all issues (with assignee info)
+// Get all issues (with assignee info and subtask counts)
 app.get("/api/issues", async (req, res) => {
-	try {
-		const { status, assignee_id, priority } = req.query;
+  try {
+    const { status, assignee_id, priority, include_subtasks, parent_id } =
+      req.query;
 
-		let sql = `
+    let sql = `
       SELECT 
         issues.*,
         assignee.name as assignee_name,
         assignee.avatar_color as assignee_color,
-        reporter.name as reporter_name
+        reporter.name as reporter_name,
+        parent.key as parent_key,
+        (SELECT COUNT(*) FROM issues sub WHERE sub.parent_id = issues.id) as subtask_count,
+        (SELECT COUNT(*) FROM issues sub WHERE sub.parent_id = issues.id AND sub.status = 'done') as subtask_done_count
       FROM issues
       LEFT JOIN users assignee ON issues.assignee_id = assignee.id
       LEFT JOIN users reporter ON issues.reporter_id = reporter.id
+      LEFT JOIN issues parent ON issues.parent_id = parent.id
       WHERE 1=1
     `;
-		const args = [];
+    const args = [];
 
-		if (status) {
-			sql += " AND issues.status = ?";
-			args.push(status);
-		}
-		if (assignee_id) {
-			sql += " AND issues.assignee_id = ?";
-			args.push(assignee_id);
-		}
-		if (priority) {
-			sql += " AND issues.priority = ?";
-			args.push(priority);
-		}
+    // Filter for subtasks of a specific parent
+    if (parent_id) {
+      sql += " AND issues.parent_id = ?";
+      args.push(parent_id);
+    } else if (include_subtasks !== "true") {
+      // By default, exclude subtasks from main board view
+      sql += " AND issues.parent_id IS NULL";
+    }
 
-		sql += " ORDER BY issues.created_at DESC";
+    if (status) {
+      sql += " AND issues.status = ?";
+      args.push(status);
+    }
+    if (assignee_id) {
+      sql += " AND issues.assignee_id = ?";
+      args.push(assignee_id);
+    }
+    if (priority) {
+      sql += " AND issues.priority = ?";
+      args.push(priority);
+    }
 
-		const { rows } = await db.execute({ sql, args });
-		res.json(rows);
-	} catch (err) {
-		res.status(500).json({ error: err.message });
-	}
+    sql += " ORDER BY issues.created_at DESC";
+
+    const { rows } = await db.execute({ sql, args });
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get subtasks for a specific issue
+app.get("/api/issues/:id/subtasks", async (req, res) => {
+  try {
+    const { rows } = await db.execute({
+      sql: `
+        SELECT 
+          issues.*,
+          assignee.name as assignee_name,
+          assignee.avatar_color as assignee_color
+        FROM issues
+        LEFT JOIN users assignee ON issues.assignee_id = assignee.id
+        WHERE issues.parent_id = ?
+        ORDER BY issues.created_at ASC
+      `,
+      args: [req.params.id],
+    });
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Get single issue
 app.get("/api/issues/:id", async (req, res) => {
-	try {
-		const { rows } = await db.execute({
-			sql: `
+  try {
+    const { rows } = await db.execute({
+      sql: `
         SELECT 
           issues.*,
           assignee.name as assignee_name,
           assignee.avatar_color as assignee_color,
-          reporter.name as reporter_name
+          reporter.name as reporter_name,
+          parent.key as parent_key,
+          (SELECT COUNT(*) FROM issues sub WHERE sub.parent_id = issues.id) as subtask_count,
+          (SELECT COUNT(*) FROM issues sub WHERE sub.parent_id = issues.id AND sub.status = 'done') as subtask_done_count
         FROM issues
         LEFT JOIN users assignee ON issues.assignee_id = assignee.id
         LEFT JOIN users reporter ON issues.reporter_id = reporter.id
+        LEFT JOIN issues parent ON issues.parent_id = parent.id
         WHERE issues.id = ?
       `,
-			args: [req.params.id],
-		});
-		if (rows.length === 0)
-			return res.status(404).json({ error: "Issue not found" });
-		res.json(rows[0]);
-	} catch (err) {
-		res.status(500).json({ error: err.message });
-	}
+      args: [req.params.id],
+    });
+    if (rows.length === 0)
+      return res.status(404).json({ error: "Issue not found" });
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Create issue
 app.post("/api/issues", async (req, res) => {
-	try {
-		const { title, description, status, priority, assignee_id, reporter_id } =
-			req.body;
+  try {
+    const {
+      title,
+      description,
+      status,
+      priority,
+      assignee_id,
+      reporter_id,
+      parent_id,
+    } = req.body;
 
-		if (!title) {
-			return res.status(400).json({ error: "Title is required" });
-		}
+    if (!title) {
+      return res.status(400).json({ error: "Title is required" });
+    }
 
-		// Get next issue key
-		await db.execute(
-			"UPDATE counters SET value = value + 1 WHERE name = 'issue_key'"
-		);
-		const { rows: counterRows } = await db.execute(
-			"SELECT value FROM counters WHERE name = 'issue_key'"
-		);
-		const key = `JPL-${counterRows[0].value}`;
+    // If creating a subtask, verify parent exists
+    if (parent_id) {
+      const { rows: parentRows } = await db.execute({
+        sql: "SELECT id FROM issues WHERE id = ?",
+        args: [parent_id],
+      });
+      if (parentRows.length === 0) {
+        return res.status(400).json({ error: "Parent issue not found" });
+      }
+    }
 
-		const result = await db.execute({
-			sql: `INSERT INTO issues (key, title, description, status, priority, assignee_id, reporter_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			args: [
-				key,
-				title,
-				description || null,
-				status || "todo",
-				priority || "medium",
-				assignee_id || null,
-				reporter_id || null,
-			],
-		});
+    // Get next issue key
+    await db.execute(
+      "UPDATE counters SET value = value + 1 WHERE name = 'issue_key'"
+    );
+    const { rows: counterRows } = await db.execute(
+      "SELECT value FROM counters WHERE name = 'issue_key'"
+    );
+    const key = `JPL-${counterRows[0].value}`;
 
-		const { rows } = await db.execute({
-			sql: "SELECT * FROM issues WHERE id = ?",
-			args: [result.lastInsertRowid],
-		});
+    const result = await db.execute({
+      sql: `INSERT INTO issues (key, title, description, status, priority, assignee_id, reporter_id, parent_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        key,
+        title,
+        description || null,
+        status || "todo",
+        priority || "medium",
+        assignee_id || null,
+        reporter_id || null,
+        parent_id || null,
+      ],
+    });
 
-		res.status(201).json(rows[0]);
-	} catch (err) {
-		res.status(500).json({ error: err.message });
-	}
-});
-
-// Update issue
-app.patch("/api/issues/:id", async (req, res) => {
-	try {
-		const { title, description, status, priority, assignee_id } = req.body;
-		const { id } = req.params;
-
-		const { rows: existing } = await db.execute({
-			sql: "SELECT * FROM issues WHERE id = ?",
-			args: [id],
-		});
-		if (existing.length === 0)
-			return res.status(404).json({ error: "Issue not found" });
-
-		const updates = [];
-		const args = [];
-
-		if (title !== undefined) {
-			updates.push("title = ?");
-			args.push(title);
-		}
-		if (description !== undefined) {
-			updates.push("description = ?");
-			args.push(description);
-		}
-		if (status !== undefined) {
-			updates.push("status = ?");
-			args.push(status);
-		}
-		if (priority !== undefined) {
-			updates.push("priority = ?");
-			args.push(priority);
-		}
-		if (assignee_id !== undefined) {
-			updates.push("assignee_id = ?");
-			args.push(assignee_id || null);
-		}
-
-		if (updates.length > 0) {
-			updates.push("updated_at = CURRENT_TIMESTAMP");
-			args.push(id);
-			await db.execute({
-				sql: `UPDATE issues SET ${updates.join(", ")} WHERE id = ?`,
-				args,
-			});
-		}
-
-		const { rows } = await db.execute({
-			sql: `
+    // Return the created issue with all joined fields
+    const { rows } = await db.execute({
+      sql: `
         SELECT 
           issues.*,
           assignee.name as assignee_name,
           assignee.avatar_color as assignee_color,
-          reporter.name as reporter_name
+          reporter.name as reporter_name,
+          parent.key as parent_key,
+          (SELECT COUNT(*) FROM issues sub WHERE sub.parent_id = issues.id) as subtask_count,
+          (SELECT COUNT(*) FROM issues sub WHERE sub.parent_id = issues.id AND sub.status = 'done') as subtask_done_count
         FROM issues
         LEFT JOIN users assignee ON issues.assignee_id = assignee.id
         LEFT JOIN users reporter ON issues.reporter_id = reporter.id
+        LEFT JOIN issues parent ON issues.parent_id = parent.id
         WHERE issues.id = ?
       `,
-			args: [id],
-		});
+      args: [result.lastInsertRowid],
+    });
 
-		res.json(rows[0]);
-	} catch (err) {
-		res.status(500).json({ error: err.message });
-	}
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update issue
+app.patch("/api/issues/:id", async (req, res) => {
+  try {
+    const { title, description, status, priority, assignee_id, parent_id } =
+      req.body;
+    const { id } = req.params;
+
+    const { rows: existing } = await db.execute({
+      sql: "SELECT * FROM issues WHERE id = ?",
+      args: [id],
+    });
+    if (existing.length === 0)
+      return res.status(404).json({ error: "Issue not found" });
+
+    const updates = [];
+    const args = [];
+
+    if (title !== undefined) {
+      updates.push("title = ?");
+      args.push(title);
+    }
+    if (description !== undefined) {
+      updates.push("description = ?");
+      args.push(description);
+    }
+    if (status !== undefined) {
+      updates.push("status = ?");
+      args.push(status);
+    }
+    if (priority !== undefined) {
+      updates.push("priority = ?");
+      args.push(priority);
+    }
+    if (assignee_id !== undefined) {
+      updates.push("assignee_id = ?");
+      args.push(assignee_id || null);
+    }
+    if (parent_id !== undefined) {
+      // Prevent setting parent_id to self or to a descendant (would create cycle)
+      if (parent_id === parseInt(id)) {
+        return res
+          .status(400)
+          .json({ error: "Issue cannot be its own parent" });
+      }
+      updates.push("parent_id = ?");
+      args.push(parent_id || null);
+    }
+
+    if (updates.length > 0) {
+      updates.push("updated_at = CURRENT_TIMESTAMP");
+      args.push(id);
+      await db.execute({
+        sql: `UPDATE issues SET ${updates.join(", ")} WHERE id = ?`,
+        args,
+      });
+    }
+
+    const { rows } = await db.execute({
+      sql: `
+        SELECT 
+          issues.*,
+          assignee.name as assignee_name,
+          assignee.avatar_color as assignee_color,
+          reporter.name as reporter_name,
+          parent.key as parent_key,
+          (SELECT COUNT(*) FROM issues sub WHERE sub.parent_id = issues.id) as subtask_count,
+          (SELECT COUNT(*) FROM issues sub WHERE sub.parent_id = issues.id AND sub.status = 'done') as subtask_done_count
+        FROM issues
+        LEFT JOIN users assignee ON issues.assignee_id = assignee.id
+        LEFT JOIN users reporter ON issues.reporter_id = reporter.id
+        LEFT JOIN issues parent ON issues.parent_id = parent.id
+        WHERE issues.id = ?
+      `,
+      args: [id],
+    });
+
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Delete issue
 app.delete("/api/issues/:id", async (req, res) => {
-	try {
-		const result = await db.execute({
-			sql: "DELETE FROM issues WHERE id = ?",
-			args: [req.params.id],
-		});
-		if (result.rowsAffected === 0)
-			return res.status(404).json({ error: "Issue not found" });
-		res.status(204).send();
-	} catch (err) {
-		res.status(500).json({ error: err.message });
-	}
+  try {
+    const result = await db.execute({
+      sql: "DELETE FROM issues WHERE id = ?",
+      args: [req.params.id],
+    });
+    if (result.rowsAffected === 0)
+      return res.status(404).json({ error: "Issue not found" });
+    res.status(204).send();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ============================================
@@ -248,9 +337,9 @@ app.delete("/api/issues/:id", async (req, res) => {
 
 // Get comments for an issue
 app.get("/api/issues/:id/comments", async (req, res) => {
-	try {
-		const { rows } = await db.execute({
-			sql: `
+  try {
+    const { rows } = await db.execute({
+      sql: `
         SELECT 
           comments.*,
           users.name as user_name,
@@ -260,38 +349,38 @@ app.get("/api/issues/:id/comments", async (req, res) => {
         WHERE comments.issue_id = ?
         ORDER BY comments.created_at ASC
       `,
-			args: [req.params.id],
-		});
-		res.json(rows);
-	} catch (err) {
-		res.status(500).json({ error: err.message });
-	}
+      args: [req.params.id],
+    });
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Add comment
 app.post("/api/issues/:id/comments", async (req, res) => {
-	try {
-		const { body, user_id } = req.body;
-		const issue_id = req.params.id;
+  try {
+    const { body, user_id } = req.body;
+    const issue_id = req.params.id;
 
-		if (!body) {
-			return res.status(400).json({ error: "Comment body is required" });
-		}
+    if (!body) {
+      return res.status(400).json({ error: "Comment body is required" });
+    }
 
-		const { rows: issueRows } = await db.execute({
-			sql: "SELECT id FROM issues WHERE id = ?",
-			args: [issue_id],
-		});
-		if (issueRows.length === 0)
-			return res.status(404).json({ error: "Issue not found" });
+    const { rows: issueRows } = await db.execute({
+      sql: "SELECT id FROM issues WHERE id = ?",
+      args: [issue_id],
+    });
+    if (issueRows.length === 0)
+      return res.status(404).json({ error: "Issue not found" });
 
-		const result = await db.execute({
-			sql: "INSERT INTO comments (issue_id, user_id, body) VALUES (?, ?, ?)",
-			args: [issue_id, user_id || null, body],
-		});
+    const result = await db.execute({
+      sql: "INSERT INTO comments (issue_id, user_id, body) VALUES (?, ?, ?)",
+      args: [issue_id, user_id || null, body],
+    });
 
-		const { rows } = await db.execute({
-			sql: `
+    const { rows } = await db.execute({
+      sql: `
         SELECT 
           comments.*,
           users.name as user_name,
@@ -300,13 +389,13 @@ app.post("/api/issues/:id/comments", async (req, res) => {
         LEFT JOIN users ON comments.user_id = users.id
         WHERE comments.id = ?
       `,
-			args: [result.lastInsertRowid],
-		});
+      args: [result.lastInsertRowid],
+    });
 
-		res.status(201).json(rows[0]);
-	} catch (err) {
-		res.status(500).json({ error: err.message });
-	}
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ============================================
@@ -314,39 +403,47 @@ app.post("/api/issues/:id/comments", async (req, res) => {
 // ============================================
 
 app.get("/api/stats", async (req, res) => {
-	try {
-		const [total, todo, inProgress, done] = await Promise.all([
-			db.execute("SELECT COUNT(*) as count FROM issues"),
-			db.execute(
-				"SELECT COUNT(*) as count FROM issues WHERE status = 'todo'"
-			),
-			db.execute(
-				"SELECT COUNT(*) as count FROM issues WHERE status = 'in_progress'"
-			),
-			db.execute(
-				"SELECT COUNT(*) as count FROM issues WHERE status = 'done'"
-			),
-		]);
+  try {
+    const { include_subtasks } = req.query;
 
-		res.json({
-			total: total.rows[0].count,
-			todo: todo.rows[0].count,
-			in_progress: inProgress.rows[0].count,
-			done: done.rows[0].count,
-		});
-	} catch (err) {
-		res.status(500).json({ error: err.message });
-	}
+    // By default, stats only count parent issues (not subtasks)
+    const parentFilter =
+      include_subtasks === "true" ? "" : "WHERE parent_id IS NULL";
+    const parentFilterAnd =
+      include_subtasks === "true" ? "WHERE" : "WHERE parent_id IS NULL AND";
+
+    const [total, todo, inProgress, done] = await Promise.all([
+      db.execute(`SELECT COUNT(*) as count FROM issues ${parentFilter}`),
+      db.execute(
+        `SELECT COUNT(*) as count FROM issues ${parentFilterAnd} status = 'todo'`
+      ),
+      db.execute(
+        `SELECT COUNT(*) as count FROM issues ${parentFilterAnd} status = 'in_progress'`
+      ),
+      db.execute(
+        `SELECT COUNT(*) as count FROM issues ${parentFilterAnd} status = 'done'`
+      ),
+    ]);
+
+    res.json({
+      total: total.rows[0].count,
+      todo: todo.rows[0].count,
+      in_progress: inProgress.rows[0].count,
+      done: done.rows[0].count,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // SPA fallback for production
 if (process.env.NODE_ENV === "production") {
-	app.get("*", (req, res) => {
-		res.sendFile(join(__dirname, "../client/dist/index.html"));
-	});
+  app.get("*", (req, res) => {
+    res.sendFile(join(__dirname, "../client/dist/index.html"));
+  });
 }
 
 // Start server
 app.listen(PORT, () => {
-	console.log(`✓ MiniJira API running at http://localhost:${PORT}`);
+  console.log(`✓ MiniJira API running at http://localhost:${PORT}`);
 });

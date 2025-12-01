@@ -680,3 +680,46 @@ body {
 .editable-field:hover {
   background-color: var(--mantine-color-dark-6);
 }
+
+/* Subtask expansion styles */
+.subtasks-container {
+  margin-top: 0.5rem;
+  margin-left: 1rem;
+  position: relative;
+}
+
+.subtask-item {
+  position: relative;
+  margin-bottom: 0.5rem;
+}
+
+.subtask-connector {
+  position: absolute;
+  left: -1rem;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--mantine-color-blue-6);
+  opacity: 0.3;
+}
+
+.subtask-connector::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 0.75rem;
+  height: 2px;
+  background: var(--mantine-color-blue-6);
+  opacity: 0.3;
+}
+
+.subtask-card {
+  transition: all 0.2s ease;
+  margin-left: 0.5rem;
+}
+
+.subtask-card:hover {
+  background-color: var(--bg-hover) !important;
+  transform: translateX(2px);
+}
