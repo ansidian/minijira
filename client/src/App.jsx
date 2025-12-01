@@ -14,6 +14,8 @@ import {
   Progress,
   Paper,
   Stack,
+  Checkbox,
+  Tooltip,
 } from "@mantine/core";
 import { Notifications, notifications } from "@mantine/notifications";
 import "@mantine/notifications/styles.css";
@@ -108,6 +110,10 @@ function App() {
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createStatus, setCreateStatus] = useState("todo");
+  const [showSubtasks, setShowSubtasks] = useState(() => {
+    const saved = localStorage.getItem("minijira_show_subtasks");
+    return saved === "true";
+  });
   const [currentUserId, setCurrentUserId] = useState(() => {
     const saved = localStorage.getItem("minijira_user");
     return saved ? parseInt(saved) : null;
@@ -120,15 +126,20 @@ function App() {
     }
   }, [currentUserId]);
 
+  // Persist subtask visibility preference
+  useEffect(() => {
+    localStorage.setItem("minijira_show_subtasks", showSubtasks.toString());
+  }, [showSubtasks]);
+
   // Load data
   useEffect(() => {
     loadData();
-  }, []);
+  }, [showSubtasks]);
 
   async function loadData() {
     setLoading(true);
     const [issuesData, usersData, statsData] = await Promise.all([
-      api.get("/issues"),
+      api.get(`/issues?include_subtasks=${showSubtasks}`),
       api.get("/users"),
       api.get("/stats"),
     ]);
@@ -153,6 +164,10 @@ function App() {
     setStats(await api.get("/stats"));
     if (selectedIssue?.id === issueId) {
       setSelectedIssue(updated);
+    }
+    // If this is a subtask being moved, refresh parent issue counts
+    if (updated.parent_id) {
+      handleSubtaskChange();
     }
   }
 
@@ -182,6 +197,25 @@ function App() {
       message: "The issue has been removed",
       color: "red",
     });
+  }
+
+  // Handle viewing a different issue (for subtask navigation)
+  async function handleViewIssue(issueId) {
+    const issue = await api.get(`/issues/${issueId}`);
+    setSelectedIssue(issue);
+  }
+
+  // Refresh issues after subtask changes
+  async function handleSubtaskChange() {
+    const issuesData = await api.get(
+      `/issues?include_subtasks=${showSubtasks}`
+    );
+    setIssues(issuesData);
+    // Refresh selected issue to get updated subtask counts
+    if (selectedIssue) {
+      const updated = await api.get(`/issues/${selectedIssue.id}`);
+      setSelectedIssue(updated);
+    }
   }
 
   const currentUser = users.find((u) => u.id === currentUserId);
@@ -254,6 +288,25 @@ function App() {
                 />
               </div>
             </div>
+
+            {/* Subtask Toggle */}
+            <Tooltip
+              label={
+                showSubtasks
+                  ? "Subtasks visible on board"
+                  : "Subtasks hidden from board"
+              }
+            >
+              <Button
+                variant={showSubtasks ? "filled" : "subtle"}
+                size="xs"
+                onClick={() => setShowSubtasks(!showSubtasks)}
+                style={{ marginRight: "1rem" }}
+              >
+                {showSubtasks ? "⊟" : "⊞"} Subtasks
+              </Button>
+            </Tooltip>
+
             <div
               className={`user-selector ${!currentUserId ? "unselected" : ""}`}
             >
@@ -298,6 +351,7 @@ function App() {
                   setShowCreateModal(true);
                 }}
                 onDrop={handleStatusChange}
+                showSubtasks={showSubtasks}
               />
             ))}
           </div>
@@ -444,6 +498,8 @@ function App() {
             onUpdate={handleUpdateIssue}
             onDelete={handleDeleteIssue}
             onStatusChange={handleStatusChange}
+            onViewIssue={handleViewIssue}
+            onSubtaskChange={handleSubtaskChange}
           />
         )}
       </div>
@@ -452,7 +508,14 @@ function App() {
 }
 
 // Column component
-function Column({ column, issues, onIssueClick, onAddClick, onDrop }) {
+function Column({
+  column,
+  issues,
+  onIssueClick,
+  onAddClick,
+  onDrop,
+  showSubtasks,
+}) {
   const [dragOver, setDragOver] = useState(false);
 
   function handleDragOver(e) {
@@ -508,6 +571,7 @@ function Column({ column, issues, onIssueClick, onAddClick, onDrop }) {
               key={issue.id}
               issue={issue}
               onClick={() => onIssueClick(issue)}
+              showSubtasks={showSubtasks}
             />
           ))
         )}
@@ -520,7 +584,7 @@ function Column({ column, issues, onIssueClick, onAddClick, onDrop }) {
 }
 
 // Issue Card component
-function IssueCard({ issue, onClick }) {
+function IssueCard({ issue, onClick, showSubtasks }) {
   const [dragging, setDragging] = useState(false);
   const [hovering, setHovering] = useState(false);
 
@@ -533,6 +597,9 @@ function IssueCard({ issue, onClick }) {
   function handleDragEnd() {
     setDragging(false);
   }
+
+  const hasSubtasks = issue.subtask_count > 0;
+  const isSubtask = !!issue.parent_id;
 
   return (
     <Paper
@@ -552,18 +619,32 @@ function IssueCard({ issue, onClick }) {
         backgroundColor: hovering ? "var(--bg-hover)" : undefined,
         transform: hovering ? "translateY(-2px)" : undefined,
         boxShadow: hovering ? "0 4px 8px rgba(0, 0, 0, 0.3)" : undefined,
+        // Indent subtasks slightly when shown on board
+        marginLeft: isSubtask && showSubtasks ? "12px" : undefined,
+        borderLeft:
+          isSubtask && showSubtasks
+            ? "3px solid var(--mantine-color-blue-6)"
+            : undefined,
       }}
     >
       <Stack gap="xs">
-        <div
-          style={{
-            fontSize: "0.75rem",
-            color: "var(--text-secondary)",
-            fontWeight: 500,
-          }}
-        >
-          {issue.key}
-        </div>
+        <Group justify="space-between" gap="xs">
+          <div
+            style={{
+              fontSize: "0.75rem",
+              color: "var(--text-secondary)",
+              fontWeight: 500,
+            }}
+          >
+            {issue.key}
+          </div>
+          {/* Show parent badge if this is a subtask */}
+          {isSubtask && issue.parent_key && (
+            <Badge size="xs" variant="outline" color="blue">
+              ↑ {issue.parent_key}
+            </Badge>
+          )}
+        </Group>
         <div
           style={{
             fontSize: "0.875rem",
@@ -593,19 +674,40 @@ function IssueCard({ issue, onClick }) {
           </div>
         )}
         <Group justify="space-between" mt="xs">
-          <Badge
-            color={
-              issue.priority === "high"
-                ? "red"
-                : issue.priority === "medium"
-                ? "yellow"
-                : "gray"
-            }
-            size="sm"
-            variant="light"
-          >
-            {issue.priority}
-          </Badge>
+          <Group gap="xs">
+            <Badge
+              color={
+                issue.priority === "high"
+                  ? "red"
+                  : issue.priority === "medium"
+                  ? "yellow"
+                  : "gray"
+              }
+              size="sm"
+              variant="light"
+            >
+              {issue.priority}
+            </Badge>
+            {/* Subtask progress indicator */}
+            {hasSubtasks && (
+              <Tooltip
+                label={`${issue.subtask_done_count} of ${issue.subtask_count} subtasks done`}
+              >
+                <Badge
+                  size="sm"
+                  variant="light"
+                  color={
+                    issue.subtask_done_count === issue.subtask_count
+                      ? "green"
+                      : "blue"
+                  }
+                  style={{ cursor: "default" }}
+                >
+                  ⊟ {issue.subtask_done_count}/{issue.subtask_count}
+                </Badge>
+              </Tooltip>
+            )}
+          </Group>
           {issue.assignee_name ? (
             <Avatar
               color={issue.assignee_color}
@@ -639,6 +741,7 @@ function CreateIssueModal({
   createStatus,
   onClose,
   onCreate,
+  parentIssue = null,
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -650,6 +753,7 @@ function CreateIssueModal({
   const [flashStatus, setFlashStatus] = useState(true);
 
   const isDirty = title.trim() || description.trim();
+  const isSubtask = !!parentIssue;
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -661,6 +765,7 @@ function CreateIssueModal({
       priority,
       assignee_id: assigneeId || null,
       reporter_id: currentUserId || null,
+      parent_id: parentIssue?.id || null,
     });
   }
 
@@ -698,7 +803,9 @@ function CreateIssueModal({
         }
       }}
       withCloseButton={true}
-      title="Create Issue"
+      title={
+        isSubtask ? `Create Subtask for ${parentIssue.key}` : "Create Issue"
+      }
       classNames={{ content: shake ? "shake" : "" }}
       size="lg"
     >
@@ -762,7 +869,7 @@ function CreateIssueModal({
                 Cancel
               </Button>
               <Button type="submit" disabled={!title.trim()}>
-                Create Issue
+                {isSubtask ? "Create Subtask" : "Create Issue"}
               </Button>
             </>
           ) : (
@@ -795,6 +902,304 @@ function CreateIssueModal({
   );
 }
 
+// Subtask Row component
+function SubtaskRow({ subtask, users, onStatusToggle, onClick, onUpdate }) {
+  return (
+    <Group
+      gap="sm"
+      p="xs"
+      style={{
+        backgroundColor: "var(--mantine-color-dark-6)",
+        borderRadius: "4px",
+        cursor: "pointer",
+        transition: "background-color 0.15s ease",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = "var(--mantine-color-dark-5)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = "var(--mantine-color-dark-6)";
+      }}
+      onClick={onClick}
+    >
+      <Checkbox
+        checked={subtask.status === "done"}
+        onChange={(e) => {
+          e.stopPropagation();
+          onStatusToggle(subtask.id, e.currentTarget.checked ? "done" : "todo");
+        }}
+        size="sm"
+        onClick={(e) => e.stopPropagation()}
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: "0.8rem",
+            color: "var(--text-secondary)",
+            marginBottom: "2px",
+          }}
+        >
+          {subtask.key}
+        </div>
+        <div
+          style={{
+            textDecoration: subtask.status === "done" ? "line-through" : "none",
+            color:
+              subtask.status === "done" ? "var(--text-secondary)" : "inherit",
+            fontSize: "0.875rem",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {subtask.title}
+        </div>
+      </div>
+      <Badge
+        size="xs"
+        variant="light"
+        color={
+          subtask.priority === "high"
+            ? "red"
+            : subtask.priority === "medium"
+            ? "yellow"
+            : "gray"
+        }
+      >
+        {subtask.priority}
+      </Badge>
+      {subtask.assignee_name ? (
+        <Tooltip label={subtask.assignee_name}>
+          <Avatar
+            color={subtask.assignee_color}
+            name={subtask.assignee_name}
+            size="sm"
+          />
+        </Tooltip>
+      ) : (
+        <div
+          title="Unassigned"
+          style={{
+            width: "24px",
+            height: "24px",
+            borderRadius: "50%",
+            border: "2px dashed var(--mantine-color-gray-6)",
+            backgroundColor: "transparent",
+            flexShrink: 0,
+          }}
+        />
+      )}
+    </Group>
+  );
+}
+
+// Subtasks Section component
+function SubtasksSection({
+  parentIssue,
+  users,
+  currentUserId,
+  onViewIssue,
+  onSubtaskChange,
+}) {
+  const [subtasks, setSubtasks] = useState([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newAssignee, setNewAssignee] = useState("");
+  const [newPriority, setNewPriority] = useState("medium");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadSubtasks();
+  }, [parentIssue.id]);
+
+  async function loadSubtasks() {
+    setLoading(true);
+    const data = await api.get(`/issues/${parentIssue.id}/subtasks`);
+    setSubtasks(data);
+    setLoading(false);
+  }
+
+  async function handleCreateSubtask() {
+    if (!newTitle.trim()) return;
+
+    const newSubtask = await api.post("/issues", {
+      title: newTitle.trim(),
+      parent_id: parentIssue.id,
+      status: "todo",
+      priority: newPriority,
+      assignee_id: newAssignee || null,
+      reporter_id: currentUserId,
+    });
+
+    setSubtasks([...subtasks, newSubtask]);
+    setNewTitle("");
+    setNewAssignee("");
+    setNewPriority("medium");
+    setShowAddForm(false);
+    onSubtaskChange?.();
+
+    notifications.show({
+      title: "Subtask created",
+      message: `${newSubtask.key} has been added`,
+      color: "green",
+    });
+  }
+
+  async function handleStatusToggle(subtaskId, newStatus) {
+    const updated = await api.patch(`/issues/${subtaskId}`, {
+      status: newStatus,
+    });
+    setSubtasks((prev) =>
+      prev.map((s) => (s.id === subtaskId ? { ...s, ...updated } : s))
+    );
+    onSubtaskChange?.();
+  }
+
+  const doneCount = subtasks.filter((s) => s.status === "done").length;
+
+  if (loading) {
+    return (
+      <Center py="md">
+        <Loader size="sm" />
+      </Center>
+    );
+  }
+
+  return (
+    <div>
+      <Group justify="space-between" mb="sm">
+        <h3
+          style={{
+            fontSize: "0.875rem",
+            fontWeight: 600,
+            margin: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+          }}
+        >
+          Subtasks
+          <Badge size="sm" variant="light" color="gray">
+            {doneCount}/{subtasks.length}
+          </Badge>
+        </h3>
+        {!showAddForm && (
+          <Button
+            size="xs"
+            variant="subtle"
+            onClick={() => setShowAddForm(true)}
+          >
+            + Add Subtask
+          </Button>
+        )}
+      </Group>
+
+      {subtasks.length > 0 && (
+        <Progress
+          value={subtasks.length > 0 ? (doneCount / subtasks.length) * 100 : 0}
+          size="sm"
+          mb="sm"
+          color="green"
+          animated={doneCount < subtasks.length}
+        />
+      )}
+
+      <Stack gap="xs">
+        {subtasks.map((subtask) => (
+          <SubtaskRow
+            key={subtask.id}
+            subtask={subtask}
+            users={users}
+            onStatusToggle={handleStatusToggle}
+            onClick={() => onViewIssue(subtask.id)}
+          />
+        ))}
+      </Stack>
+
+      {subtasks.length === 0 && !showAddForm && (
+        <div
+          style={{
+            padding: "1rem",
+            textAlign: "center",
+            color: "var(--text-secondary)",
+            fontSize: "0.875rem",
+            backgroundColor: "var(--mantine-color-dark-6)",
+            borderRadius: "4px",
+          }}
+        >
+          No subtasks yet. Click "+ Add Subtask" to break this issue down.
+        </div>
+      )}
+
+      {showAddForm && (
+        <Paper p="sm" mt="sm" withBorder>
+          <TextInput
+            placeholder="Subtask title"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && newTitle.trim()) {
+                handleCreateSubtask();
+              } else if (e.key === "Escape") {
+                setShowAddForm(false);
+                setNewTitle("");
+              }
+            }}
+            mb="sm"
+            autoFocus
+          />
+          <Group gap="sm">
+            <Select
+              placeholder="Assignee"
+              value={newAssignee}
+              onChange={(value) => setNewAssignee(value || "")}
+              data={users.map((u) => ({
+                value: u.id.toString(),
+                label: u.name,
+              }))}
+              clearable
+              size="sm"
+              style={{ flex: 1 }}
+            />
+            <Select
+              value={newPriority}
+              onChange={(value) => setNewPriority(value)}
+              data={[
+                { value: "low", label: "Low" },
+                { value: "medium", label: "Medium" },
+                { value: "high", label: "High" },
+              ]}
+              size="sm"
+              style={{ width: "110px" }}
+            />
+          </Group>
+          <Group justify="flex-end" mt="sm">
+            <Button
+              size="sm"
+              variant="subtle"
+              onClick={() => {
+                setShowAddForm(false);
+                setNewTitle("");
+                setNewAssignee("");
+                setNewPriority("medium");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleCreateSubtask}
+              disabled={!newTitle.trim()}
+            >
+              Add Subtask
+            </Button>
+          </Group>
+        </Paper>
+      )}
+    </div>
+  );
+}
+
 function IssueDetailModal({
   issue,
   users,
@@ -803,6 +1208,8 @@ function IssueDetailModal({
   onUpdate,
   onDelete,
   onStatusChange,
+  onViewIssue,
+  onSubtaskChange,
 }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(issue.title);
@@ -817,6 +1224,17 @@ function IssueDetailModal({
   const isEditDirty =
     editing &&
     (title !== issue.title || description !== (issue.description || ""));
+
+  const isSubtask = !!issue.parent_id;
+
+  // Reset state when issue changes (for subtask navigation)
+  useEffect(() => {
+    setTitle(issue.title);
+    setDescription(issue.description || "");
+    setEditing(false);
+    setConfirmingDelete(false);
+    setConfirmingCancel(false);
+  }, [issue.id]);
 
   useEffect(() => {
     loadComments();
@@ -907,11 +1325,33 @@ function IssueDetailModal({
           onClose();
         }
       }}
-      title={issue.key}
+      title={
+        <Group gap="xs">
+          {issue.key}
+          {isSubtask && (
+            <Badge size="sm" variant="light" color="blue">
+              Subtask
+            </Badge>
+          )}
+        </Group>
+      }
       withCloseButton={true}
       classNames={{ content: shake ? "shake" : "" }}
       size="lg"
     >
+      {/* Parent issue link for subtasks */}
+      {isSubtask && issue.parent_key && (
+        <Button
+          variant="subtle"
+          size="xs"
+          mb="md"
+          onClick={() => onViewIssue(issue.parent_id)}
+          style={{ marginLeft: "-0.5rem" }}
+        >
+          ← Back to {issue.parent_key}
+        </Button>
+      )}
+
       {editing ? (
         // Editing mode - editable inputs
         <>
@@ -1124,6 +1564,26 @@ function IssueDetailModal({
         />
       </Group>
 
+      {/* Subtasks Section - only show for parent issues */}
+      {!isSubtask && (
+        <div
+          style={{
+            marginTop: "1.5rem",
+            marginBottom: "1.5rem",
+            paddingTop: "1rem",
+            borderTop: "1px solid var(--mantine-color-dark-4)",
+          }}
+        >
+          <SubtasksSection
+            parentIssue={issue}
+            users={users}
+            currentUserId={currentUserId}
+            onViewIssue={onViewIssue}
+            onSubtaskChange={onSubtaskChange}
+          />
+        </div>
+      )}
+
       {/* Comments */}
       <h3
         style={{
@@ -1205,7 +1665,7 @@ function IssueDetailModal({
             color="red"
             onClick={() => setConfirmingDelete(true)}
           >
-            Delete Issue
+            Delete {isSubtask ? "Subtask" : "Issue"}
           </Button>
         ) : (
           <>
