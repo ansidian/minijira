@@ -16,6 +16,8 @@ import {
   Stack,
   Checkbox,
   Tooltip,
+  Collapse,
+  ActionIcon,
 } from "@mantine/core";
 import { Notifications, notifications } from "@mantine/notifications";
 import "@mantine/notifications/styles.css";
@@ -110,14 +112,12 @@ function App() {
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createStatus, setCreateStatus] = useState("todo");
-  const [showSubtasks, setShowSubtasks] = useState(() => {
-    const saved = localStorage.getItem("minijira_show_subtasks");
-    return saved === "true";
-  });
   const [currentUserId, setCurrentUserId] = useState(() => {
     const saved = localStorage.getItem("minijira_user");
     return saved ? parseInt(saved) : null;
   });
+  const [expandedIssues, setExpandedIssues] = useState(new Set());
+  const [subtasksCache, setSubtasksCache] = useState({});
 
   // Persist user selection
   useEffect(() => {
@@ -126,20 +126,15 @@ function App() {
     }
   }, [currentUserId]);
 
-  // Persist subtask visibility preference
-  useEffect(() => {
-    localStorage.setItem("minijira_show_subtasks", showSubtasks.toString());
-  }, [showSubtasks]);
-
   // Load data
   useEffect(() => {
     loadData();
-  }, [showSubtasks]);
+  }, []);
 
   async function loadData() {
     setLoading(true);
     const [issuesData, usersData, statsData] = await Promise.all([
-      api.get(`/issues?include_subtasks=${showSubtasks}`),
+      api.get("/issues"),
       api.get("/users"),
       api.get("/stats"),
     ]);
@@ -149,9 +144,9 @@ function App() {
     setLoading(false);
   }
 
-  // Group issues by status
+  // Group issues by status - only show parent issues (not subtasks)
   const issuesByStatus = COLUMNS.reduce((acc, col) => {
-    acc[col.status] = issues.filter((i) => i.status === col.status);
+    acc[col.status] = issues.filter((i) => i.status === col.status && !i.parent_id);
     return acc;
   }, {});
 
@@ -165,9 +160,17 @@ function App() {
     if (selectedIssue?.id === issueId) {
       setSelectedIssue(updated);
     }
-    // If this is a subtask being moved, refresh parent issue counts
-    if (updated.parent_id) {
-      handleSubtaskChange();
+
+    // If this issue has subtasks and is expanded, refresh them
+    if (updated.subtask_count > 0 && expandedIssues.has(issueId)) {
+      const subtasks = await api.get(`/issues/${issueId}/subtasks`);
+      setSubtasksCache((prev) => ({ ...prev, [issueId]: subtasks }));
+    }
+
+    // If this is a subtask, refresh its parent's cache if expanded
+    if (updated.parent_id && expandedIssues.has(updated.parent_id)) {
+      const subtasks = await api.get(`/issues/${updated.parent_id}/subtasks`);
+      setSubtasksCache((prev) => ({ ...prev, [updated.parent_id]: subtasks }));
     }
   }
 
@@ -207,14 +210,71 @@ function App() {
 
   // Refresh issues after subtask changes
   async function handleSubtaskChange() {
-    const issuesData = await api.get(
-      `/issues?include_subtasks=${showSubtasks}`
-    );
+    const issuesData = await api.get("/issues");
     setIssues(issuesData);
+
+    // Refresh all expanded subtasks caches
+    const newCache = {};
+    for (const issueId of expandedIssues) {
+      const subtasks = await api.get(`/issues/${issueId}/subtasks`);
+      newCache[issueId] = subtasks;
+    }
+    setSubtasksCache(newCache);
+
     // Refresh selected issue to get updated subtask counts
     if (selectedIssue) {
       const updated = await api.get(`/issues/${selectedIssue.id}`);
       setSelectedIssue(updated);
+    }
+  }
+
+  // Toggle subtask expansion and fetch if needed
+  async function handleToggleSubtasks(issueId) {
+    const newExpanded = new Set(expandedIssues);
+
+    if (newExpanded.has(issueId)) {
+      // Collapse
+      newExpanded.delete(issueId);
+    } else {
+      // Expand - fetch subtasks if not cached
+      newExpanded.add(issueId);
+      if (!subtasksCache[issueId]) {
+        const subtasks = await api.get(`/issues/${issueId}/subtasks`);
+        setSubtasksCache((prev) => ({ ...prev, [issueId]: subtasks }));
+      }
+    }
+
+    setExpandedIssues(newExpanded);
+  }
+
+  // Toggle all subtasks at once
+  async function handleToggleAllSubtasks() {
+    const parentsWithSubtasks = issues.filter(
+      (i) => !i.parent_id && i.subtask_count > 0
+    );
+
+    // If all are expanded, collapse all. Otherwise, expand all.
+    const allExpanded = parentsWithSubtasks.every((i) =>
+      expandedIssues.has(i.id)
+    );
+
+    if (allExpanded) {
+      // Collapse all
+      setExpandedIssues(new Set());
+    } else {
+      // Expand all - fetch any missing subtasks
+      const newExpanded = new Set(parentsWithSubtasks.map((i) => i.id));
+      const newCache = { ...subtasksCache };
+
+      for (const issue of parentsWithSubtasks) {
+        if (!subtasksCache[issue.id]) {
+          const subtasks = await api.get(`/issues/${issue.id}/subtasks`);
+          newCache[issue.id] = subtasks;
+        }
+      }
+
+      setSubtasksCache(newCache);
+      setExpandedIssues(newExpanded);
     }
   }
 
@@ -289,23 +349,37 @@ function App() {
               </div>
             </div>
 
-            {/* Subtask Toggle */}
-            <Tooltip
-              label={
-                showSubtasks
-                  ? "Subtasks visible on board"
-                  : "Subtasks hidden from board"
+            <Button
+              variant="light"
+              size="sm"
+              color="blue"
+              onClick={handleToggleAllSubtasks}
+              leftSection={
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{
+                    transform: issues.filter((i) => !i.parent_id && i.subtask_count > 0).every((i) => expandedIssues.has(i.id))
+                      ? "rotate(180deg)"
+                      : "rotate(0deg)",
+                    transition: "transform 0.2s ease",
+                  }}
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
               }
+              style={{ marginLeft: "1rem" }}
             >
-              <Button
-                variant={showSubtasks ? "filled" : "subtle"}
-                size="xs"
-                onClick={() => setShowSubtasks(!showSubtasks)}
-                style={{ marginRight: "1rem" }}
-              >
-                {showSubtasks ? "⊟" : "⊞"} Subtasks
-              </Button>
-            </Tooltip>
+              {issues.filter((i) => !i.parent_id && i.subtask_count > 0).every((i) => expandedIssues.has(i.id))
+                ? "Hide All Subtasks"
+                : "Show All Subtasks"}
+            </Button>
 
             <div
               className={`user-selector ${!currentUserId ? "unselected" : ""}`}
@@ -351,7 +425,9 @@ function App() {
                   setShowCreateModal(true);
                 }}
                 onDrop={handleStatusChange}
-                showSubtasks={showSubtasks}
+                expandedIssues={expandedIssues}
+                subtasksCache={subtasksCache}
+                onToggleSubtasks={handleToggleSubtasks}
               />
             ))}
           </div>
@@ -514,7 +590,9 @@ function Column({
   onIssueClick,
   onAddClick,
   onDrop,
-  showSubtasks,
+  expandedIssues,
+  subtasksCache,
+  onToggleSubtasks,
 }) {
   const [dragOver, setDragOver] = useState(false);
 
@@ -570,8 +648,10 @@ function Column({
             <IssueCard
               key={issue.id}
               issue={issue}
-              onClick={() => onIssueClick(issue)}
-              showSubtasks={showSubtasks}
+              onClick={onIssueClick}
+              isExpanded={expandedIssues.has(issue.id)}
+              subtasks={subtasksCache[issue.id] || []}
+              onToggleSubtasks={onToggleSubtasks}
             />
           ))
         )}
@@ -584,7 +664,7 @@ function Column({
 }
 
 // Issue Card component
-function IssueCard({ issue, onClick, showSubtasks }) {
+function IssueCard({ issue, onClick, isExpanded, subtasks, onToggleSubtasks }) {
   const [dragging, setDragging] = useState(false);
   const [hovering, setHovering] = useState(false);
 
@@ -599,138 +679,237 @@ function IssueCard({ issue, onClick, showSubtasks }) {
   }
 
   const hasSubtasks = issue.subtask_count > 0;
-  const isSubtask = !!issue.parent_id;
+
+  function handleSubtaskBadgeClick(e) {
+    e.stopPropagation();
+    onToggleSubtasks(issue.id);
+  }
 
   return (
-    <Paper
-      className={dragging ? "dragging" : ""}
-      onClick={onClick}
-      draggable
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => setHovering(false)}
-      p="md"
-      mb="sm"
-      withBorder
-      style={{
-        cursor: "pointer",
-        transition: "all 0.2s ease",
-        backgroundColor: hovering ? "var(--bg-hover)" : undefined,
-        transform: hovering ? "translateY(-2px)" : undefined,
-        boxShadow: hovering ? "0 4px 8px rgba(0, 0, 0, 0.3)" : undefined,
-        // Indent subtasks slightly when shown on board
-        marginLeft: isSubtask && showSubtasks ? "12px" : undefined,
-        borderLeft:
-          isSubtask && showSubtasks
-            ? "3px solid var(--mantine-color-blue-6)"
-            : undefined,
-      }}
-    >
-      <Stack gap="xs">
-        <Group justify="space-between" gap="xs">
+    <div style={{ marginBottom: "0.5rem" }}>
+      <Paper
+        className={dragging ? "dragging" : ""}
+        onClick={() => onClick(issue)}
+        draggable
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onMouseEnter={() => setHovering(true)}
+        onMouseLeave={() => setHovering(false)}
+        p="md"
+        withBorder
+        style={{
+          cursor: "pointer",
+          transition: "all 0.2s ease",
+          backgroundColor: hovering ? "var(--bg-hover)" : undefined,
+          transform: hovering ? "translateY(-2px)" : undefined,
+          boxShadow: hovering ? "0 4px 8px rgba(0, 0, 0, 0.3)" : undefined,
+        }}
+      >
+        <Stack gap="xs">
+          <Group justify="space-between" gap="xs">
+            <div
+              style={{
+                fontSize: "0.75rem",
+                color: "var(--text-secondary)",
+                fontWeight: 500,
+              }}
+            >
+              {issue.key}
+            </div>
+          </Group>
           <div
             style={{
-              fontSize: "0.75rem",
-              color: "var(--text-secondary)",
-              fontWeight: 500,
-            }}
-          >
-            {issue.key}
-          </div>
-          {/* Show parent badge if this is a subtask */}
-          {isSubtask && issue.parent_key && (
-            <Badge size="xs" variant="outline" color="blue">
-              ↑ {issue.parent_key}
-            </Badge>
-          )}
-        </Group>
-        <div
-          style={{
-            fontSize: "0.875rem",
-            lineHeight: 1.4,
-            wordWrap: "break-word",
-            overflowWrap: "break-word",
-          }}
-        >
-          {issue.title}
-        </div>
-        {issue.description && (
-          <div
-            style={{
-              fontSize: "0.75rem",
-              lineHeight: 1.5,
-              color: "var(--text-secondary)",
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
+              fontSize: "0.875rem",
+              lineHeight: 1.4,
               wordWrap: "break-word",
               overflowWrap: "break-word",
-              whiteSpace: "pre-wrap",
             }}
           >
-            {issue.description}
+            {issue.title}
           </div>
-        )}
-        <Group justify="space-between" mt="xs">
-          <Group gap="xs">
-            <Badge
-              color={
-                issue.priority === "high"
-                  ? "red"
-                  : issue.priority === "medium"
-                  ? "yellow"
-                  : "gray"
-              }
-              size="sm"
-              variant="light"
+          {issue.description && (
+            <div
+              style={{
+                fontSize: "0.75rem",
+                lineHeight: 1.5,
+                color: "var(--text-secondary)",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+                wordWrap: "break-word",
+                overflowWrap: "break-word",
+                whiteSpace: "pre-wrap",
+              }}
             >
-              {issue.priority}
-            </Badge>
-            {/* Subtask progress indicator */}
-            {hasSubtasks && (
-              <Tooltip
-                label={`${issue.subtask_done_count} of ${issue.subtask_count} subtasks done`}
+              {issue.description}
+            </div>
+          )}
+          <Group justify="space-between" mt="xs">
+            <Group gap="xs">
+              <Badge
+                color={
+                  issue.priority === "high"
+                    ? "red"
+                    : issue.priority === "medium"
+                    ? "yellow"
+                    : "gray"
+                }
+                size="sm"
+                variant="light"
               >
-                <Badge
-                  size="sm"
-                  variant="light"
-                  color={
-                    issue.subtask_done_count === issue.subtask_count
-                      ? "green"
-                      : "blue"
+                {issue.priority}
+              </Badge>
+              {/* Subtask progress indicator - now clickable */}
+              {hasSubtasks && (
+                <Tooltip
+                  label={
+                    isExpanded
+                      ? "Click to collapse subtasks"
+                      : `${issue.subtask_done_count} of ${issue.subtask_count} subtasks done - Click to expand`
                   }
-                  style={{ cursor: "default" }}
                 >
-                  ⊟ {issue.subtask_done_count}/{issue.subtask_count}
-                </Badge>
-              </Tooltip>
+                  <Badge
+                    size="sm"
+                    variant="light"
+                    color={
+                      issue.subtask_done_count === issue.subtask_count
+                        ? "green"
+                        : "blue"
+                    }
+                    style={{ cursor: "pointer" }}
+                    onClick={handleSubtaskBadgeClick}
+                  >
+                    {isExpanded ? "▼" : "▶"} {issue.subtask_done_count}/
+                    {issue.subtask_count}
+                  </Badge>
+                </Tooltip>
+              )}
+            </Group>
+            {issue.assignee_name ? (
+              <Avatar
+                color={issue.assignee_color}
+                name={issue.assignee_name}
+                size="sm"
+                title={issue.assignee_name}
+                variant="filled"
+              />
+            ) : (
+              <div
+                title="Unassigned"
+                style={{
+                  width: "26px",
+                  height: "26px",
+                  borderRadius: "50%",
+                  border: "2px dashed var(--mantine-color-gray-6)",
+                  backgroundColor: "transparent",
+                }}
+              />
             )}
           </Group>
-          {issue.assignee_name ? (
-            <Avatar
-              color={issue.assignee_color}
-              name={issue.assignee_name}
-              size="sm"
-              title={issue.assignee_name}
-              variant="filled"
-            />
-          ) : (
-            <div
-              title="Unassigned"
-              style={{
-                width: "26px",
-                height: "26px",
-                borderRadius: "50%",
-                border: "2px dashed var(--mantine-color-gray-6)",
-                backgroundColor: "transparent",
-              }}
-            />
-          )}
-        </Group>
-      </Stack>
-    </Paper>
+        </Stack>
+      </Paper>
+
+      {/* Expanded subtasks */}
+      {hasSubtasks && (
+        <Collapse in={isExpanded}>
+          <div className="subtasks-container">
+            {subtasks.map((subtask) => (
+              <div key={subtask.id} className="subtask-item">
+                <div className="subtask-connector" />
+                <Paper
+                  p="sm"
+                  withBorder
+                  className="subtask-card"
+                  style={{
+                    cursor: "pointer",
+                    backgroundColor: "var(--bg-tertiary)",
+                    borderLeft: "3px solid var(--mantine-color-blue-6)",
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClick(subtask);
+                  }}
+                >
+                  <Stack gap="xs">
+                    <Group justify="space-between" gap="xs">
+                      <div
+                        style={{
+                          fontSize: "0.7rem",
+                          color: "var(--text-secondary)",
+                          fontWeight: 500,
+                        }}
+                      >
+                        {subtask.key}
+                      </div>
+                      <Badge
+                        size="xs"
+                        variant="dot"
+                        color={
+                          subtask.status === "done"
+                            ? "green"
+                            : subtask.status === "in_progress"
+                            ? "blue"
+                            : "gray"
+                        }
+                      >
+                        {subtask.status === "done"
+                          ? "Done"
+                          : subtask.status === "in_progress"
+                          ? "In Progress"
+                          : "To Do"}
+                      </Badge>
+                    </Group>
+                    <div
+                      style={{
+                        fontSize: "0.8rem",
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      {subtask.title}
+                    </div>
+                    <Group justify="space-between" gap="xs">
+                      <Badge
+                        color={
+                          subtask.priority === "high"
+                            ? "red"
+                            : subtask.priority === "medium"
+                            ? "yellow"
+                            : "gray"
+                        }
+                        size="xs"
+                        variant="light"
+                      >
+                        {subtask.priority}
+                      </Badge>
+                      {subtask.assignee_name ? (
+                        <Avatar
+                          color={subtask.assignee_color}
+                          name={subtask.assignee_name}
+                          size="xs"
+                          title={subtask.assignee_name}
+                        />
+                      ) : (
+                        <div
+                          title="Unassigned"
+                          style={{
+                            width: "20px",
+                            height: "20px",
+                            borderRadius: "50%",
+                            border: "2px dashed var(--mantine-color-gray-6)",
+                            backgroundColor: "transparent",
+                          }}
+                        />
+                      )}
+                    </Group>
+                  </Stack>
+                </Paper>
+              </div>
+            ))}
+          </div>
+        </Collapse>
+      )}
+    </div>
   );
 }
 
