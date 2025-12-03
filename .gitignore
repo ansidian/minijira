@@ -4,3 +4,4 @@ client/dist/
 server/db/*.db
 .DS_Store
 *.log
+CLAUDE.md
