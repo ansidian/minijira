@@ -333,7 +333,7 @@ function App() {
       const timer = setTimeout(() => setStatsBadgeAnimate(false), 300);
       return () => clearTimeout(timer);
     }
-  }, [stats, previousStats]);
+  }, [stats]); // Only depend on stats, not previousStats
 
   // Load data
   useEffect(() => {
@@ -507,7 +507,7 @@ function App() {
   }
 
   // Refresh issues after subtask changes
-  async function handleSubtaskChange() {
+  async function handleSubtaskChange(parentIdToExpand = null) {
     const [issuesData, allIssuesData] = await Promise.all([
       api.get("/issues"),
       api.get("/issues?include_subtasks=true"),
@@ -517,7 +517,21 @@ function App() {
 
     // Refresh all expanded subtasks caches
     const newCache = {};
-    for (const issueId of expandedIssues) {
+    const issueIdsToRefresh = new Set(expandedIssues);
+
+    // Also refresh cache for the currently selected issue if it's a parent with subtasks
+    if (selectedIssue && !selectedIssue.parent_id) {
+      issueIdsToRefresh.add(selectedIssue.id);
+    }
+
+    // If a specific parent should be expanded (e.g., after adding a subtask), add it
+    if (parentIdToExpand) {
+      issueIdsToRefresh.add(parentIdToExpand);
+      // Also add to expandedIssues set to show it expanded
+      setExpandedIssues(new Set([...expandedIssues, parentIdToExpand]));
+    }
+
+    for (const issueId of issueIdsToRefresh) {
       const subtasks = await api.get(`/issues/${issueId}/subtasks`);
       newCache[issueId] = subtasks;
     }
@@ -1482,6 +1496,20 @@ function SubtaskCardInline({
     onRequestAddSubtask: null, // Subtasks can't have subtasks
   });
 
+  const handleCheckboxToggle = async (e) => {
+    e.stopPropagation();
+    const isDone = subtask.status === "done";
+
+    if (isDone) {
+      // Unchecking: restore to previous status or default to todo
+      const newStatus = subtask.previous_status || "todo";
+      await onUpdateIssue(subtask.id, { status: newStatus });
+    } else {
+      // Checking: mark as done
+      await onUpdateIssue(subtask.id, { status: "done" });
+    }
+  };
+
   return (
     <div className="subtask-item">
       <div className="subtask-connector" />
@@ -1506,16 +1534,25 @@ function SubtaskCardInline({
         onContextMenu={handleContextMenu}
       >
         <Stack gap="xs">
-          <Group justify="space-between" gap="xs">
-            <div
-              style={{
-                fontSize: "0.7rem",
-                color: "var(--text-secondary)",
-                fontWeight: 500,
-              }}
-            >
-              {subtask.key}
-            </div>
+          <Group justify="space-between" gap="xs" wrap="nowrap">
+            <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+              <Checkbox
+                checked={subtask.status === "done"}
+                onChange={handleCheckboxToggle}
+                onClick={(e) => e.stopPropagation()}
+                size="sm"
+                styles={{ input: { cursor: "pointer" } }}
+              />
+              <div
+                style={{
+                  fontSize: "0.7rem",
+                  color: "var(--text-secondary)",
+                  fontWeight: 500,
+                }}
+              >
+                {subtask.key}
+              </div>
+            </Group>
             <Badge
               size="xs"
               variant="dot"
@@ -1532,6 +1569,8 @@ function SubtaskCardInline({
             style={{
               fontSize: "0.8rem",
               lineHeight: 1.3,
+              textDecoration: subtask.status === "done" ? "line-through" : "none",
+              opacity: subtask.status === "done" ? 0.7 : 1,
             }}
           >
             {subtask.title}
@@ -1794,7 +1833,15 @@ function SubtaskRow({
         checked={subtask.status === "done"}
         onChange={(e) => {
           e.stopPropagation();
-          onStatusToggle(subtask.id, e.currentTarget.checked ? "done" : "todo");
+          const isDone = e.currentTarget.checked;
+          if (isDone) {
+            // Checking: mark as done
+            onStatusToggle(subtask.id, "done");
+          } else {
+            // Unchecking: restore to previous status or default to todo
+            const newStatus = subtask.previous_status || "todo";
+            onStatusToggle(subtask.id, newStatus);
+          }
         }}
         size="sm"
         onClick={(e) => e.stopPropagation()}
@@ -1918,7 +1965,7 @@ function SubtasksSection({
     setNewAssignee("");
     setNewPriority("medium");
     setShowAddForm(false);
-    onSubtaskChange?.();
+    onSubtaskChange?.(parentIssue.id); // Pass parent ID to expand it
 
     notifications.show({
       title: "Subtask created",

@@ -239,7 +239,7 @@ app.post("/api/issues", async (req, res) => {
 // Update issue
 app.patch("/api/issues/:id", async (req, res) => {
   try {
-    const { title, description, status, priority, assignee_id, parent_id } =
+    const { title, description, status, priority, assignee_id, parent_id, previous_status } =
       req.body;
     const { id } = req.params;
 
@@ -262,8 +262,22 @@ app.patch("/api/issues/:id", async (req, res) => {
       args.push(description);
     }
     if (status !== undefined) {
+      // When moving to 'done', store current status as previous_status
+      if (status === 'done' && existing[0].status !== 'done') {
+        updates.push("previous_status = ?");
+        args.push(existing[0].status);
+      }
+      // When moving from 'done', clear previous_status
+      if (status !== 'done' && existing[0].status === 'done') {
+        updates.push("previous_status = ?");
+        args.push(null);
+      }
       updates.push("status = ?");
       args.push(status);
+    }
+    if (previous_status !== undefined) {
+      updates.push("previous_status = ?");
+      args.push(previous_status || null);
     }
     if (priority !== undefined) {
       updates.push("priority = ?");
