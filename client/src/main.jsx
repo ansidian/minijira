@@ -6,26 +6,35 @@ import App from "./App.jsx";
 import "./index.css";
 
 const theme = createTheme({
-  colorScheme: "dark",
   colors: {
+    // Dark mode colors (used when --mantine-color-dark-X is referenced)
     dark: [
-      "#fafafa", // text-primary
-      "#a1a1aa", // text-secondary
-      "#71717a", // text-muted
-      "#3a3a3f", // border-secondary
-      "#2a2a2e", // border-primary
-      "#232326", // bg-hover
-      "#1c1c1f", // bg-card
-      "#18181b", // bg-tertiary
-      "#111113", // bg-secondary
-      "#0a0a0b", // bg-primary
+      "#fafafa", // 0 - text-primary (dark mode)
+      "#a1a1aa", // 1 - text-secondary
+      "#71717a", // 2 - text-muted
+      "#3a3a3f", // 3 - border-secondary
+      "#2a2a2e", // 4 - border-primary
+      "#232326", // 5 - bg-hover
+      "#1c1c1f", // 6 - bg-card
+      "#18181b", // 7 - bg-tertiary
+      "#111113", // 8 - bg-secondary
+      "#0a0a0b", // 9 - bg-primary
     ],
   },
+  // Use 'dark' as the default color for backgrounds/components
+  // This way --mantine-color-dark-6 will automatically switch between dark[6] and light theme equivalent
+  primaryColor: "blue",
 });
+
+// Get initial color scheme from localStorage, default to dark
+const getInitialColorScheme = () => {
+  const stored = localStorage.getItem("mantine-color-scheme");
+  return stored || "dark";
+};
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <MantineProvider theme={theme} forceColorScheme="dark">
+    <MantineProvider theme={theme} defaultColorScheme={getInitialColorScheme()}>
       <App />
     </MantineProvider>
   </React.StrictMode>

@@ -18,6 +18,8 @@ import {
   Tooltip,
   Collapse,
   HoverCard,
+  ActionIcon,
+  useMantineColorScheme,
 } from "@mantine/core";
 import { Notifications, notifications } from "@mantine/notifications";
 import "@mantine/notifications/styles.css";
@@ -306,6 +308,9 @@ function App() {
   const [allIssues, setAllIssues] = useState([]); // All issues including subtasks for Spotlight
   const [statsBadgeAnimate, setStatsBadgeAnimate] = useState(false);
   const [previousStats, setPreviousStats] = useState(null);
+
+  // Theme toggle
+  const { colorScheme, setColorScheme } = useMantineColorScheme();
 
   // Detect if this is a touch device
   const isTouchDevice =
@@ -827,7 +832,7 @@ function App() {
                     transition: "transform 0.15s ease-out",
                   }}
                 >
-                  <span style={{ color: "var(--mantine-color-gray-4)" }}>
+                  <span style={{ color: "var(--mantine-color-darkgray-4)" }}>
                     {stats.todo}
                   </span>{" "}
                   /{" "}
@@ -896,7 +901,7 @@ function App() {
                   {/* Hints section */}
                   <div
                     style={{
-                      borderTop: "1px solid var(--mantine-color-dark-4)",
+                      borderTop: "1px solid var(--border-primary)",
                       paddingTop: "0.75rem",
                       marginTop: "0.25rem",
                     }}
@@ -940,6 +945,59 @@ function App() {
                 {isMac ? "⌘ + K" : "Ctrl + K"}
               </span>
             </button>
+            {/* Theme toggle button */}
+            <Tooltip
+              label={`Switch to ${
+                colorScheme === "dark" ? "light" : "dark"
+              } mode`}
+            >
+              <ActionIcon
+                variant="default"
+                size="lg"
+                onClick={() =>
+                  setColorScheme(colorScheme === "dark" ? "light" : "dark")
+                }
+                aria-label="Toggle theme"
+              >
+                {colorScheme === "dark" ? (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="4" />
+                    <path d="M12 2v2" />
+                    <path d="M12 20v2" />
+                    <path d="m4.93 4.93 1.41 1.41" />
+                    <path d="m17.66 17.66 1.41 1.41" />
+                    <path d="M2 12h2" />
+                    <path d="M20 12h2" />
+                    <path d="m6.34 17.66-1.41 1.41" />
+                    <path d="m19.07 4.93-1.41 1.41" />
+                  </svg>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+                  </svg>
+                )}
+              </ActionIcon>
+            </Tooltip>
             <div
               className={`user-selector ${!currentUserId ? "unselected" : ""}`}
             >
@@ -1849,16 +1907,16 @@ function SubtaskRow({
       gap="sm"
       p="xs"
       style={{
-        backgroundColor: "var(--mantine-color-dark-6)",
+        backgroundColor: "var(--bg-tertiary)",
         borderRadius: "4px",
         cursor: "pointer",
         transition: "background-color 0.15s ease",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = "var(--mantine-color-dark-5)";
+        e.currentTarget.style.backgroundColor = "var(--bg-hover)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = "var(--mantine-color-dark-6)";
+        e.currentTarget.style.backgroundColor = "var(--bg-tertiary)";
       }}
       onClick={onClick}
       onContextMenu={handleContextMenu}
@@ -2108,7 +2166,7 @@ function SubtasksSection({
             textAlign: "center",
             color: "var(--text-secondary)",
             fontSize: "0.875rem",
-            backgroundColor: "var(--mantine-color-dark-6)",
+            backgroundColor: "var(--bg-tertiary)",
             borderRadius: "4px",
           }}
         >
@@ -2436,7 +2494,7 @@ function IssueDetailModal({
             <div
               style={{
                 padding: "0.5rem 0.75rem",
-                backgroundColor: "var(--mantine-color-dark-6)",
+                backgroundColor: "var(--bg-tertiary)",
                 borderRadius: "4px",
                 minHeight: "36px",
                 display: "flex",
@@ -2470,16 +2528,14 @@ function IssueDetailModal({
             <div
               style={{
                 padding: "0.5rem 0.75rem",
-                backgroundColor: "var(--mantine-color-dark-6)",
+                backgroundColor: "var(--bg-tertiary)",
                 borderRadius: "4px",
                 minHeight: "60px",
                 whiteSpace: "pre-wrap",
                 wordWrap: "break-word",
                 fontSize: "0.875rem",
                 lineHeight: "1.5",
-                color: issue.description
-                  ? "inherit"
-                  : "var(--mantine-color-dimmed)",
+                color: issue.description ? "inherit" : "var(--text-muted)",
               }}
             >
               {issue.description
@@ -2575,7 +2631,7 @@ function IssueDetailModal({
             marginTop: "1.5rem",
             marginBottom: "1.5rem",
             paddingTop: "1rem",
-            borderTop: "1px solid var(--mantine-color-dark-4)",
+            borderTop: "1px solid var(--border-primary)",
           }}
         >
           <SubtasksSection
@@ -2664,7 +2720,7 @@ function IssueDetailModal({
         justify="flex-start"
         mt="xl"
         pt="md"
-        style={{ borderTop: "1px solid var(--mantine-color-dark-4)" }}
+        style={{ borderTop: "1px solid var(--border-primary)" }}
       >
         {!confirmingDelete ? (
           <Button

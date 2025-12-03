@@ -5,6 +5,16 @@
 }
 
 :root {
+	/* Fonts */
+	--font-mono: "JetBrains Mono", monospace;
+	--font-sans: "Space Grotesk", system-ui, sans-serif;
+
+	/* Sizing */
+	--header-height: 56px;
+}
+
+/* Dark theme variables */
+[data-mantine-color-scheme="dark"] {
 	/* Dark utilitarian palette */
 	--bg-primary: #0a0a0b;
 	--bg-secondary: #111113;
@@ -33,13 +43,38 @@
 	/* Accent */
 	--accent: #3b82f6;
 	--accent-hover: #2563eb;
+}
 
-	/* Fonts */
-	--font-mono: "JetBrains Mono", monospace;
-	--font-sans: "Space Grotesk", system-ui, sans-serif;
+/* Light theme variables */
+[data-mantine-color-scheme="light"] {
+	/* Bright, high-contrast light palette */
+	--bg-primary: #ffffff;
+	--bg-secondary: #f9fafb;
+	--bg-tertiary: #f3f4f6;
+	--bg-card: #ffffff;
+	--bg-hover: #f3f4f6;
 
-	/* Sizing */
-	--header-height: 56px;
+	--border-primary: #e5e7eb;
+	--border-secondary: #d1d5db;
+	--border-accent: #9ca3af;
+
+	--text-primary: #111827;
+	--text-secondary: #4b5563;
+	--text-muted: #6b7280;
+
+	/* Status colors - vibrant */
+	--status-todo: #3b82f6;
+	--status-progress: #f59e0b;
+	--status-done: #10b981;
+
+	/* Priority */
+	--priority-low: #6b7280;
+	--priority-medium: #f59e0b;
+	--priority-high: #ef4444;
+
+	/* Accent */
+	--accent: #3b82f6;
+	--accent-hover: #2563eb;
 }
 
 html,
@@ -748,7 +783,7 @@ body {
 }
 
 .editable-field:hover {
-  background-color: var(--mantine-color-dark-6);
+  background-color: var(--bg-tertiary);
 }
 
 /* Subtask expansion styles */
