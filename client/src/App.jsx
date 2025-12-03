@@ -151,6 +151,30 @@ function App() {
     setLoading(false);
   }
 
+  // Auto-expand issues with subtasks on first load
+  useEffect(() => {
+    if (issues.length > 0 && expandedIssues.size === 0) {
+      const parentsWithSubtasks = issues.filter(
+        (i) => !i.parent_id && i.subtask_count > 0
+      );
+      if (parentsWithSubtasks.length > 0) {
+        const newExpanded = new Set(parentsWithSubtasks.map((i) => i.id));
+        setExpandedIssues(newExpanded);
+
+        // Fetch all subtasks for expanded issues
+        const fetchSubtasks = async () => {
+          const newCache = {};
+          for (const issue of parentsWithSubtasks) {
+            const subtasks = await api.get(`/issues/${issue.id}/subtasks`);
+            newCache[issue.id] = subtasks;
+          }
+          setSubtasksCache(newCache);
+        };
+        fetchSubtasks();
+      }
+    }
+  }, [issues]);
+
   // Group issues by status - only show parent issues (not subtasks)
   const issuesByStatus = COLUMNS.reduce((acc, col) => {
     acc[col.status] = issues.filter(
@@ -345,8 +369,44 @@ function App() {
           <div className="logo">
             <div className="logo-icon">MJ</div>
             <span>MiniJira</span>
-          </div>
-          <div className="header-right">
+            <Button
+              variant="light"
+              size="sm"
+              color="blue"
+              onClick={handleToggleAllSubtasks}
+              className="subtask-toggle-desktop"
+              leftSection={
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{
+                    transform: issues
+                      .filter((i) => !i.parent_id && i.subtask_count > 0)
+                      .every((i) => expandedIssues.has(i.id))
+                      ? "rotate(180deg)"
+                      : "rotate(0deg)",
+                    transition: "transform 0.2s ease",
+                  }}
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              }
+              style={{ marginLeft: "1rem" }}
+            >
+              <span className="subtask-toggle-text-full">
+                {issues
+                  .filter((i) => !i.parent_id && i.subtask_count > 0)
+                  .every((i) => expandedIssues.has(i.id))
+                  ? "Hide All Subtasks"
+                  : "Show All Subtasks"}
+              </span>
+            </Button>
             <div className="header-stats">
               <div className="stat">
                 <span style={{ minWidth: "60px" }}>
@@ -387,43 +447,8 @@ function App() {
                 />
               </div>
             </div>
-
-            <Button
-              variant="light"
-              size="sm"
-              color="blue"
-              onClick={handleToggleAllSubtasks}
-              leftSection={
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{
-                    transform: issues
-                      .filter((i) => !i.parent_id && i.subtask_count > 0)
-                      .every((i) => expandedIssues.has(i.id))
-                      ? "rotate(180deg)"
-                      : "rotate(0deg)",
-                    transition: "transform 0.2s ease",
-                  }}
-                >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              }
-              style={{ marginLeft: "1rem" }}
-            >
-              {issues
-                .filter((i) => !i.parent_id && i.subtask_count > 0)
-                .every((i) => expandedIssues.has(i.id))
-                ? "Hide All Subtasks"
-                : "Show All Subtasks"}
-            </Button>
-
+          </div>
+          <div className="header-right">
             <div
               className={`user-selector ${!currentUserId ? "unselected" : ""}`}
             >
@@ -450,6 +475,44 @@ function App() {
                   </option>
                 ))}
               </select>
+              <Button
+                variant="light"
+                size="sm"
+                color="blue"
+                onClick={handleToggleAllSubtasks}
+                className="subtask-toggle-mobile"
+                leftSection={
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{
+                      transform: issues
+                        .filter((i) => !i.parent_id && i.subtask_count > 0)
+                        .every((i) => expandedIssues.has(i.id))
+                        ? "rotate(180deg)"
+                        : "rotate(0deg)",
+                      transition: "transform 0.2s ease",
+                    }}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                }
+                style={{ marginLeft: "1rem" }}
+              >
+                <span className="subtask-toggle-text-mobile">
+                  {issues
+                    .filter((i) => !i.parent_id && i.subtask_count > 0)
+                    .every((i) => expandedIssues.has(i.id))
+                    ? "Subtasks"
+                    : "Subtasks"}
+                </span>
+              </Button>
             </div>
           </div>
         </header>

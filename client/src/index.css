@@ -723,3 +723,22 @@ body {
   background-color: var(--bg-hover) !important;
   transform: translateX(2px);
 }
+
+/* Subtask toggle button visibility - show desktop version by default, mobile on small screens */
+.subtask-toggle-mobile {
+  display: none;
+}
+
+.subtask-toggle-desktop {
+  display: inline-flex;
+}
+
+@media (max-width: 768px) {
+  .subtask-toggle-mobile {
+    display: inline-flex;
+  }
+
+  .subtask-toggle-desktop {
+    display: none;
+  }
+}
