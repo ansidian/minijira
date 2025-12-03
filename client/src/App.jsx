@@ -17,7 +17,6 @@ import {
   Checkbox,
   Tooltip,
   Collapse,
-  ActionIcon,
 } from "@mantine/core";
 import { Notifications, notifications } from "@mantine/notifications";
 import "@mantine/notifications/styles.css";
@@ -26,7 +25,10 @@ import "mantine-contextmenu/styles.css";
 
 const API_BASE = "/api";
 
-// API helpers
+// ============================================================================
+// API HELPERS
+// ============================================================================
+
 const api = {
   async get(path) {
     const res = await fetch(`${API_BASE}${path}`);
@@ -52,6 +54,18 @@ const api = {
     await fetch(`${API_BASE}${path}`, { method: "DELETE" });
   },
 };
+
+// ============================================================================
+// UTILITIES
+// ============================================================================
+
+// Priority → color mapping
+const getPriorityColor = (priority) =>
+  priority === "high" ? "red" : priority === "medium" ? "yellow" : "gray";
+
+// Status → color mapping
+const getStatusColor = (status) =>
+  status === "done" ? "green" : status === "in_progress" ? "blue" : "gray";
 
 // Format date
 function formatDate(dateStr) {
@@ -99,12 +113,171 @@ function linkifyText(text) {
   return parts.length === 0 ? [{ type: "text", content: text }] : parts;
 }
 
+// ============================================================================
+// SMALL COMPONENTS
+// ============================================================================
+
+// Unassigned avatar placeholder - dashed circle
+function UnassignedAvatar({ size = "md" }) {
+  const sizes = {
+    xs: { width: "18px", height: "18px" },
+    sm: { width: "26px", height: "26px" },
+    md: { width: "32px", height: "32px" },
+  };
+  const sizeStyles = sizes[size] || sizes.md;
+
+  return (
+    <div
+      title="Unassigned"
+      style={{
+        ...sizeStyles,
+        borderRadius: "50%",
+        border: "2px dashed var(--mantine-color-gray-6)",
+        backgroundColor: "transparent",
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
 // Column configuration
 const COLUMNS = [
   { id: "todo", title: "To Do", status: "todo" },
   { id: "in_progress", title: "In Progress", status: "in_progress" },
   { id: "done", title: "Done", status: "done" },
 ];
+
+// ============================================================================
+// HOOKS
+// ============================================================================
+
+// Hook for generating context menu items for an issue
+function useIssueContextMenu({
+  issue,
+  users,
+  isTouchDevice,
+  onViewDetails,
+  onStatusChange,
+  onUpdateIssue,
+  onDeleteIssue,
+  onRequestAddSubtask,
+}) {
+  const { showContextMenu } = useContextMenu();
+  const isSubtask = !!issue.parent_id;
+
+  const handleContextMenu = (e) => {
+    // Don't show context menu on touch devices (preserve mobile drag & drop)
+    if (isTouchDevice) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const menuItems = [
+      {
+        key: "view",
+        title: "View Details",
+        onClick: () => onViewDetails(issue),
+      },
+      { key: "divider-1" },
+      {
+        key: "status",
+        title: "Change Status",
+        items: [
+          {
+            key: "status-todo",
+            title: "To Do",
+            onClick: () => onStatusChange(issue.id, "todo"),
+          },
+          {
+            key: "status-in_progress",
+            title: "In Progress",
+            onClick: () => onStatusChange(issue.id, "in_progress"),
+          },
+          {
+            key: "status-done",
+            title: "Done",
+            onClick: () => onStatusChange(issue.id, "done"),
+          },
+        ],
+      },
+      {
+        key: "priority",
+        title: "Change Priority",
+        items: [
+          {
+            key: "priority-low",
+            title: "Low",
+            onClick: () => onUpdateIssue(issue.id, { priority: "low" }),
+          },
+          {
+            key: "priority-medium",
+            title: "Medium",
+            onClick: () => onUpdateIssue(issue.id, { priority: "medium" }),
+          },
+          {
+            key: "priority-high",
+            title: "High",
+            onClick: () => onUpdateIssue(issue.id, { priority: "high" }),
+          },
+        ],
+      },
+      {
+        key: "assignee",
+        title: "Assign To",
+        items: [
+          {
+            key: "assignee-unassigned",
+            title: "Unassigned",
+            onClick: () => onUpdateIssue(issue.id, { assignee_id: null }),
+          },
+          { key: "assignee-divider" },
+          ...users.map((user) => ({
+            key: `assignee-${user.id}`,
+            title: user.name,
+            onClick: () => onUpdateIssue(issue.id, { assignee_id: user.id }),
+          })),
+        ],
+      },
+    ];
+
+    // Add "Add Subtask" option only for parent issues
+    if (!isSubtask && onRequestAddSubtask) {
+      menuItems.push(
+        { key: "divider-2" },
+        {
+          key: "add-subtask",
+          title: "Add Subtask",
+          onClick: () => onRequestAddSubtask(issue),
+        }
+      );
+    }
+
+    // Add delete option
+    menuItems.push(
+      { key: "divider-3" },
+      {
+        key: "delete",
+        title: isSubtask ? "Delete Subtask" : "Delete Issue",
+        color: "red",
+        onClick: async () => {
+          await onDeleteIssue(issue.id);
+        },
+      }
+    );
+
+    showContextMenu(menuItems)(e);
+  };
+
+  return handleContextMenu;
+}
+
+// ============================================================================
+// MAIN APP COMPONENT
+// ============================================================================
 
 function App() {
   const [issues, setIssues] = useState([]);
@@ -183,6 +356,16 @@ function App() {
     return acc;
   }, {});
 
+  // Helper to refresh subtasks cache for expanded issues
+  async function refreshSubtasksCache(issueIds) {
+    const newCache = {};
+    for (const issueId of issueIds) {
+      const subtasks = await api.get(`/issues/${issueId}/subtasks`);
+      newCache[issueId] = subtasks;
+    }
+    setSubtasksCache((prev) => ({ ...prev, ...newCache }));
+  }
+
   // Handle status change (drag simulation via click)
   async function handleStatusChange(issueId, newStatus) {
     const updated = await api.patch(`/issues/${issueId}`, {
@@ -196,14 +379,12 @@ function App() {
 
     // If this issue has subtasks and is expanded, refresh them
     if (updated.subtask_count > 0 && expandedIssues.has(issueId)) {
-      const subtasks = await api.get(`/issues/${issueId}/subtasks`);
-      setSubtasksCache((prev) => ({ ...prev, [issueId]: subtasks }));
+      await refreshSubtasksCache([issueId]);
     }
 
     // If this is a subtask, refresh its parent's cache if expanded
     if (updated.parent_id && expandedIssues.has(updated.parent_id)) {
-      const subtasks = await api.get(`/issues/${updated.parent_id}/subtasks`);
-      setSubtasksCache((prev) => ({ ...prev, [updated.parent_id]: subtasks }));
+      await refreshSubtasksCache([updated.parent_id]);
     }
   }
 
@@ -227,8 +408,7 @@ function App() {
 
     // If this is a subtask, refresh its parent's cache if expanded
     if (updated.parent_id && expandedIssues.has(updated.parent_id)) {
-      const subtasks = await api.get(`/issues/${updated.parent_id}/subtasks`);
-      setSubtasksCache((prev) => ({ ...prev, [updated.parent_id]: subtasks }));
+      await refreshSubtasksCache([updated.parent_id]);
     }
   }
 
@@ -247,15 +427,15 @@ function App() {
     setSelectedIssue(null);
 
     // Refresh all expanded subtask caches to ensure they reflect the deletion
-    const newCache = {};
-    for (const expandedId of expandedIssues) {
-      // Skip the deleted issue itself
-      if (expandedId !== issueId) {
+    const expandedIds = [...expandedIssues].filter((id) => id !== issueId);
+    if (expandedIds.length > 0) {
+      const newCache = {};
+      for (const expandedId of expandedIds) {
         const subtasks = await api.get(`/issues/${expandedId}/subtasks`);
         newCache[expandedId] = subtasks;
       }
+      setSubtasksCache(newCache);
     }
-    setSubtasksCache(newCache);
 
     // If this was a parent issue with expanded subtasks, clean it from expanded set
     if (expandedIssues.has(issueId)) {
@@ -705,7 +885,10 @@ function App() {
   );
 }
 
-// Column component
+// ============================================================================
+// COLUMN COMPONENT
+// ============================================================================
+
 function Column({
   column,
   issues,
@@ -799,7 +982,10 @@ function Column({
   );
 }
 
-// Issue Card component
+// ============================================================================
+// ISSUE CARD COMPONENT
+// ============================================================================
+
 function IssueCard({
   issue,
   users,
@@ -816,7 +1002,17 @@ function IssueCard({
 }) {
   const [dragging, setDragging] = useState(false);
   const [hovering, setHovering] = useState(false);
-  const { showContextMenu } = useContextMenu();
+
+  const handleContextMenu = useIssueContextMenu({
+    issue,
+    users,
+    isTouchDevice,
+    onViewDetails: onClick,
+    onStatusChange,
+    onUpdateIssue,
+    onDeleteIssue,
+    onRequestAddSubtask,
+  });
 
   function handleDragStart(e) {
     setDragging(true);
@@ -829,112 +1025,10 @@ function IssueCard({
   }
 
   const hasSubtasks = issue.subtask_count > 0;
-  const isSubtask = !!issue.parent_id;
 
   function handleSubtaskBadgeClick(e) {
     e.stopPropagation();
     onToggleSubtasks(issue.id);
-  }
-
-  function handleContextMenu(e) {
-    // Don't show context menu on touch devices (preserve mobile drag & drop)
-    if (isTouchDevice) {
-      e.preventDefault();
-      e.stopPropagation();
-      return;
-    }
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    showContextMenu([
-      {
-        key: "view",
-        title: "View Details",
-        onClick: () => onClick(issue),
-      },
-      { key: "divider-1" },
-      {
-        key: "status",
-        title: "Change Status",
-        items: [
-          {
-            key: "status-todo",
-            title: "To Do",
-            onClick: () => onStatusChange(issue.id, "todo"),
-          },
-          {
-            key: "status-in_progress",
-            title: "In Progress",
-            onClick: () => onStatusChange(issue.id, "in_progress"),
-          },
-          {
-            key: "status-done",
-            title: "Done",
-            onClick: () => onStatusChange(issue.id, "done"),
-          },
-        ],
-      },
-      {
-        key: "priority",
-        title: "Change Priority",
-        items: [
-          {
-            key: "priority-low",
-            title: "Low",
-            onClick: () => onUpdateIssue(issue.id, { priority: "low" }),
-          },
-          {
-            key: "priority-medium",
-            title: "Medium",
-            onClick: () => onUpdateIssue(issue.id, { priority: "medium" }),
-          },
-          {
-            key: "priority-high",
-            title: "High",
-            onClick: () => onUpdateIssue(issue.id, { priority: "high" }),
-          },
-        ],
-      },
-      {
-        key: "assignee",
-        title: "Assign To",
-        items: [
-          {
-            key: "assignee-unassigned",
-            title: "Unassigned",
-            onClick: () => onUpdateIssue(issue.id, { assignee_id: null }),
-          },
-          { key: "assignee-divider" },
-          ...users.map((user) => ({
-            key: `assignee-${user.id}`,
-            title: user.name,
-            onClick: () => onUpdateIssue(issue.id, { assignee_id: user.id }),
-          })),
-        ],
-      },
-      ...(!isSubtask
-        ? [
-            { key: "divider-2" },
-            {
-              key: "add-subtask",
-              title: "Add Subtask",
-              onClick: () => {
-                onRequestAddSubtask(issue);
-              },
-            },
-          ]
-        : []),
-      { key: "divider-3" },
-      {
-        key: "delete",
-        title: "Delete Issue",
-        color: "red",
-        onClick: async () => {
-          await onDeleteIssue(issue.id);
-        },
-      },
-    ])(e);
   }
 
   return (
@@ -1002,13 +1096,7 @@ function IssueCard({
           <Group justify="space-between" mt="xs">
             <Group gap="xs">
               <Badge
-                color={
-                  issue.priority === "high"
-                    ? "red"
-                    : issue.priority === "medium"
-                    ? "yellow"
-                    : "gray"
-                }
+                color={getPriorityColor(issue.priority)}
                 size="sm"
                 variant="light"
               >
@@ -1049,16 +1137,7 @@ function IssueCard({
                 variant="filled"
               />
             ) : (
-              <div
-                title="Unassigned"
-                style={{
-                  width: "26px",
-                  height: "26px",
-                  borderRadius: "50%",
-                  border: "2px dashed var(--mantine-color-gray-6)",
-                  backgroundColor: "transparent",
-                }}
-              />
+              <UnassignedAvatar size="sm" />
             )}
           </Group>
         </Stack>
@@ -1068,201 +1147,18 @@ function IssueCard({
       {hasSubtasks && (
         <Collapse in={isExpanded}>
           <div className="subtasks-container">
-            {subtasks.map((subtask) => {
-              const handleSubtaskContextMenu = (e) => {
-                // Don't show context menu on touch devices (preserve mobile drag & drop)
-                if (isTouchDevice) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  return;
-                }
-
-                e.preventDefault();
-                e.stopPropagation();
-
-                showContextMenu([
-                  {
-                    key: "view",
-                    title: "View Details",
-                    onClick: () => onClick(subtask),
-                  },
-                  { key: "divider-1" },
-                  {
-                    key: "status",
-                    title: "Change Status",
-                    items: [
-                      {
-                        key: "status-todo",
-                        title: "To Do",
-                        onClick: () => onStatusChange(subtask.id, "todo"),
-                      },
-                      {
-                        key: "status-in_progress",
-                        title: "In Progress",
-                        onClick: () =>
-                          onStatusChange(subtask.id, "in_progress"),
-                      },
-                      {
-                        key: "status-done",
-                        title: "Done",
-                        onClick: () => onStatusChange(subtask.id, "done"),
-                      },
-                    ],
-                  },
-                  {
-                    key: "priority",
-                    title: "Change Priority",
-                    items: [
-                      {
-                        key: "priority-low",
-                        title: "Low",
-                        onClick: () =>
-                          onUpdateIssue(subtask.id, { priority: "low" }),
-                      },
-                      {
-                        key: "priority-medium",
-                        title: "Medium",
-                        onClick: () =>
-                          onUpdateIssue(subtask.id, { priority: "medium" }),
-                      },
-                      {
-                        key: "priority-high",
-                        title: "High",
-                        onClick: () =>
-                          onUpdateIssue(subtask.id, { priority: "high" }),
-                      },
-                    ],
-                  },
-                  {
-                    key: "assignee",
-                    title: "Assign To",
-                    items: [
-                      {
-                        key: "assignee-unassigned",
-                        title: "Unassigned",
-                        onClick: () =>
-                          onUpdateIssue(subtask.id, { assignee_id: null }),
-                      },
-                      { key: "assignee-divider" },
-                      ...users.map((user) => ({
-                        key: `assignee-${user.id}`,
-                        title: user.name,
-                        onClick: () =>
-                          onUpdateIssue(subtask.id, { assignee_id: user.id }),
-                      })),
-                    ],
-                  },
-                  { key: "divider-2" },
-                  {
-                    key: "delete",
-                    title: "Delete Subtask",
-                    color: "red",
-                    onClick: async () => {
-                      await onDeleteIssue(subtask.id);
-                    },
-                  },
-                ])(e);
-              };
-
-              return (
-                <div key={subtask.id} className="subtask-item">
-                  <div className="subtask-connector" />
-                  <Paper
-                    p="sm"
-                    withBorder
-                    className="subtask-card"
-                    style={{
-                      cursor: "pointer",
-                      backgroundColor: "var(--bg-tertiary)",
-                      borderLeft:
-                        subtask.status === "done"
-                          ? "10px solid var(--mantine-color-green-6)"
-                          : subtask.status === "in_progress"
-                          ? "6px solid var(--mantine-color-blue-6)"
-                          : "3px solid var(--mantine-color-gray-6)",
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onClick(subtask);
-                    }}
-                    onContextMenu={handleSubtaskContextMenu}
-                  >
-                    <Stack gap="xs">
-                      <Group justify="space-between" gap="xs">
-                        <div
-                          style={{
-                            fontSize: "0.7rem",
-                            color: "var(--text-secondary)",
-                            fontWeight: 500,
-                          }}
-                        >
-                          {subtask.key}
-                        </div>
-                        <Badge
-                          size="xs"
-                          variant="dot"
-                          color={
-                            subtask.status === "done"
-                              ? "green"
-                              : subtask.status === "in_progress"
-                              ? "blue"
-                              : "gray"
-                          }
-                        >
-                          {subtask.status === "done"
-                            ? "Done"
-                            : subtask.status === "in_progress"
-                            ? "In Progress"
-                            : "To Do"}
-                        </Badge>
-                      </Group>
-                      <div
-                        style={{
-                          fontSize: "0.8rem",
-                          lineHeight: 1.3,
-                        }}
-                      >
-                        {subtask.title}
-                      </div>
-                      <Group justify="space-between" gap="xs">
-                        <Badge
-                          color={
-                            subtask.priority === "high"
-                              ? "red"
-                              : subtask.priority === "medium"
-                              ? "yellow"
-                              : "gray"
-                          }
-                          size="xs"
-                          variant="light"
-                        >
-                          {subtask.priority}
-                        </Badge>
-                        {subtask.assignee_name ? (
-                          <Avatar
-                            color={subtask.assignee_color}
-                            name={subtask.assignee_name}
-                            size="sm"
-                            title={subtask.assignee_name}
-                          />
-                        ) : (
-                          <div
-                            title="Unassigned"
-                            style={{
-                              width: "20px",
-                              height: "20px",
-                              borderRadius: "50%",
-                              border: "2px dashed var(--mantine-color-gray-6)",
-                              backgroundColor: "transparent",
-                            }}
-                          />
-                        )}
-                      </Group>
-                    </Stack>
-                  </Paper>
-                </div>
-              );
-            })}
+            {subtasks.map((subtask) => (
+              <SubtaskCardInline
+                key={subtask.id}
+                subtask={subtask}
+                users={users}
+                isTouchDevice={isTouchDevice}
+                onClick={onClick}
+                onStatusChange={onStatusChange}
+                onUpdateIssue={onUpdateIssue}
+                onDeleteIssue={onDeleteIssue}
+              />
+            ))}
           </div>
         </Collapse>
       )}
@@ -1270,7 +1166,113 @@ function IssueCard({
   );
 }
 
-// Create Issue Modal
+// ============================================================================
+// SUBTASK CARD INLINE (for expanded view in issue cards)
+// ============================================================================
+
+function SubtaskCardInline({
+  subtask,
+  users,
+  isTouchDevice,
+  onClick,
+  onStatusChange,
+  onUpdateIssue,
+  onDeleteIssue,
+}) {
+  const handleContextMenu = useIssueContextMenu({
+    issue: subtask,
+    users,
+    isTouchDevice,
+    onViewDetails: onClick,
+    onStatusChange,
+    onUpdateIssue,
+    onDeleteIssue,
+    onRequestAddSubtask: null, // Subtasks can't have subtasks
+  });
+
+  return (
+    <div className="subtask-item">
+      <div className="subtask-connector" />
+      <Paper
+        p="sm"
+        withBorder
+        className="subtask-card"
+        style={{
+          cursor: "pointer",
+          backgroundColor: "var(--bg-tertiary)",
+          borderLeft:
+            subtask.status === "done"
+              ? "10px solid var(--mantine-color-green-6)"
+              : subtask.status === "in_progress"
+              ? "6px solid var(--mantine-color-blue-6)"
+              : "3px solid var(--mantine-color-gray-6)",
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick(subtask);
+        }}
+        onContextMenu={handleContextMenu}
+      >
+        <Stack gap="xs">
+          <Group justify="space-between" gap="xs">
+            <div
+              style={{
+                fontSize: "0.7rem",
+                color: "var(--text-secondary)",
+                fontWeight: 500,
+              }}
+            >
+              {subtask.key}
+            </div>
+            <Badge
+              size="xs"
+              variant="dot"
+              color={getStatusColor(subtask.status)}
+            >
+              {subtask.status === "done"
+                ? "Done"
+                : subtask.status === "in_progress"
+                ? "In Progress"
+                : "To Do"}
+            </Badge>
+          </Group>
+          <div
+            style={{
+              fontSize: "0.8rem",
+              lineHeight: 1.3,
+            }}
+          >
+            {subtask.title}
+          </div>
+          <Group justify="space-between" gap="xs">
+            <Badge
+              color={getPriorityColor(subtask.priority)}
+              size="xs"
+              variant="light"
+            >
+              {subtask.priority}
+            </Badge>
+            {subtask.assignee_name ? (
+              <Avatar
+                color={subtask.assignee_color}
+                name={subtask.assignee_name}
+                size="sm"
+                title={subtask.assignee_name}
+              />
+            ) : (
+              <UnassignedAvatar size="sm" />
+            )}
+          </Group>
+        </Stack>
+      </Paper>
+    </div>
+  );
+}
+
+// ============================================================================
+// CREATE ISSUE MODAL
+// ============================================================================
+
 function CreateIssueModal({
   users,
   currentUserId,
@@ -1438,7 +1440,10 @@ function CreateIssueModal({
   );
 }
 
-// Subtask Row component
+// ============================================================================
+// SUBTASK ROW COMPONENT (for SubtasksSection in modal)
+// ============================================================================
+
 function SubtaskRow({
   subtask,
   users,
@@ -1448,96 +1453,16 @@ function SubtaskRow({
   onDelete,
   isTouchDevice,
 }) {
-  const { showContextMenu } = useContextMenu();
-
-  function handleContextMenu(e) {
-    // Don't show context menu on touch devices (preserve mobile drag & drop)
-    if (isTouchDevice) {
-      e.preventDefault();
-      e.stopPropagation();
-      return;
-    }
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    showContextMenu([
-      {
-        key: "view",
-        title: "View Details",
-        onClick: () => onClick(),
-      },
-      { key: "divider-1" },
-      {
-        key: "status",
-        title: "Change Status",
-        items: [
-          {
-            key: "status-todo",
-            title: "To Do",
-            onClick: () => onStatusToggle(subtask.id, "todo"),
-          },
-          {
-            key: "status-in_progress",
-            title: "In Progress",
-            onClick: () => onStatusToggle(subtask.id, "in_progress"),
-          },
-          {
-            key: "status-done",
-            title: "Done",
-            onClick: () => onStatusToggle(subtask.id, "done"),
-          },
-        ],
-      },
-      {
-        key: "priority",
-        title: "Change Priority",
-        items: [
-          {
-            key: "priority-low",
-            title: "Low",
-            onClick: () => onUpdate(subtask.id, { priority: "low" }),
-          },
-          {
-            key: "priority-medium",
-            title: "Medium",
-            onClick: () => onUpdate(subtask.id, { priority: "medium" }),
-          },
-          {
-            key: "priority-high",
-            title: "High",
-            onClick: () => onUpdate(subtask.id, { priority: "high" }),
-          },
-        ],
-      },
-      {
-        key: "assignee",
-        title: "Assign To",
-        items: [
-          {
-            key: "assignee-unassigned",
-            title: "Unassigned",
-            onClick: () => onUpdate(subtask.id, { assignee_id: null }),
-          },
-          { key: "assignee-divider" },
-          ...users.map((user) => ({
-            key: `assignee-${user.id}`,
-            title: user.name,
-            onClick: () => onUpdate(subtask.id, { assignee_id: user.id }),
-          })),
-        ],
-      },
-      { key: "divider-2" },
-      {
-        key: "delete",
-        title: "Delete Subtask",
-        color: "red",
-        onClick: async () => {
-          await onDelete(subtask.id);
-        },
-      },
-    ])(e);
-  }
+  const handleContextMenu = useIssueContextMenu({
+    issue: subtask,
+    users,
+    isTouchDevice,
+    onViewDetails: () => onClick(),
+    onStatusChange: onStatusToggle,
+    onUpdateIssue: onUpdate,
+    onDeleteIssue: onDelete,
+    onRequestAddSubtask: null,
+  });
 
   return (
     <Group
@@ -1594,13 +1519,7 @@ function SubtaskRow({
       <Badge
         size="xs"
         variant="light"
-        color={
-          subtask.priority === "high"
-            ? "red"
-            : subtask.priority === "medium"
-            ? "yellow"
-            : "gray"
-        }
+        color={getPriorityColor(subtask.priority)}
       >
         {subtask.priority}
       </Badge>
@@ -1613,23 +1532,16 @@ function SubtaskRow({
           />
         </Tooltip>
       ) : (
-        <div
-          title="Unassigned"
-          style={{
-            width: "24px",
-            height: "24px",
-            borderRadius: "50%",
-            border: "2px dashed var(--mantine-color-gray-6)",
-            backgroundColor: "transparent",
-            flexShrink: 0,
-          }}
-        />
+        <UnassignedAvatar size="sm" />
       )}
     </Group>
   );
 }
 
-// Subtasks Section component
+// ============================================================================
+// SUBTASKS SECTION COMPONENT
+// ============================================================================
+
 function SubtasksSection({
   parentIssue,
   users,
@@ -1868,6 +1780,10 @@ function SubtasksSection({
     </div>
   );
 }
+
+// ============================================================================
+// ISSUE DETAIL MODAL
+// ============================================================================
 
 function IssueDetailModal({
   issue,
