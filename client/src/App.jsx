@@ -21,6 +21,7 @@ import {
   ActionIcon,
   useMantineColorScheme,
 } from "@mantine/core";
+import { useHotkeys } from "@mantine/hooks";
 import { Notifications, notifications } from "@mantine/notifications";
 import "@mantine/notifications/styles.css";
 import { Spotlight, spotlight } from "@mantine/spotlight";
@@ -311,6 +312,11 @@ function App() {
 
   // Theme toggle
   const { colorScheme, setColorScheme } = useMantineColorScheme();
+
+  // Hotkey for theme toggle (Cmd/Ctrl + J)
+  useHotkeys([
+    ['mod+J', () => setColorScheme(colorScheme === 'dark' ? 'light' : 'dark')],
+  ]);
 
   // Detect if this is a touch device
   const isTouchDevice =
