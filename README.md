@@ -2,7 +2,7 @@
 
 A minimal, no-nonsense project management tool for small teams. Built with the KISS principle in mind.
 
-![MiniJira](https://img.shields.io/badge/version-2.1.3-blue)
+![MiniJira](https://img.shields.io/badge/version-2.2.0-blue)
 
 ## Features
 
