@@ -664,7 +664,51 @@ function App() {
         scrollable
         maxHeight={600}
         searchProps={{
-          placeholder: "Search Issues...",
+          placeholder: "Search Issues... (Try 'issues:' or 'subtasks:' to filter)",
+        }}
+        filter={(query, actions) => {
+          const lowerQuery = query.toLowerCase().trim();
+
+          // Check for filter prefixes
+          if (lowerQuery.startsWith("issues:")) {
+            // Filter for parent issues only
+            const searchTerm = lowerQuery.slice(7).trim();
+            return actions.filter((action) => {
+              const issue = allIssues.find((i) => i.id.toString() === action.id);
+              if (!issue || issue.parent_id) return false;
+              if (!searchTerm) return true;
+              return (
+                issue.key.toLowerCase().includes(searchTerm) ||
+                issue.title.toLowerCase().includes(searchTerm) ||
+                (issue.description || "").toLowerCase().includes(searchTerm)
+              );
+            });
+          } else if (lowerQuery.startsWith("subtasks:")) {
+            // Filter for subtasks only
+            const searchTerm = lowerQuery.slice(9).trim();
+            return actions.filter((action) => {
+              const issue = allIssues.find((i) => i.id.toString() === action.id);
+              if (!issue || !issue.parent_id) return false;
+              if (!searchTerm) return true;
+              return (
+                issue.key.toLowerCase().includes(searchTerm) ||
+                issue.title.toLowerCase().includes(searchTerm) ||
+                (issue.description || "").toLowerCase().includes(searchTerm)
+              );
+            });
+          }
+
+          // Default search (no prefix) - search all issues
+          if (!query) return actions;
+          return actions.filter((action) => {
+            const issue = allIssues.find((i) => i.id.toString() === action.id);
+            if (!issue) return false;
+            return (
+              issue.key.toLowerCase().includes(lowerQuery) ||
+              issue.title.toLowerCase().includes(lowerQuery) ||
+              (issue.description || "").toLowerCase().includes(lowerQuery)
+            );
+          });
         }}
       />
       <div className="app">
