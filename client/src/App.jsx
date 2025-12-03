@@ -1242,7 +1242,7 @@ function IssueCard({
                           <Avatar
                             color={subtask.assignee_color}
                             name={subtask.assignee_name}
-                            size="xs"
+                            size="sm"
                             title={subtask.assignee_name}
                           />
                         ) : (
