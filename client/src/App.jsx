@@ -20,6 +20,8 @@ import {
 } from "@mantine/core";
 import { Notifications, notifications } from "@mantine/notifications";
 import "@mantine/notifications/styles.css";
+import { Spotlight } from "@mantine/spotlight";
+import "@mantine/spotlight/styles.css";
 import { ContextMenuProvider, useContextMenu } from "mantine-contextmenu";
 import "mantine-contextmenu/styles.css";
 import { IconCheck } from "@tabler/icons-react";
@@ -295,6 +297,7 @@ function App() {
   const [expandedIssues, setExpandedIssues] = useState(new Set());
   const [subtasksCache, setSubtasksCache] = useState({});
   const [autoShowSubtaskForm, setAutoShowSubtaskForm] = useState(false);
+  const [allIssues, setAllIssues] = useState([]); // All issues including subtasks for Spotlight
 
   // Detect if this is a touch device
   const isTouchDevice =
@@ -314,14 +317,18 @@ function App() {
 
   async function loadData() {
     setLoading(true);
-    const [issuesData, usersData, statsData] = await Promise.all([
-      api.get("/issues"),
-      api.get("/users"),
-      api.get("/stats"),
-    ]);
+    const [issuesData, usersData, statsData, allIssuesData] = await Promise.all(
+      [
+        api.get("/issues"),
+        api.get("/users"),
+        api.get("/stats"),
+        api.get("/issues?include_subtasks=true"),
+      ]
+    );
     setIssues(issuesData);
     setUsers(usersData);
     setStats(statsData);
+    setAllIssues(allIssuesData);
     setLoading(false);
   }
 
@@ -387,6 +394,10 @@ function App() {
     if (updated.parent_id && expandedIssues.has(updated.parent_id)) {
       await refreshSubtasksCache([updated.parent_id]);
     }
+
+    // Refresh allIssues for Spotlight
+    const allIssuesData = await api.get("/issues?include_subtasks=true");
+    setAllIssues(allIssuesData);
   }
 
   // Create issue
@@ -395,6 +406,10 @@ function App() {
     setIssues((prev) => [newIssue, ...prev]);
     setStats(await api.get("/stats"));
     setShowCreateModal(false);
+
+    // Refresh allIssues for Spotlight
+    const allIssuesData = await api.get("/issues?include_subtasks=true");
+    setAllIssues(allIssuesData);
   }
 
   // Update issue
@@ -411,6 +426,10 @@ function App() {
     if (updated.parent_id && expandedIssues.has(updated.parent_id)) {
       await refreshSubtasksCache([updated.parent_id]);
     }
+
+    // Refresh allIssues for Spotlight
+    const allIssuesData = await api.get("/issues?include_subtasks=true");
+    setAllIssues(allIssuesData);
   }
 
   // Delete issue
@@ -418,13 +437,15 @@ function App() {
     await api.delete(`/issues/${issueId}`);
 
     // Reload all issues to ensure subtask counts are updated
-    const [issuesData, statsData] = await Promise.all([
+    const [issuesData, statsData, allIssuesData] = await Promise.all([
       api.get("/issues"),
       api.get("/stats"),
+      api.get("/issues?include_subtasks=true"),
     ]);
 
     setIssues(issuesData);
     setStats(statsData);
+    setAllIssues(allIssuesData);
     setSelectedIssue(null);
 
     // Refresh all expanded subtask caches to ensure they reflect the deletion
@@ -462,8 +483,12 @@ function App() {
 
   // Refresh issues after subtask changes
   async function handleSubtaskChange() {
-    const issuesData = await api.get("/issues");
+    const [issuesData, allIssuesData] = await Promise.all([
+      api.get("/issues"),
+      api.get("/issues?include_subtasks=true"),
+    ]);
     setIssues(issuesData);
+    setAllIssues(allIssuesData);
 
     // Refresh all expanded subtasks caches
     const newCache = {};
@@ -532,9 +557,116 @@ function App() {
 
   const currentUser = users.find((u) => u.id === currentUserId);
 
+  // Prepare spotlight actions from all issues
+  const spotlightActions = allIssues.map((issue) => {
+    const isSubtask = !!issue.parent_id;
+
+    return {
+      id: issue.id.toString(),
+      label: issue.title,
+      description: issue.description || "",
+      onClick: () => setSelectedIssue(issue),
+      keywords: [issue.key, issue.title, issue.description || ""].join(" "),
+      leftSection: (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            minWidth: 0,
+          }}
+        >
+          {/* Indentation for subtasks with status-based styling */}
+          {isSubtask && (
+            <div
+              style={{
+                width: "16px",
+                height:
+                  issue.status === "done"
+                    ? "6px"
+                    : issue.status === "in_progress"
+                    ? "4px"
+                    : "2px",
+                backgroundColor:
+                  issue.status === "todo"
+                    ? "#71717a"
+                    : issue.status === "in_progress"
+                    ? "#3b82f6"
+                    : "#22c55e",
+                flexShrink: 0,
+                borderRadius: "2px",
+              }}
+            />
+          )}
+          {/* Status indicator */}
+          <div
+            style={{
+              width: "8px",
+              height: "8px",
+              borderRadius: "50%",
+              backgroundColor:
+                issue.status === "todo"
+                  ? "#71717a"
+                  : issue.status === "in_progress"
+                  ? "#3b82f6"
+                  : "#22c55e",
+              flexShrink: 0,
+            }}
+          />
+          {/* Issue key */}
+          <div
+            style={{
+              fontSize: "0.75rem",
+              color: "var(--text-secondary)",
+              fontWeight: 500,
+              flexShrink: 0,
+            }}
+          >
+            {issue.key}
+          </div>
+        </div>
+      ),
+      rightSection: (
+        <Group gap="xs" wrap="nowrap">
+          {/* Priority badge */}
+          <Badge
+            color={getPriorityColor(issue.priority)}
+            size="sm"
+            variant="light"
+            style={{ flexShrink: 0 }}
+          >
+            {issue.priority}
+          </Badge>
+          {/* Assignee */}
+          {issue.assignee_name ? (
+            <Avatar
+              color={issue.assignee_color}
+              name={issue.assignee_name}
+              size="sm"
+              title={issue.assignee_name}
+              style={{ flexShrink: 0 }}
+            />
+          ) : (
+            <UnassignedAvatar size="sm" />
+          )}
+        </Group>
+      ),
+    };
+  });
+
   return (
     <ContextMenuProvider submenuDelay={150}>
       <Notifications position="top-right" autoClose={2000} />
+      <Spotlight
+        actions={spotlightActions}
+        nothingFound="No issues found..."
+        highlightQuery
+        scrollable
+        maxHeight={600}
+        searchProps={{
+          placeholder: "Search Issues...",
+        }}
+      />
       <div className="app">
         {/* User Selection Prompt Overlay */}
         {!currentUserId && (
