@@ -21,7 +21,7 @@ import {
 } from "@mantine/core";
 import { Notifications, notifications } from "@mantine/notifications";
 import "@mantine/notifications/styles.css";
-import { Spotlight } from "@mantine/spotlight";
+import { Spotlight, spotlight } from "@mantine/spotlight";
 import "@mantine/spotlight/styles.css";
 import { ContextMenuProvider, useContextMenu } from "mantine-contextmenu";
 import "mantine-contextmenu/styles.css";
@@ -62,6 +62,9 @@ const api = {
 // ============================================================================
 // UTILITIES
 // ============================================================================
+
+// Detect if user is on Mac
+const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
 
 // Priority → color mapping
 const getPriorityColor = (priority) =>
@@ -899,32 +902,6 @@ function App() {
                     <Stack gap="xs">
                       <Group gap="xs">
                         <span style={{ fontSize: "0.75rem", opacity: 0.7 }}>
-                          🔍 Press{" "}
-                          <kbd
-                            style={{
-                              padding: "2px 6px",
-                              borderRadius: "4px",
-                              backgroundColor: "var(--mantine-color-dark-5)",
-                              fontSize: "0.7rem",
-                            }}
-                          >
-                            {navigator.userAgent.includes("Mac") ? "⌘" : "Ctrl"}
-                          </kbd>{" "}
-                          <kbd
-                            style={{
-                              padding: "2px 6px",
-                              borderRadius: "4px",
-                              backgroundColor: "var(--mantine-color-dark-5)",
-                              fontSize: "0.7rem",
-                            }}
-                          >
-                            K
-                          </kbd>{" "}
-                          to search
-                        </span>
-                      </Group>
-                      <Group gap="xs">
-                        <span style={{ fontSize: "0.75rem", opacity: 0.7 }}>
                           ⌨️ Right-click issues for contextual actions
                         </span>
                       </Group>
@@ -935,6 +912,30 @@ function App() {
             </HoverCard>
           </div>
           <div className="header-right">
+            {/* Fake search bar button */}
+            <button
+              className="search-button"
+              onClick={() => spotlight.open()}
+              aria-label="Search issues"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="search-icon"
+              >
+                <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"></path>
+                <path d="M21 21l-6 -6"></path>
+              </svg>
+              <span className="search-text">Search</span>
+              <span className="search-shortcut">{isMac ? '⌘K' : 'Ctrl+K'}</span>
+            </button>
             <div
               className={`user-selector ${!currentUserId ? "unselected" : ""}`}
             >
@@ -1122,6 +1123,34 @@ function App() {
                   </defs>
                 </svg>
                 Vite
+              </a>
+            </div>
+            <div className="footer-divider">•</div>
+            <div className="footer-section">
+              <span className="footer-label">UI with</span>
+              <a
+                href="https://mantine.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="footer-link"
+              >
+                <svg className="footer-icon" viewBox="0 0 163 163" fill="none">
+                  <path
+                    fill="#339AF0"
+                    d="M162.162 81.5c0-45.011-36.301-81.5-81.08-81.5C36.301 0 0 36.489 0 81.5 0 126.51 36.301 163 81.081 163s81.081-36.49 81.081-81.5z"
+                  />
+                  <path
+                    fill="#fff"
+                    d="M65.983 43.049a6.234 6.234 0 00-.336 6.884 6.14 6.14 0 001.618 1.786c9.444 7.036 14.866 17.794 14.866 29.52 0 11.726-5.422 22.484-14.866 29.52a6.145 6.145 0 00-1.616 1.786 6.21 6.21 0 00-.694 4.693 6.21 6.21 0 001.028 2.186 6.151 6.151 0 006.457 2.319 6.154 6.154 0 002.177-1.035 50.083 50.083 0 007.947-7.39h17.493c3.406 0 6.174-2.772 6.174-6.194s-2.762-6.194-6.174-6.194h-9.655a49.165 49.165 0 004.071-19.69 49.167 49.167 0 00-4.07-19.692h9.66c3.406 0 6.173-2.771 6.173-6.194 0-3.422-2.762-6.193-6.173-6.193H82.574a50.112 50.112 0 00-7.952-7.397 6.15 6.15 0 00-4.578-1.153 6.189 6.189 0 00-4.055 2.438h-.006z"
+                  />
+                  <path
+                    fill="#fff"
+                    fillRule="evenodd"
+                    d="M56.236 79.391a9.342 9.342 0 01.632-3.608 9.262 9.262 0 011.967-3.077 9.143 9.143 0 012.994-2.063 9.06 9.06 0 017.103 0 9.145 9.145 0 012.995 2.063 9.262 9.262 0 011.967 3.077 9.339 9.339 0 01-2.125 10.003 9.094 9.094 0 01-6.388 2.63 9.094 9.094 0 01-6.39-2.63 9.3 9.3 0 01-2.755-6.395z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Mantine
               </a>
             </div>
             <div className="footer-divider">•</div>
@@ -1569,7 +1598,8 @@ function SubtaskCardInline({
             style={{
               fontSize: "0.8rem",
               lineHeight: 1.3,
-              textDecoration: subtask.status === "done" ? "line-through" : "none",
+              textDecoration:
+                subtask.status === "done" ? "line-through" : "none",
               opacity: subtask.status === "done" ? 0.7 : 1,
             }}
           >

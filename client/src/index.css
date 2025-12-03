@@ -125,7 +125,60 @@ body {
 .header-right {
 	display: flex;
 	align-items: center;
-	gap: 32px;
+	gap: 16px;
+}
+
+/* Search button (fake search bar) */
+.search-button {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	background: var(--bg-tertiary);
+	border: 1px solid var(--border-primary);
+	border-radius: 6px;
+	color: var(--text-secondary);
+	font-family: var(--font-sans);
+	font-size: 13px;
+	cursor: pointer;
+	transition: all 0.15s ease;
+	min-width: 200px;
+}
+
+.search-button:hover {
+	background: var(--bg-card);
+	border-color: var(--border-accent);
+	color: var(--text-primary);
+}
+
+.search-button:focus {
+	outline: none;
+	border-color: var(--accent);
+}
+
+.search-icon {
+	width: 15px;
+	height: 15px;
+	flex-shrink: 0;
+	color: var(--text-muted);
+}
+
+.search-text {
+	flex: 1;
+	text-align: left;
+	color: var(--text-muted);
+}
+
+.search-shortcut {
+	font-family: var(--font-mono);
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--text-secondary);
+	background: var(--bg-primary);
+	border: 1px solid var(--border-secondary);
+	border-radius: 4px;
+	padding: 2px 6px;
+	flex-shrink: 0;
 }
 
 .user-selector {
@@ -504,7 +557,7 @@ body {
 @media (max-width: 768px) {
 	/* Header adjustments */
 	.header {
-		padding: 0 12px;
+		padding: 12px 12px 0 12px;
 		flex-wrap: wrap;
 		height: auto;
 		min-height: var(--header-height);
@@ -524,7 +577,7 @@ body {
 	.header-right {
 		gap: 12px;
 		width: 100%;
-		justify-content: space-between;
+		justify-content: flex-start;
 		margin-top: 8px;
 		padding-bottom: 12px;
 	}
@@ -550,9 +603,26 @@ body {
 	}
 
 	.user-select {
-		min-width: 120px;
-		padding: 6px 10px;
+		min-width: 100px;
+		max-width: 120px;
+		padding: 6px 8px;
 		font-size: 12px;
+	}
+
+	/* Search button - show only icon on mobile */
+	.search-button {
+		min-width: auto;
+		padding: 8px;
+	}
+
+	.search-text,
+	.search-shortcut {
+		display: none;
+	}
+
+	.search-icon {
+		width: 18px;
+		height: 18px;
 	}
 
 	/* board - allow horizontal scroll with single column view */
