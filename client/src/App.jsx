@@ -22,6 +22,7 @@ import { Notifications, notifications } from "@mantine/notifications";
 import "@mantine/notifications/styles.css";
 import { ContextMenuProvider, useContextMenu } from "mantine-contextmenu";
 import "mantine-contextmenu/styles.css";
+import { IconCheck } from "@tabler/icons-react";
 
 const API_BASE = "/api";
 
@@ -2167,6 +2168,17 @@ function IssueDetailModal({
           }
           placeholder="Unassigned"
           clearable
+          searchable
+          selectFirstOptionOnChange
+          onFocus={(event) => event.currentTarget.select()}
+          renderOption={({ option }) => (
+            <Group gap="xs">
+              {option.value === issue.assignee_id?.toString() && (
+                <IconCheck size={16} />
+              )}
+              <span>{option.label}</span>
+            </Group>
+          )}
           data={users.map((user) => ({
             value: user.id.toString(),
             label: user.name,
