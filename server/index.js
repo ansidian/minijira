@@ -110,12 +110,14 @@ app.get("/api/issues/:id/subtasks", async (req, res) => {
   try {
     const { rows } = await db.execute({
       sql: `
-        SELECT 
+        SELECT
           issues.*,
           assignee.name as assignee_name,
-          assignee.avatar_color as assignee_color
+          assignee.avatar_color as assignee_color,
+          parent.key as parent_key
         FROM issues
         LEFT JOIN users assignee ON issues.assignee_id = assignee.id
+        LEFT JOIN issues parent ON issues.parent_id = parent.id
         WHERE issues.parent_id = ?
         ORDER BY issues.created_at ASC
       `,
