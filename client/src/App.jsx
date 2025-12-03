@@ -1111,7 +1111,12 @@ function IssueCard({
                     style={{
                       cursor: "pointer",
                       backgroundColor: "var(--bg-tertiary)",
-                      borderLeft: "3px solid var(--mantine-color-blue-6)",
+                      borderLeft:
+                        subtask.status === "done"
+                          ? "10px solid var(--mantine-color-green-6)"
+                          : subtask.status === "in_progress"
+                          ? "6px solid var(--mantine-color-blue-6)"
+                          : "3px solid var(--mantine-color-gray-6)",
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
