@@ -742,3 +742,67 @@ body {
     display: none;
   }
 }
+
+/* Hint pills for keyboard shortcuts */
+.hints-container {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.hint-pill {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: help;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  max-width: 40px;
+  overflow: hidden;
+}
+
+.hint-pill:hover {
+  max-width: 300px;
+  background: var(--bg-card);
+  border-color: var(--border-accent);
+  color: var(--text-primary);
+}
+
+.hint-pill-icon {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.hint-pill-text {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.hint-pill:hover .hint-pill-text {
+  opacity: 1;
+}
+
+.kbd {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+/* Hide hints on mobile */
+@media (max-width: 768px) {
+  .hints-container {
+    display: none;
+  }
+}

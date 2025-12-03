@@ -17,6 +17,7 @@ import {
   Checkbox,
   Tooltip,
   Collapse,
+  HoverCard,
 } from "@mantine/core";
 import { Notifications, notifications } from "@mantine/notifications";
 import "@mantine/notifications/styles.css";
@@ -298,6 +299,8 @@ function App() {
   const [subtasksCache, setSubtasksCache] = useState({});
   const [autoShowSubtaskForm, setAutoShowSubtaskForm] = useState(false);
   const [allIssues, setAllIssues] = useState([]); // All issues including subtasks for Spotlight
+  const [statsBadgeAnimate, setStatsBadgeAnimate] = useState(false);
+  const [previousStats, setPreviousStats] = useState(null);
 
   // Detect if this is a touch device
   const isTouchDevice =
@@ -309,6 +312,28 @@ function App() {
       localStorage.setItem("minijira_user", currentUserId.toString());
     }
   }, [currentUserId]);
+
+  // Animate stats badge when stats change
+  useEffect(() => {
+    // Skip animation on initial load (when previousStats is null)
+    if (!previousStats) {
+      setPreviousStats(stats);
+      return;
+    }
+
+    // Only animate if stats actually changed
+    const hasChanged =
+      previousStats.todo !== stats.todo ||
+      previousStats.in_progress !== stats.in_progress ||
+      previousStats.done !== stats.done;
+
+    if (hasChanged) {
+      setPreviousStats(stats);
+      setStatsBadgeAnimate(true);
+      const timer = setTimeout(() => setStatsBadgeAnimate(false), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [stats, previousStats]);
 
   // Load data
   useEffect(() => {
@@ -664,7 +689,8 @@ function App() {
         scrollable
         maxHeight={600}
         searchProps={{
-          placeholder: "Search Issues... (Try 'issues:' or 'subtasks:' to filter)",
+          placeholder:
+            "Search Issues... (Try 'issues:' or 'subtasks:' to filter)",
         }}
         filter={(query, actions) => {
           const lowerQuery = query.toLowerCase().trim();
@@ -674,7 +700,9 @@ function App() {
             // Filter for parent issues only
             const searchTerm = lowerQuery.slice(7).trim();
             return actions.filter((action) => {
-              const issue = allIssues.find((i) => i.id.toString() === action.id);
+              const issue = allIssues.find(
+                (i) => i.id.toString() === action.id
+              );
               if (!issue || issue.parent_id) return false;
               if (!searchTerm) return true;
               return (
@@ -687,7 +715,9 @@ function App() {
             // Filter for subtasks only
             const searchTerm = lowerQuery.slice(9).trim();
             return actions.filter((action) => {
-              const issue = allIssues.find((i) => i.id.toString() === action.id);
+              const issue = allIssues.find(
+                (i) => i.id.toString() === action.id
+              );
               if (!issue || !issue.parent_id) return false;
               if (!searchTerm) return true;
               return (
@@ -764,46 +794,131 @@ function App() {
                   : "Show All Subtasks"}
               </span>
             </Button>
-            <div className="header-stats">
-              <div className="stat">
-                <span style={{ minWidth: "60px" }}>
-                  <span className="stat-value">{stats.todo}</span> to do
-                </span>
-                <Progress
-                  value={stats.total > 0 ? (stats.todo / stats.total) * 100 : 0}
+            {/* Condensed stats badge with hover detail */}
+            <HoverCard width={380} shadow="md" position="bottom" withArrow>
+              <HoverCard.Target>
+                <Badge
+                  size="lg"
+                  variant="light"
                   color="gray"
-                  size="sm"
-                  style={{ flex: 1, minWidth: "80px" }}
-                />
-              </div>
-              <div className="stat">
-                <span style={{ minWidth: "80px" }}>
-                  <span className="stat-value">{stats.in_progress}</span> in
-                  progress
-                </span>
-                <Progress
-                  value={
-                    stats.total > 0
-                      ? (stats.in_progress / stats.total) * 100
-                      : 0
-                  }
-                  color="blue"
-                  size="sm"
-                  style={{ flex: 1, minWidth: "80px" }}
-                />
-              </div>
-              <div className="stat">
-                <span style={{ minWidth: "60px" }}>
-                  <span className="stat-value">{stats.done}</span> done
-                </span>
-                <Progress
-                  value={stats.total > 0 ? (stats.done / stats.total) * 100 : 0}
-                  color="green"
-                  size="sm"
-                  style={{ flex: 1, minWidth: "80px" }}
-                />
-              </div>
-            </div>
+                  style={{
+                    cursor: "pointer",
+                    marginLeft: "1rem",
+                    transform: statsBadgeAnimate ? "scale(1.15)" : "scale(1)",
+                    transition: "transform 0.15s ease-out",
+                  }}
+                >
+                  <span style={{ color: "var(--mantine-color-gray-4)" }}>
+                    {stats.todo}
+                  </span>{" "}
+                  /{" "}
+                  <span style={{ color: "var(--mantine-color-blue-4)" }}>
+                    {stats.in_progress}
+                  </span>{" "}
+                  /{" "}
+                  <span style={{ color: "var(--mantine-color-green-4)" }}>
+                    {stats.done}
+                  </span>
+                </Badge>
+              </HoverCard.Target>
+              <HoverCard.Dropdown>
+                <Stack gap="sm">
+                  {/* Progress bars */}
+                  <div>
+                    <Group gap="xs" mb={4}>
+                      <span style={{ fontSize: "0.875rem", minWidth: "60px" }}>
+                        <span style={{ fontWeight: 600 }}>{stats.todo}</span> to
+                        do
+                      </span>
+                    </Group>
+                    <Progress
+                      value={
+                        stats.total > 0 ? (stats.todo / stats.total) * 100 : 0
+                      }
+                      color="gray"
+                      size="sm"
+                    />
+                  </div>
+                  <div>
+                    <Group gap="xs" mb={4}>
+                      <span style={{ fontSize: "0.875rem", minWidth: "80px" }}>
+                        <span style={{ fontWeight: 600 }}>
+                          {stats.in_progress}
+                        </span>{" "}
+                        in progress
+                      </span>
+                    </Group>
+                    <Progress
+                      value={
+                        stats.total > 0
+                          ? (stats.in_progress / stats.total) * 100
+                          : 0
+                      }
+                      color="blue"
+                      size="sm"
+                    />
+                  </div>
+                  <div>
+                    <Group gap="xs" mb={4}>
+                      <span style={{ fontSize: "0.875rem", minWidth: "60px" }}>
+                        <span style={{ fontWeight: 600 }}>{stats.done}</span>{" "}
+                        done
+                      </span>
+                    </Group>
+                    <Progress
+                      value={
+                        stats.total > 0 ? (stats.done / stats.total) * 100 : 0
+                      }
+                      color="green"
+                      size="sm"
+                    />
+                  </div>
+
+                  {/* Hints section */}
+                  <div
+                    style={{
+                      borderTop: "1px solid var(--mantine-color-dark-4)",
+                      paddingTop: "0.75rem",
+                      marginTop: "0.25rem",
+                    }}
+                  >
+                    <Stack gap="xs">
+                      <Group gap="xs">
+                        <span style={{ fontSize: "0.75rem", opacity: 0.7 }}>
+                          🔍 Press{" "}
+                          <kbd
+                            style={{
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                              backgroundColor: "var(--mantine-color-dark-5)",
+                              fontSize: "0.7rem",
+                            }}
+                          >
+                            {navigator.userAgent.includes("Mac") ? "⌘" : "Ctrl"}
+                          </kbd>{" "}
+                          <kbd
+                            style={{
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                              backgroundColor: "var(--mantine-color-dark-5)",
+                              fontSize: "0.7rem",
+                            }}
+                          >
+                            K
+                          </kbd>{" "}
+                          to search
+                        </span>
+                      </Group>
+                      <Group gap="xs">
+                        <span style={{ fontSize: "0.75rem", opacity: 0.7 }}>
+                          ⌨️ Right-click issues for contextual actions
+                        </span>
+                      </Group>
+                    </Stack>
+                  </div>
+                </Stack>
+              </HoverCard.Dropdown>
+            </HoverCard>
           </div>
           <div className="header-right">
             <div
@@ -2346,6 +2461,7 @@ function IssueDetailModal({
           clearable
           searchable
           selectFirstOptionOnChange
+          autoSelectOnBlur
           onFocus={(event) => event.currentTarget.select()}
           renderOption={({ option }) => (
             <Group gap="xs">
