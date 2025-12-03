@@ -1244,6 +1244,21 @@ function SubtaskCardInline({
           >
             {subtask.title}
           </div>
+          {subtask.description && (
+            <div
+              style={{
+                fontSize: "0.7rem",
+                color: "var(--text-secondary)",
+                lineHeight: 1.4,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {subtask.description}
+            </div>
+          )}
           <Group justify="space-between" gap="xs">
             <Badge
               color={getPriorityColor(subtask.priority)}
@@ -1515,6 +1530,22 @@ function SubtaskRow({
         >
           {subtask.title}
         </div>
+        {subtask.description && (
+          <div
+            style={{
+              fontSize: "0.75rem",
+              color: "var(--text-secondary)",
+              marginTop: "4px",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {subtask.description}
+          </div>
+        )}
       </div>
       <Badge
         size="xs"
