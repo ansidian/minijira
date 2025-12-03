@@ -64,7 +64,9 @@ const api = {
 // ============================================================================
 
 // Detect if user is on Mac
-const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+const isMac =
+  typeof navigator !== "undefined" &&
+  navigator.platform.toUpperCase().indexOf("MAC") >= 0;
 
 // Priority → color mapping
 const getPriorityColor = (priority) =>
@@ -934,7 +936,9 @@ function App() {
                 <path d="M21 21l-6 -6"></path>
               </svg>
               <span className="search-text">Search</span>
-              <span className="search-shortcut">{isMac ? '⌘K' : 'Ctrl+K'}</span>
+              <span className="search-shortcut">
+                {isMac ? "⌘ + K" : "Ctrl + K"}
+              </span>
             </button>
             <div
               className={`user-selector ${!currentUserId ? "unselected" : ""}`}
