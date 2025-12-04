@@ -314,9 +314,10 @@ function App() {
   const { colorScheme, setColorScheme } = useMantineColorScheme();
 
   // Hotkey for theme toggle (Cmd/Ctrl + J)
+  // triggerOnContentEditable: true allows it to work even when Spotlight is open
   useHotkeys([
     ['mod+J', () => setColorScheme(colorScheme === 'dark' ? 'light' : 'dark')],
-  ]);
+  ], [], true);
 
   // Detect if this is a touch device
   const isTouchDevice =
