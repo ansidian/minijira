@@ -314,10 +314,16 @@ function App() {
   const { colorScheme, setColorScheme } = useMantineColorScheme();
 
   // Hotkey for theme toggle (Cmd/Ctrl + J)
-  // triggerOnContentEditable: true allows it to work even when Spotlight is open
-  useHotkeys([
-    ['mod+J', () => setColorScheme(colorScheme === 'dark' ? 'light' : 'dark')],
-  ], [], true);
+  useHotkeys(
+    [
+      [
+        "mod+J",
+        () => setColorScheme(colorScheme === "dark" ? "light" : "dark"),
+      ],
+    ],
+    [],
+    true
+  );
 
   // Detect if this is a touch device
   const isTouchDevice =
@@ -1739,7 +1745,7 @@ function CreateIssueModal({
   const isSubtask = !!parentIssue;
 
   function handleSubmit(e) {
-    e.preventDefault();
+    e?.preventDefault();
     if (!title.trim()) return;
     onCreate({
       title: title.trim(),
@@ -1751,6 +1757,9 @@ function CreateIssueModal({
       parent_id: parentIssue?.id || null,
     });
   }
+
+  // Hotkey for submit (Cmd/Ctrl + Enter)
+  useHotkeys([["mod+Enter", () => handleSubmit()]], [], true);
 
   function handleOverlayClick() {
     if (isDirty) {
@@ -1839,6 +1848,8 @@ function CreateIssueModal({
           onChange={(value) => setAssigneeId(value || "")}
           placeholder="Unassigned"
           clearable
+          searchable
+          selectFirstOptionOnChange
           data={users.map((user) => ({
             value: user.id.toString(),
             label: user.name,
@@ -2073,6 +2084,22 @@ function SubtasksSection({
     });
   }
 
+  // Hotkey for creating subtask when form is open (Cmd/Ctrl + Enter)
+  useHotkeys(
+    [
+      [
+        "mod+Enter",
+        () => {
+          if (showAddForm && newTitle.trim()) {
+            handleCreateSubtask();
+          }
+        },
+      ],
+    ],
+    [],
+    true
+  );
+
   async function handleStatusToggle(subtaskId, newStatus) {
     const updated = await api.patch(`/issues/${subtaskId}`, {
       status: newStatus,
@@ -2188,7 +2215,11 @@ function SubtasksSection({
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && newTitle.trim()) {
+              if (
+                (e.metaKey || e.ctrlKey) &&
+                e.key === "Enter" &&
+                newTitle.trim()
+              ) {
                 handleCreateSubtask();
               } else if (e.key === "Escape") {
                 setShowAddForm(false);
@@ -2208,6 +2239,8 @@ function SubtasksSection({
                 label: u.name,
               }))}
               clearable
+              searchable
+              selectFirstOptionOnChange
               size="sm"
               style={{ flex: 1 }}
             />
@@ -2336,6 +2369,7 @@ function IssueDetailModal({
   }
 
   async function handleSave() {
+    if (!editing) return;
     await onUpdate(issue.id, { title, description });
     setEditing(false);
     notifications.show({
@@ -2344,6 +2378,24 @@ function IssueDetailModal({
       color: "green",
     });
   }
+
+  // Hotkey for save/send (Cmd/Ctrl + Enter)
+  useHotkeys(
+    [
+      [
+        "mod+Enter",
+        () => {
+          if (editing) {
+            handleSave();
+          } else if (newComment.trim()) {
+            handleAddComment();
+          }
+        },
+      ],
+    ],
+    [],
+    true
+  );
 
   async function handleAddComment() {
     if (!newComment.trim()) return;
@@ -2710,9 +2762,11 @@ function IssueDetailModal({
           placeholder="Add a comment..."
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
-          onKeyDown={(e) =>
-            e.key === "Enter" && !e.shiftKey && handleAddComment()
-          }
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+              handleAddComment();
+            }
+          }}
           autosize
           minRows={1}
           style={{ flex: 1 }}
