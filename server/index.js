@@ -428,13 +428,16 @@ app.get("/api/stats", async (req, res) => {
     const parentFilterAnd =
       include_subtasks === "true" ? "WHERE" : "WHERE parent_id IS NULL AND";
 
-    const [total, todo, inProgress, done] = await Promise.all([
+    const [total, todo, inProgress, review, done] = await Promise.all([
       db.execute(`SELECT COUNT(*) as count FROM issues ${parentFilter}`),
       db.execute(
         `SELECT COUNT(*) as count FROM issues ${parentFilterAnd} status = 'todo'`
       ),
       db.execute(
         `SELECT COUNT(*) as count FROM issues ${parentFilterAnd} status = 'in_progress'`
+      ),
+      db.execute(
+        `SELECT COUNT(*) as count FROM issues ${parentFilterAnd} status = 'review'`
       ),
       db.execute(
         `SELECT COUNT(*) as count FROM issues ${parentFilterAnd} status = 'done'`
@@ -445,6 +448,7 @@ app.get("/api/stats", async (req, res) => {
       total: total.rows[0].count,
       todo: todo.rows[0].count,
       in_progress: inProgress.rows[0].count,
+      review: review.rows[0].count,
       done: done.rows[0].count,
     });
   } catch (err) {

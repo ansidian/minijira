@@ -33,6 +33,7 @@
 	/* Status colors - muted */
 	--status-todo: #3b82f6;
 	--status-progress: #f59e0b;
+	--status-review: #a855f7;
 	--status-done: #10b981;
 
 	/* Priority */
@@ -65,6 +66,7 @@
 	/* Status colors - vibrant */
 	--status-todo: #3b82f6;
 	--status-progress: #f59e0b;
+	--status-review: #a855f7;
 	--status-done: #10b981;
 
 	/* Priority */

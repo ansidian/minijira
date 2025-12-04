@@ -77,7 +77,13 @@ const getPriorityColor = (priority) =>
 
 // Status → color mapping
 const getStatusColor = (status) =>
-  status === "done" ? "green" : status === "in_progress" ? "blue" : "gray";
+  status === "done"
+    ? "green"
+    : status === "in_progress"
+    ? "blue"
+    : status === "review"
+    ? "violet"
+    : "gray";
 
 // Format date
 function formatDate(dateStr) {
@@ -156,6 +162,7 @@ function UnassignedAvatar({ size = "md" }) {
 const COLUMNS = [
   { id: "todo", title: "To Do", status: "todo" },
   { id: "in_progress", title: "In Progress", status: "in_progress" },
+  { id: "review", title: "Review", status: "review" },
   { id: "done", title: "Done", status: "done" },
 ];
 
@@ -208,6 +215,11 @@ function useIssueContextMenu({
             key: "status-in_progress",
             title: "In Progress",
             onClick: () => onStatusChange(issue.id, "in_progress"),
+          },
+          {
+            key: "status-review",
+            title: "Review",
+            onClick: () => onStatusChange(issue.id, "review"),
           },
           {
             key: "status-done",
@@ -294,7 +306,7 @@ function useIssueContextMenu({
 function App() {
   const [issues, setIssues] = useState([]);
   const [users, setUsers] = useState([]);
-  const [stats, setStats] = useState({ todo: 0, in_progress: 0, done: 0 });
+  const [stats, setStats] = useState({ todo: 0, in_progress: 0, review: 0, done: 0 });
   const [loading, setLoading] = useState(true);
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -348,6 +360,7 @@ function App() {
     const hasChanged =
       previousStats.todo !== stats.todo ||
       previousStats.in_progress !== stats.in_progress ||
+      previousStats.review !== stats.review ||
       previousStats.done !== stats.done;
 
     if (hasChanged) {
@@ -648,12 +661,16 @@ function App() {
                     ? "6px"
                     : issue.status === "in_progress"
                     ? "4px"
+                    : issue.status === "review"
+                    ? "5px"
                     : "2px",
                 backgroundColor:
                   issue.status === "todo"
                     ? "#71717a"
                     : issue.status === "in_progress"
                     ? "#3b82f6"
+                    : issue.status === "review"
+                    ? "#a855f7"
                     : "#22c55e",
                 flexShrink: 0,
                 borderRadius: "2px",
@@ -671,6 +688,8 @@ function App() {
                   ? "#71717a"
                   : issue.status === "in_progress"
                   ? "#3b82f6"
+                  : issue.status === "review"
+                  ? "#a855f7"
                   : "#22c55e",
               flexShrink: 0,
             }}
@@ -853,6 +872,10 @@ function App() {
                     {stats.in_progress}
                   </span>{" "}
                   /{" "}
+                  <span style={{ color: "var(--mantine-color-violet-4)" }}>
+                    {stats.review}
+                  </span>{" "}
+                  /{" "}
                   <span style={{ color: "var(--mantine-color-green-4)" }}>
                     {stats.done}
                   </span>
@@ -892,6 +915,25 @@ function App() {
                           : 0
                       }
                       color="blue"
+                      size="sm"
+                    />
+                  </div>
+                  <div>
+                    <Group gap="xs" mb={4}>
+                      <span style={{ fontSize: "0.875rem", minWidth: "80px" }}>
+                        <span style={{ fontWeight: 600 }}>
+                          {stats.review}
+                        </span>{" "}
+                        in review
+                      </span>
+                    </Group>
+                    <Progress
+                      value={
+                        stats.total > 0
+                          ? (stats.review / stats.total) * 100
+                          : 0
+                      }
+                      color="violet"
                       size="sm"
                     />
                   </div>
@@ -1355,6 +1397,8 @@ function Column({
                   ? "#71717a"
                   : column.status === "in_progress"
                   ? "#3b82f6"
+                  : column.status === "review"
+                  ? "#a855f7"
                   : "#22c55e",
             }}
           />
@@ -1629,6 +1673,8 @@ function SubtaskCardInline({
               ? "10px solid var(--mantine-color-green-6)"
               : subtask.status === "in_progress"
               ? "6px solid var(--mantine-color-blue-6)"
+              : subtask.status === "review"
+              ? "8px solid var(--mantine-color-violet-6)"
               : "3px solid var(--mantine-color-gray-6)",
         }}
         onClick={(e) => {
@@ -1666,6 +1712,8 @@ function SubtaskCardInline({
                 ? "Done"
                 : subtask.status === "in_progress"
                 ? "In Progress"
+                : subtask.status === "review"
+                ? "Review"
                 : "To Do"}
             </Badge>
           </Group>
@@ -1827,6 +1875,7 @@ function CreateIssueModal({
             data={[
               { value: "todo", label: "To Do" },
               { value: "in_progress", label: "In Progress" },
+              { value: "review", label: "Review" },
               { value: "done", label: "Done" },
             ]}
           />
@@ -2629,6 +2678,7 @@ function IssueDetailModal({
           data={[
             { value: "todo", label: "To Do" },
             { value: "in_progress", label: "In Progress" },
+            { value: "review", label: "Review" },
             { value: "done", label: "Done" },
           ]}
         />

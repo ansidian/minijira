@@ -23,7 +23,7 @@ async function init() {
       key TEXT UNIQUE NOT NULL,
       title TEXT NOT NULL,
       description TEXT,
-      status TEXT DEFAULT 'todo' CHECK(status IN ('todo', 'in_progress', 'done')),
+      status TEXT DEFAULT 'todo' CHECK(status IN ('todo', 'in_progress', 'review', 'done')),
       priority TEXT DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high')),
       assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
       reporter_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
