@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { version } from "../package.json";
 import {
   Loader,
@@ -322,6 +322,26 @@ function App() {
   const [statsBadgeAnimate, setStatsBadgeAnimate] = useState(false);
   const [previousStats, setPreviousStats] = useState(null);
 
+  // Request deduplication for subtask fetches - prevents duplicate in-flight requests
+  const pendingSubtaskFetches = useRef(new Map());
+
+  // Centralized subtask fetch with deduplication
+  async function fetchSubtasksForParent(parentId) {
+    // If there's already a pending request for this parent, return that promise
+    if (pendingSubtaskFetches.current.has(parentId)) {
+      return pendingSubtaskFetches.current.get(parentId);
+    }
+
+    // Create new fetch promise
+    const fetchPromise = api.get(`/issues/${parentId}/subtasks`).finally(() => {
+      // Clean up after completion (success or failure)
+      pendingSubtaskFetches.current.delete(parentId);
+    });
+
+    pendingSubtaskFetches.current.set(parentId, fetchPromise);
+    return fetchPromise;
+  }
+
   // Theme toggle
   const { colorScheme, setColorScheme } = useMantineColorScheme();
 
@@ -403,16 +423,23 @@ function App() {
         const newExpanded = new Set(parentsWithSubtasks.map((i) => i.id));
         setExpandedIssues(newExpanded);
 
-        // Fetch all subtasks for expanded issues
-        const fetchSubtasks = async () => {
-          const newCache = {};
-          for (const issue of parentsWithSubtasks) {
-            const subtasks = await api.get(`/issues/${issue.id}/subtasks`);
-            newCache[issue.id] = subtasks;
-          }
-          setSubtasksCache(newCache);
+        // Fetch all subtasks for expanded issues (parallelized)
+        const fetchAllSubtasks = async () => {
+          const results = await Promise.all(
+            parentsWithSubtasks.map(async (issue) => {
+              const subtasks = await fetchSubtasksForParent(issue.id);
+              return { issueId: issue.id, subtasks };
+            })
+          );
+          setSubtasksCache((prev) => {
+            const newCache = { ...prev };
+            for (const { issueId, subtasks } of results) {
+              newCache[issueId] = subtasks;
+            }
+            return newCache;
+          });
         };
-        fetchSubtasks();
+        fetchAllSubtasks();
       }
     }
   }, [issues]);
@@ -425,23 +452,46 @@ function App() {
     return acc;
   }, {});
 
-  // Helper to refresh subtasks cache for expanded issues
+  // Helper to refresh subtasks cache for expanded issues (parallelized with deduplication)
   async function refreshSubtasksCache(issueIds) {
-    const newCache = {};
-    for (const issueId of issueIds) {
-      const subtasks = await api.get(`/issues/${issueId}/subtasks`);
-      newCache[issueId] = subtasks;
-    }
-    setSubtasksCache((prev) => ({ ...prev, ...newCache }));
+    const results = await Promise.all(
+      issueIds.map(async (issueId) => {
+        const subtasks = await fetchSubtasksForParent(issueId);
+        return { issueId, subtasks };
+      })
+    );
+    // Merge results into cache using functional update to prevent race conditions
+    setSubtasksCache((prev) => {
+      const newCache = { ...prev };
+      for (const { issueId, subtasks } of results) {
+        newCache[issueId] = subtasks;
+      }
+      return newCache;
+    });
   }
 
   // Handle status change (drag simulation via click)
   async function handleStatusChange(issueId, newStatus) {
+    // Find the current issue to get its old status for optimistic stats update
+    const currentIssue = issues.find((i) => i.id === issueId) ||
+      allIssues.find((i) => i.id === issueId);
+    const oldStatus = currentIssue?.status;
+    const isParentIssue = !currentIssue?.parent_id;
+
     const updated = await api.patch(`/issues/${issueId}`, {
       status: newStatus,
     });
     setIssues((prev) => prev.map((i) => (i.id === issueId ? updated : i)));
-    setStats(await api.get("/stats"));
+
+    // Optimistic stats update (only for parent issues, not subtasks)
+    if (isParentIssue && oldStatus && oldStatus !== newStatus) {
+      setStats((prev) => ({
+        ...prev,
+        [oldStatus]: Math.max(0, prev[oldStatus] - 1),
+        [newStatus]: prev[newStatus] + 1,
+      }));
+    }
+
     if (selectedIssue?.id === issueId) {
       setSelectedIssue(updated);
     }
@@ -465,7 +515,17 @@ function App() {
   async function handleCreateIssue(data) {
     const newIssue = await api.post("/issues", data);
     setIssues((prev) => [newIssue, ...prev]);
-    setStats(await api.get("/stats"));
+
+    // Optimistic stats update (only for parent issues, not subtasks)
+    if (!data.parent_id) {
+      const status = data.status || "todo";
+      setStats((prev) => ({
+        ...prev,
+        total: (prev.total || 0) + 1,
+        [status]: prev[status] + 1,
+      }));
+    }
+
     setShowCreateModal(false);
 
     // Refresh allIssues for Spotlight
@@ -495,37 +555,73 @@ function App() {
 
   // Delete issue
   async function handleDeleteIssue(issueId) {
+    // Find the issue before deletion to know if it's a subtask and its status
+    const deletedIssue = issues.find((i) => i.id === issueId) ||
+      allIssues.find((i) => i.id === issueId);
+    const parentId = deletedIssue?.parent_id;
+    const deletedStatus = deletedIssue?.status;
+    const isParentIssue = !parentId;
+
     await api.delete(`/issues/${issueId}`);
 
     // Reload all issues to ensure subtask counts are updated
-    const [issuesData, statsData, allIssuesData] = await Promise.all([
+    const [issuesData, allIssuesData] = await Promise.all([
       api.get("/issues"),
-      api.get("/stats"),
       api.get("/issues?include_subtasks=true"),
     ]);
 
     setIssues(issuesData);
-    setStats(statsData);
     setAllIssues(allIssuesData);
     setSelectedIssue(null);
 
-    // Refresh all expanded subtask caches to ensure they reflect the deletion
-    const expandedIds = [...expandedIssues].filter((id) => id !== issueId);
-    if (expandedIds.length > 0) {
-      const newCache = {};
-      for (const expandedId of expandedIds) {
-        const subtasks = await api.get(`/issues/${expandedId}/subtasks`);
-        newCache[expandedId] = subtasks;
-      }
-      setSubtasksCache(newCache);
+    // Optimistic stats update (only for parent issues, not subtasks)
+    if (isParentIssue && deletedStatus) {
+      setStats((prev) => ({
+        ...prev,
+        total: Math.max(0, (prev.total || 0) - 1),
+        [deletedStatus]: Math.max(0, prev[deletedStatus] - 1),
+      }));
     }
 
-    // If this was a parent issue with expanded subtasks, clean it from expanded set
+    // Clean up expanded set if this was a parent issue
     if (expandedIssues.has(issueId)) {
       setExpandedIssues((prev) => {
         const newSet = new Set(prev);
         newSet.delete(issueId);
         return newSet;
+      });
+    }
+
+    // Refresh expanded subtask caches (parallelized with deduplication)
+    // Include the parent if we deleted a subtask
+    const expandedIds = [...expandedIssues].filter((id) => id !== issueId);
+    if (parentId && expandedIssues.has(parentId)) {
+      expandedIds.push(parentId);
+    }
+
+    if (expandedIds.length > 0) {
+      const results = await Promise.all(
+        expandedIds.map(async (expandedId) => {
+          const subtasks = await fetchSubtasksForParent(expandedId);
+          return { issueId: expandedId, subtasks };
+        })
+      );
+      setSubtasksCache((prev) => {
+        const newCache = { ...prev };
+        // Remove deleted issue from cache if it was a parent
+        delete newCache[issueId];
+        // Update remaining caches
+        for (const { issueId: id, subtasks } of results) {
+          newCache[id] = subtasks;
+        }
+        return newCache;
+      });
+    } else {
+      // Just remove deleted issue from cache if it was there
+      setSubtasksCache((prev) => {
+        const newCache = { ...prev };
+        delete newCache[issueId];
+        return newCache;
       });
     }
 
@@ -552,7 +648,6 @@ function App() {
     setAllIssues(allIssuesData);
 
     // Refresh all expanded subtasks caches
-    const newCache = {};
     const issueIdsToRefresh = new Set(expandedIssues);
 
     // Also refresh cache for the currently selected issue if it's a parent with subtasks
@@ -564,14 +659,25 @@ function App() {
     if (parentIdToExpand) {
       issueIdsToRefresh.add(parentIdToExpand);
       // Also add to expandedIssues set to show it expanded
-      setExpandedIssues(new Set([...expandedIssues, parentIdToExpand]));
+      setExpandedIssues((prev) => new Set([...prev, parentIdToExpand]));
     }
 
-    for (const issueId of issueIdsToRefresh) {
-      const subtasks = await api.get(`/issues/${issueId}/subtasks`);
-      newCache[issueId] = subtasks;
+    // Fetch all subtasks in parallel with deduplication
+    if (issueIdsToRefresh.size > 0) {
+      const results = await Promise.all(
+        [...issueIdsToRefresh].map(async (issueId) => {
+          const subtasks = await fetchSubtasksForParent(issueId);
+          return { issueId, subtasks };
+        })
+      );
+      setSubtasksCache((prev) => {
+        const newCache = { ...prev };
+        for (const { issueId, subtasks } of results) {
+          newCache[issueId] = subtasks;
+        }
+        return newCache;
+      });
     }
-    setSubtasksCache(newCache);
 
     // Refresh selected issue to get updated subtask counts
     if (selectedIssue) {
@@ -588,10 +694,10 @@ function App() {
       // Collapse
       newExpanded.delete(issueId);
     } else {
-      // Expand - fetch subtasks if not cached
+      // Expand - fetch subtasks if not cached (with deduplication)
       newExpanded.add(issueId);
       if (!subtasksCache[issueId]) {
-        const subtasks = await api.get(`/issues/${issueId}/subtasks`);
+        const subtasks = await fetchSubtasksForParent(issueId);
         setSubtasksCache((prev) => ({ ...prev, [issueId]: subtasks }));
       }
     }
@@ -614,126 +720,140 @@ function App() {
       // Collapse all
       setExpandedIssues(new Set());
     } else {
-      // Expand all - fetch any missing subtasks
+      // Expand all - fetch any missing subtasks (parallelized with deduplication)
       const newExpanded = new Set(parentsWithSubtasks.map((i) => i.id));
-      const newCache = { ...subtasksCache };
+      const missingParents = parentsWithSubtasks.filter(
+        (issue) => !subtasksCache[issue.id]
+      );
 
-      for (const issue of parentsWithSubtasks) {
-        if (!subtasksCache[issue.id]) {
-          const subtasks = await api.get(`/issues/${issue.id}/subtasks`);
-          newCache[issue.id] = subtasks;
-        }
+      if (missingParents.length > 0) {
+        const results = await Promise.all(
+          missingParents.map(async (issue) => {
+            const subtasks = await fetchSubtasksForParent(issue.id);
+            return { issueId: issue.id, subtasks };
+          })
+        );
+        setSubtasksCache((prev) => {
+          const newCache = { ...prev };
+          for (const { issueId, subtasks } of results) {
+            newCache[issueId] = subtasks;
+          }
+          return newCache;
+        });
       }
 
-      setSubtasksCache(newCache);
       setExpandedIssues(newExpanded);
     }
   }
 
   const currentUser = users.find((u) => u.id === currentUserId);
 
-  // Prepare spotlight actions from all issues
-  const spotlightActions = allIssues.map((issue) => {
-    const isSubtask = !!issue.parent_id;
+  // Prepare spotlight actions from all issues (memoized to prevent unnecessary recalculations)
+  const spotlightActions = useMemo(
+    () =>
+      allIssues.map((issue) => {
+        const isSubtask = !!issue.parent_id;
 
-    return {
-      id: issue.id.toString(),
-      label: issue.title,
-      description: issue.description || "",
-      onClick: () => setSelectedIssue(issue),
-      keywords: [issue.key, issue.title, issue.description || ""].join(" "),
-      leftSection: (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            minWidth: 0,
-          }}
-        >
-          {/* Indentation for subtasks with status-based styling */}
-          {isSubtask && (
+        return {
+          id: issue.id.toString(),
+          label: issue.title,
+          description: issue.description || "",
+          onClick: () => setSelectedIssue(issue),
+          keywords: [issue.key, issue.title, issue.description || ""].join(" "),
+          leftSection: (
             <div
               style={{
-                width: "16px",
-                height:
-                  issue.status === "done"
-                    ? "6px"
-                    : issue.status === "in_progress"
-                    ? "4px"
-                    : issue.status === "review"
-                    ? "5px"
-                    : "2px",
-                backgroundColor:
-                  issue.status === "todo"
-                    ? "#71717a"
-                    : issue.status === "in_progress"
-                    ? "#3b82f6"
-                    : issue.status === "review"
-                    ? "#a855f7"
-                    : "#22c55e",
-                flexShrink: 0,
-                borderRadius: "2px",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                minWidth: 0,
               }}
-            />
-          )}
-          {/* Status indicator */}
-          <div
-            style={{
-              width: "8px",
-              height: "8px",
-              borderRadius: "50%",
-              backgroundColor:
-                issue.status === "todo"
-                  ? "#71717a"
-                  : issue.status === "in_progress"
-                  ? "#3b82f6"
-                  : issue.status === "review"
-                  ? "#a855f7"
-                  : "#22c55e",
-              flexShrink: 0,
-            }}
-          />
-          {/* Issue key */}
-          <div
-            style={{
-              fontSize: "0.75rem",
-              color: "var(--text-secondary)",
-              fontWeight: 500,
-              flexShrink: 0,
-            }}
-          >
-            {issue.key}
-          </div>
-        </div>
-      ),
-      rightSection: (
-        <Group gap="xs" wrap="nowrap">
-          {/* Priority badge */}
-          <Badge
-            color={getPriorityColor(issue.priority)}
-            size="sm"
-            variant="light"
-            style={{ flexShrink: 0 }}
-          >
-            {issue.priority}
-          </Badge>
-          {/* Assignee */}
-          {issue.assignee_name ? (
-            <Avatar
-              color={issue.assignee_color}
-              name={issue.assignee_name}
-              size="sm"
-              title={issue.assignee_name}
-              style={{ flexShrink: 0 }}
-            />
-          ) : (
-            <UnassignedAvatar size="sm" />
-          )}
-        </Group>
-      ),
-    };
-  });
+            >
+              {/* Indentation for subtasks with status-based styling */}
+              {isSubtask && (
+                <div
+                  style={{
+                    width: "16px",
+                    height:
+                      issue.status === "done"
+                        ? "6px"
+                        : issue.status === "in_progress"
+                        ? "4px"
+                        : issue.status === "review"
+                        ? "5px"
+                        : "2px",
+                    backgroundColor:
+                      issue.status === "todo"
+                        ? "#71717a"
+                        : issue.status === "in_progress"
+                        ? "#3b82f6"
+                        : issue.status === "review"
+                        ? "#a855f7"
+                        : "#22c55e",
+                    flexShrink: 0,
+                    borderRadius: "2px",
+                  }}
+                />
+              )}
+              {/* Status indicator */}
+              <div
+                style={{
+                  width: "8px",
+                  height: "8px",
+                  borderRadius: "50%",
+                  backgroundColor:
+                    issue.status === "todo"
+                      ? "#71717a"
+                      : issue.status === "in_progress"
+                      ? "#3b82f6"
+                      : issue.status === "review"
+                      ? "#a855f7"
+                      : "#22c55e",
+                  flexShrink: 0,
+                }}
+              />
+              {/* Issue key */}
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "var(--text-secondary)",
+                  fontWeight: 500,
+                  flexShrink: 0,
+                }}
+              >
+                {issue.key}
+              </div>
+            </div>
+          ),
+          rightSection: (
+            <Group gap="xs" wrap="nowrap">
+              {/* Priority badge */}
+              <Badge
+                color={getPriorityColor(issue.priority)}
+                size="sm"
+                variant="light"
+                style={{ flexShrink: 0 }}
+              >
+                {issue.priority}
+              </Badge>
+              {/* Assignee */}
+              {issue.assignee_name ? (
+                <Avatar
+                  color={issue.assignee_color}
+                  name={issue.assignee_name}
+                  size="sm"
+                  title={issue.assignee_name}
+                  style={{ flexShrink: 0 }}
+                />
+              ) : (
+                <UnassignedAvatar size="sm" />
+              )}
+            </Group>
+          ),
+        };
+      }),
+    [allIssues]
+  );
 
   return (
     <ContextMenuProvider submenuDelay={150}>

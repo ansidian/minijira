@@ -186,12 +186,9 @@ app.post("/api/issues", async (req, res) => {
       }
     }
 
-    // Get next issue key
-    await db.execute(
-      "UPDATE counters SET value = value + 1 WHERE name = 'issue_key'"
-    );
+    // Get next issue key (atomic increment + read to prevent race conditions)
     const { rows: counterRows } = await db.execute(
-      "SELECT value FROM counters WHERE name = 'issue_key'"
+      "UPDATE counters SET value = value + 1 WHERE name = 'issue_key' RETURNING value"
     );
     const key = `JPL-${counterRows[0].value}`;
 
