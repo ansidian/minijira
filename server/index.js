@@ -3,6 +3,7 @@ import cors from "cors";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import db from "./db/connection.js";
+import sseManager from "./sse-manager.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -29,6 +30,22 @@ async function logActivity(issueId, actionType, entityType, userId, oldValue = n
     args: [issueId, actionType, entityType, userId, oldValue, newValue, issueKey, issueTitle]
   });
 }
+
+// ============================================
+// SERVER-SENT EVENTS (SSE)
+// ============================================
+
+// SSE endpoint for real-time updates
+app.get("/api/events", (req, res) => {
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // Disable buffering in nginx
+
+  // Register client with SSE manager
+  sseManager.addClient(res);
+});
 
 // ============================================
 // USERS
@@ -251,6 +268,13 @@ app.post("/api/issues", async (req, res) => {
       title
     );
 
+    // Broadcast SSE event
+    sseManager.broadcast({
+      type: 'issue_created',
+      issueId: Number(result.lastInsertRowid),
+      parentId: parent_id || undefined
+    });
+
     res.status(201).json(rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -353,7 +377,7 @@ app.patch("/api/issues/:id", async (req, res) => {
 
     const { rows } = await db.execute({
       sql: `
-        SELECT 
+        SELECT
           issues.*,
           assignee.name as assignee_name,
           assignee.avatar_color as assignee_color,
@@ -368,6 +392,13 @@ app.patch("/api/issues/:id", async (req, res) => {
         WHERE issues.id = ?
       `,
       args: [id],
+    });
+
+    // Broadcast SSE event
+    sseManager.broadcast({
+      type: 'issue_updated',
+      issueId: parseInt(id),
+      parentId: rows[0].parent_id || undefined
     });
 
     res.json(rows[0]);
@@ -407,6 +438,13 @@ app.delete("/api/issues/:id", async (req, res) => {
     await db.execute({
       sql: "DELETE FROM issues WHERE id = ?",
       args: [req.params.id],
+    });
+
+    // Broadcast SSE event
+    sseManager.broadcast({
+      type: 'issue_deleted',
+      issueId: parseInt(req.params.id),
+      parentId: issue.parent_id || undefined
     });
 
     res.status(204).send();
@@ -480,6 +518,12 @@ app.post("/api/issues/:id/comments", async (req, res) => {
 
     // Log activity
     await logActivity(issue_id, 'comment_added', 'comment', user_id || null, null, null, issue.key, issue.title);
+
+    // Broadcast SSE event
+    sseManager.broadcast({
+      type: 'comment_added',
+      issueId: parseInt(issue_id)
+    });
 
     res.status(201).json(rows[0]);
   } catch (err) {

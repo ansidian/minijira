@@ -406,7 +406,7 @@ function ActivityLogModal({ opened, onClose, onViewIssue }) {
   async function fetchActivities() {
     setLoading(true);
     try {
-      const data = await api.get("/activity?limit=50");
+      const data = await api.get("/activity?limit=20");
       setActivities(data);
     } catch (error) {
       console.error("Failed to fetch activity:", error);
@@ -517,9 +517,19 @@ function App() {
   const [statsBadgeAnimate, setStatsBadgeAnimate] = useState(false);
   const [previousStats, setPreviousStats] = useState(null);
   const [showActivityLog, setShowActivityLog] = useState(false);
+  const [hasNewActivity, setHasNewActivity] = useState(false);
 
   // Request deduplication for subtask fetches - prevents duplicate in-flight requests
   const pendingSubtaskFetches = useRef(new Map());
+
+  // Keep a ref to expandedIssues for SSE handler to avoid stale closures
+  const expandedIssuesRef = useRef(expandedIssues);
+  useEffect(() => {
+    expandedIssuesRef.current = expandedIssues;
+  }, [expandedIssues]);
+
+  // Keep a ref to loadData for SSE handler to avoid stale closures
+  const loadDataRef = useRef(null);
 
   // Centralized subtask fetch with deduplication
   async function fetchSubtasksForParent(parentId) {
@@ -548,6 +558,7 @@ function App() {
         "mod+J",
         () => setColorScheme(colorScheme === "dark" ? "light" : "dark"),
       ],
+      ["mod+I", () => setShowActivityLog((prev) => !prev)],
     ],
     [],
     true
@@ -587,6 +598,38 @@ function App() {
     }
   }, [stats]); // Only depend on stats, not previousStats
 
+  // Check for new activity on load
+  useEffect(() => {
+    async function checkNewActivity() {
+      try {
+        const [latest] = await api.get("/activity?limit=1");
+        if (latest) {
+          const lastViewed = localStorage.getItem("minijira_activity_viewed");
+          if (
+            !lastViewed ||
+            new Date(latest.created_at) > new Date(lastViewed)
+          ) {
+            setHasNewActivity(true);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to check activity:", error);
+      }
+    }
+    checkNewActivity();
+  }, []);
+
+  // Clear activity badge and update localStorage when modal opens
+  useEffect(() => {
+    if (showActivityLog) {
+      setHasNewActivity(false);
+      localStorage.setItem(
+        "minijira_activity_viewed",
+        new Date().toISOString()
+      );
+    }
+  }, [showActivityLog]);
+
   // Load data
   useEffect(() => {
     loadData();
@@ -608,6 +651,127 @@ function App() {
     setAllIssues(allIssuesData);
     setLoading(false);
   }
+
+  // Keep loadDataRef current
+  loadDataRef.current = loadData;
+
+  // SSE connection for real-time updates
+  useEffect(() => {
+    const eventSource = new EventSource(`${API_BASE}/events`);
+    let isInitialConnection = true;
+
+    eventSource.onopen = () => {
+      console.log("SSE connected");
+      // Only sync on reconnection, not initial connection (avoid duplicate load)
+      if (!isInitialConnection) {
+        loadDataRef.current();
+      }
+      isInitialConnection = false;
+    };
+
+    eventSource.onmessage = async (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        // Skip the initial connection message
+        if (data.type === "connected") {
+          return;
+        }
+
+        console.log("SSE event received:", data);
+
+        // Refresh all issues
+        await loadDataRef.current();
+
+        // Trigger stats animation and activity badge for events that affect stats
+        if (
+          data.type === "issue_created" ||
+          data.type === "issue_updated" ||
+          data.type === "issue_deleted"
+        ) {
+          setStatsBadgeAnimate(true);
+          setTimeout(() => setStatsBadgeAnimate(false), 300);
+
+          // Show activity notification badge (will be cleared when modal is opened)
+          setHasNewActivity(true);
+        }
+
+        // Handle deletion cleanup
+        if (data.type === "issue_deleted") {
+          // Remove from expanded issues if it was a parent
+          setExpandedIssues((prev) => {
+            if (prev.has(data.issueId)) {
+              const newSet = new Set(prev);
+              newSet.delete(data.issueId);
+              return newSet;
+            }
+            return prev;
+          });
+
+          // Remove from subtasks cache
+          setSubtasksCache((prev) => {
+            if (prev[data.issueId]) {
+              const newCache = { ...prev };
+              delete newCache[data.issueId];
+              return newCache;
+            }
+            return prev;
+          });
+        }
+
+        // Determine which parents need subtask refresh (use ref to get current value)
+        const parentsToRefresh = new Set(expandedIssuesRef.current);
+
+        // If event involves a subtask, also refresh that parent's subtasks
+        if (data.parentId) {
+          parentsToRefresh.add(data.parentId);
+        }
+
+        // Don't try to refresh deleted parents
+        if (data.type === "issue_deleted") {
+          parentsToRefresh.delete(data.issueId);
+        }
+
+        // Re-fetch subtasks for all relevant parents
+        if (parentsToRefresh.size > 0) {
+          const parentIds = Array.from(parentsToRefresh);
+          const results = await Promise.all(
+            parentIds.map(async (issueId) => {
+              try {
+                const subtasks = await fetchSubtasksForParent(issueId);
+                return { issueId, subtasks };
+              } catch (error) {
+                console.error(
+                  `Failed to fetch subtasks for issue ${issueId}:`,
+                  error
+                );
+                return { issueId, subtasks: [] };
+              }
+            })
+          );
+
+          setSubtasksCache((prev) => {
+            const newCache = { ...prev };
+            for (const { issueId, subtasks } of results) {
+              newCache[issueId] = subtasks;
+            }
+            return newCache;
+          });
+        }
+      } catch (error) {
+        console.error("Error processing SSE event:", error);
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error("SSE error:", error);
+      // EventSource will auto-reconnect
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, []);
 
   // Auto-expand issues with subtasks on first load
   useEffect(() => {
@@ -1336,27 +1500,43 @@ function App() {
             </button>
             {/* Activity log button */}
             <Tooltip label="Recent Activity">
-              <ActionIcon
-                variant="default"
-                size="lg"
-                onClick={() => setShowActivityLog(true)}
-                aria-label="View activity log"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+              <div style={{ position: "relative" }}>
+                <ActionIcon
+                  variant="default"
+                  size="lg"
+                  onClick={() => setShowActivityLog(true)}
+                  aria-label="View activity log"
                 >
-                  <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-                  <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-                </svg>
-              </ActionIcon>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                  </svg>
+                </ActionIcon>
+                {hasNewActivity && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 2,
+                      right: 2,
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      backgroundColor: "var(--mantine-color-red-6)",
+                      pointerEvents: "none",
+                    }}
+                  />
+                )}
+              </div>
             </Tooltip>
             {/* Theme toggle button */}
             <Tooltip
