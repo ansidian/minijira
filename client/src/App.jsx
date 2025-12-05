@@ -623,10 +623,12 @@ function App() {
   useEffect(() => {
     if (showActivityLog) {
       setHasNewActivity(false);
-      localStorage.setItem(
-        "minijira_activity_viewed",
-        new Date().toISOString()
-      );
+      // Store the latest activity's timestamp to ensure format consistency
+      api.get("/activity?limit=1").then(([latest]) => {
+        if (latest) {
+          localStorage.setItem("minijira_activity_viewed", latest.created_at);
+        }
+      });
     }
   }, [showActivityLog]);
 
