@@ -57,8 +57,12 @@ const api = {
     });
     return res.json();
   },
-  async delete(path) {
-    await fetch(`${API_BASE}${path}`, { method: "DELETE" });
+  async delete(path, data) {
+    await fetch(`${API_BASE}${path}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: data ? JSON.stringify(data) : undefined,
+    });
   },
 };
 
@@ -89,6 +93,80 @@ const getStatusColor = (status) =>
 function formatDate(dateStr) {
   const date = new Date(dateStr);
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+// Format relative time for activity log
+function relativeTime(dateStr) {
+  const now = new Date();
+  // Handle SQLite datetime format - ensure proper parsing
+  const date = new Date(dateStr.replace(" ", "T") + "Z");
+  const seconds = Math.floor((now - date) / 1000);
+
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+  return formatDate(dateStr);
+}
+
+// Format activity description for activity log
+function formatActivityDescription(entry) {
+  const { action_type, old_value, new_value } = entry;
+
+  // Helper to format status names
+  const formatStatus = (status) => {
+    const statusMap = {
+      todo: "To Do",
+      in_progress: "In Progress",
+      review: "Review",
+      done: "Done",
+    };
+    return statusMap[status] || status;
+  };
+
+  // Helper to format priority names
+  const formatPriority = (priority) => {
+    const priorityMap = {
+      low: "Low",
+      medium: "Medium",
+      high: "High",
+    };
+    return priorityMap[priority] || priority;
+  };
+
+  switch (action_type) {
+    case "issue_created":
+      return "created issue";
+    case "subtask_created":
+      return "created subtask";
+    case "issue_deleted":
+      return "deleted issue";
+    case "subtask_deleted":
+      return "deleted subtask";
+    case "status_changed":
+      return (
+        <>
+          changed status from <strong>{formatStatus(old_value)}</strong> to{" "}
+          <strong>{formatStatus(new_value)}</strong>
+        </>
+      );
+    case "assignee_changed":
+      if (!old_value || old_value === "null") {
+        return "assigned issue";
+      }
+      return "reassigned issue";
+    case "priority_changed":
+      return (
+        <>
+          changed priority from <strong>{formatPriority(old_value)}</strong> to{" "}
+          <strong>{formatPriority(new_value)}</strong>
+        </>
+      );
+    case "comment_added":
+      return "added a comment";
+    default:
+      return action_type.replace(/_/g, " ");
+  }
 }
 
 // Linkify text - convert URLs to clickable links
@@ -300,13 +378,130 @@ function useIssueContextMenu({
 }
 
 // ============================================================================
+// ACTIVITY LOG MODAL
+// ============================================================================
+
+function ActivityLogModal({ opened, onClose, onViewIssue }) {
+  const [activities, setActivities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [, forceUpdate] = useState(0);
+
+  useEffect(() => {
+    if (opened) {
+      fetchActivities();
+    }
+  }, [opened]);
+
+  // Update relative times every 60 seconds while modal is open
+  useEffect(() => {
+    if (!opened) return;
+
+    const interval = setInterval(() => {
+      forceUpdate((n) => n + 1);
+    }, 60000); // 60 seconds
+
+    return () => clearInterval(interval);
+  }, [opened]);
+
+  async function fetchActivities() {
+    setLoading(true);
+    try {
+      const data = await api.get("/activity?limit=50");
+      setActivities(data);
+    } catch (error) {
+      console.error("Failed to fetch activity:", error);
+    }
+    setLoading(false);
+  }
+
+  return (
+    <Modal opened={opened} onClose={onClose} size="lg" title="Recent Activity">
+      {loading ? (
+        <div
+          style={{
+            textAlign: "center",
+            padding: "2rem",
+            color: "var(--text-secondary)",
+          }}
+        >
+          Loading...
+        </div>
+      ) : activities.length === 0 ? (
+        <div
+          style={{
+            textAlign: "center",
+            padding: "2rem",
+            color: "var(--text-secondary)",
+          }}
+        >
+          No recent activity
+        </div>
+      ) : (
+        <Stack gap="sm">
+          {activities.map((entry) => (
+            <div key={entry.id} className="activity-entry">
+              <div className="activity-header">
+                <Avatar
+                  color={entry.user_color}
+                  name={entry.user_name || "System"}
+                  size="sm"
+                />
+                <span className="activity-author">
+                  {entry.user_name || "System"}
+                </span>
+                <span className="activity-time">
+                  {relativeTime(entry.created_at)}
+                </span>
+              </div>
+              <div className="activity-body">
+                <span className="activity-description">
+                  {formatActivityDescription(entry)}{" "}
+                  <Badge
+                    variant="light"
+                    size="sm"
+                    style={{ cursor: entry.issue_id ? "pointer" : "default" }}
+                    onClick={() => {
+                      if (entry.issue_id) {
+                        onViewIssue(entry.issue_id);
+                        onClose();
+                      }
+                    }}
+                  >
+                    {entry.issue_key}
+                  </Badge>
+                  {entry.issue_title && (
+                    <span
+                      style={{
+                        marginLeft: "0.5rem",
+                        color: "var(--text-secondary)",
+                      }}
+                    >
+                      {entry.issue_title}
+                    </span>
+                  )}
+                </span>
+              </div>
+            </div>
+          ))}
+        </Stack>
+      )}
+    </Modal>
+  );
+}
+
+// ============================================================================
 // MAIN APP COMPONENT
 // ============================================================================
 
 function App() {
   const [issues, setIssues] = useState([]);
   const [users, setUsers] = useState([]);
-  const [stats, setStats] = useState({ todo: 0, in_progress: 0, review: 0, done: 0 });
+  const [stats, setStats] = useState({
+    todo: 0,
+    in_progress: 0,
+    review: 0,
+    done: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -321,6 +516,7 @@ function App() {
   const [allIssues, setAllIssues] = useState([]); // All issues including subtasks for Spotlight
   const [statsBadgeAnimate, setStatsBadgeAnimate] = useState(false);
   const [previousStats, setPreviousStats] = useState(null);
+  const [showActivityLog, setShowActivityLog] = useState(false);
 
   // Request deduplication for subtask fetches - prevents duplicate in-flight requests
   const pendingSubtaskFetches = useRef(new Map());
@@ -473,13 +669,15 @@ function App() {
   // Handle status change (drag simulation via click)
   async function handleStatusChange(issueId, newStatus) {
     // Find the current issue to get its old status for optimistic stats update
-    const currentIssue = issues.find((i) => i.id === issueId) ||
+    const currentIssue =
+      issues.find((i) => i.id === issueId) ||
       allIssues.find((i) => i.id === issueId);
     const oldStatus = currentIssue?.status;
     const isParentIssue = !currentIssue?.parent_id;
 
     const updated = await api.patch(`/issues/${issueId}`, {
       status: newStatus,
+      user_id: currentUserId,
     });
     setIssues((prev) => prev.map((i) => (i.id === issueId ? updated : i)));
 
@@ -504,6 +702,14 @@ function App() {
     // If this is a subtask, refresh its parent's cache if expanded
     if (updated.parent_id && expandedIssues.has(updated.parent_id)) {
       await refreshSubtasksCache([updated.parent_id]);
+    }
+
+    // If this is a subtask, refresh its parent's subtask counts on the board
+    if (updated.parent_id) {
+      const parentIssue = await api.get(`/issues/${updated.parent_id}`);
+      setIssues((prev) =>
+        prev.map((i) => (i.id === updated.parent_id ? parentIssue : i))
+      );
     }
 
     // Refresh allIssues for Spotlight
@@ -535,7 +741,10 @@ function App() {
 
   // Update issue
   async function handleUpdateIssue(issueId, data) {
-    const updated = await api.patch(`/issues/${issueId}`, data);
+    const updated = await api.patch(`/issues/${issueId}`, {
+      ...data,
+      user_id: currentUserId,
+    });
     setIssues((prev) => prev.map((i) => (i.id === issueId ? updated : i)));
 
     // Update selected issue if it's currently open
@@ -548,6 +757,14 @@ function App() {
       await refreshSubtasksCache([updated.parent_id]);
     }
 
+    // If this is a subtask, refresh its parent's subtask counts on the board
+    if (updated.parent_id) {
+      const parentIssue = await api.get(`/issues/${updated.parent_id}`);
+      setIssues((prev) =>
+        prev.map((i) => (i.id === updated.parent_id ? parentIssue : i))
+      );
+    }
+
     // Refresh allIssues for Spotlight
     const allIssuesData = await api.get("/issues?include_subtasks=true");
     setAllIssues(allIssuesData);
@@ -556,13 +773,14 @@ function App() {
   // Delete issue
   async function handleDeleteIssue(issueId) {
     // Find the issue before deletion to know if it's a subtask and its status
-    const deletedIssue = issues.find((i) => i.id === issueId) ||
+    const deletedIssue =
+      issues.find((i) => i.id === issueId) ||
       allIssues.find((i) => i.id === issueId);
     const parentId = deletedIssue?.parent_id;
     const deletedStatus = deletedIssue?.status;
     const isParentIssue = !parentId;
 
-    await api.delete(`/issues/${issueId}`);
+    await api.delete(`/issues/${issueId}`, { user_id: currentUserId });
 
     // Reload all issues to ensure subtask counts are updated
     const [issuesData, allIssuesData] = await Promise.all([
@@ -1041,17 +1259,13 @@ function App() {
                   <div>
                     <Group gap="xs" mb={4}>
                       <span style={{ fontSize: "0.875rem", minWidth: "80px" }}>
-                        <span style={{ fontWeight: 600 }}>
-                          {stats.review}
-                        </span>{" "}
+                        <span style={{ fontWeight: 600 }}>{stats.review}</span>{" "}
                         in review
                       </span>
                     </Group>
                     <Progress
                       value={
-                        stats.total > 0
-                          ? (stats.review / stats.total) * 100
-                          : 0
+                        stats.total > 0 ? (stats.review / stats.total) * 100 : 0
                       }
                       color="violet"
                       size="sm"
@@ -1120,6 +1334,30 @@ function App() {
                 {isMac ? "⌘ + K" : "Ctrl + K"}
               </span>
             </button>
+            {/* Activity log button */}
+            <Tooltip label="Recent Activity">
+              <ActionIcon
+                variant="default"
+                size="lg"
+                onClick={() => setShowActivityLog(true)}
+                aria-label="View activity log"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                  <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                </svg>
+              </ActionIcon>
+            </Tooltip>
             {/* Theme toggle button */}
             <Tooltip
               label={`Switch to ${
@@ -1452,6 +1690,13 @@ function App() {
             isTouchDevice={isTouchDevice}
           />
         )}
+
+        {/* Activity Log Modal */}
+        <ActivityLogModal
+          opened={showActivityLog}
+          onClose={() => setShowActivityLog(false)}
+          onViewIssue={handleViewIssue}
+        />
       </div>
     </ContextMenuProvider>
   );
@@ -2272,6 +2517,7 @@ function SubtasksSection({
   async function handleStatusToggle(subtaskId, newStatus) {
     const updated = await api.patch(`/issues/${subtaskId}`, {
       status: newStatus,
+      user_id: currentUserId,
     });
     setSubtasks((prev) =>
       prev.map((s) => (s.id === subtaskId ? { ...s, ...updated } : s))
@@ -2280,7 +2526,10 @@ function SubtasksSection({
   }
 
   async function handleUpdate(subtaskId, data) {
-    const updated = await api.patch(`/issues/${subtaskId}`, data);
+    const updated = await api.patch(`/issues/${subtaskId}`, {
+      ...data,
+      user_id: currentUserId,
+    });
     setSubtasks((prev) =>
       prev.map((s) => (s.id === subtaskId ? { ...s, ...updated } : s))
     );
@@ -2288,7 +2537,7 @@ function SubtasksSection({
   }
 
   async function handleDelete(subtaskId) {
-    await api.delete(`/issues/${subtaskId}`);
+    await api.delete(`/issues/${subtaskId}`, { user_id: currentUserId });
     setSubtasks((prev) => prev.filter((s) => s.id !== subtaskId));
     onSubtaskChange?.();
     notifications.show({

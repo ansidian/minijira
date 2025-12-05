@@ -385,6 +385,54 @@ body {
 	border-bottom-color: var(--accent-hover);
 }
 
+/* Activity log styles */
+.activity-entry {
+	padding: 12px;
+	background: var(--bg-tertiary);
+	border-radius: 6px;
+	transition: background 0.15s ease;
+}
+
+.activity-entry:hover {
+	background: var(--bg-card);
+}
+
+.activity-header {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 6px;
+}
+
+.activity-author {
+	font-size: 13px;
+	font-weight: 500;
+}
+
+.activity-time {
+	font-size: 11px;
+	color: var(--text-muted);
+	margin-left: auto;
+}
+
+.activity-body {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+	color: var(--text-secondary);
+	margin-left: 42px;
+}
+
+.activity-description {
+	flex: 1;
+}
+
+.activity-description strong {
+	color: var(--text-primary);
+	font-weight: 600;
+}
+
 /* empty state */
 .empty-column {
 	text-align: center;

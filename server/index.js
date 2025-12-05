@@ -19,6 +19,18 @@ if (process.env.NODE_ENV === "production") {
 }
 
 // ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+async function logActivity(issueId, actionType, entityType, userId, oldValue = null, newValue = null, issueKey = null, issueTitle = null) {
+  await db.execute({
+    sql: `INSERT INTO activity_log (issue_id, action_type, entity_type, user_id, old_value, new_value, issue_key, issue_title)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [issueId, actionType, entityType, userId, oldValue, newValue, issueKey, issueTitle]
+  });
+}
+
+// ============================================
 // USERS
 // ============================================
 
@@ -227,6 +239,18 @@ app.post("/api/issues", async (req, res) => {
       args: [result.lastInsertRowid],
     });
 
+    // Log activity
+    await logActivity(
+      result.lastInsertRowid,
+      parent_id ? 'subtask_created' : 'issue_created',
+      parent_id ? 'subtask' : 'issue',
+      reporter_id || null,
+      null,
+      null,
+      key,
+      title
+    );
+
     res.status(201).json(rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -236,7 +260,7 @@ app.post("/api/issues", async (req, res) => {
 // Update issue
 app.patch("/api/issues/:id", async (req, res) => {
   try {
-    const { title, description, status, priority, assignee_id, parent_id, previous_status } =
+    const { title, description, status, priority, assignee_id, parent_id, previous_status, user_id } =
       req.body;
     const { id } = req.params;
 
@@ -246,6 +270,9 @@ app.patch("/api/issues/:id", async (req, res) => {
     });
     if (existing.length === 0)
       return res.status(404).json({ error: "Issue not found" });
+
+    // Store old values for activity logging
+    const oldIssue = { ...existing[0] };
 
     const updates = [];
     const args = [];
@@ -302,6 +329,26 @@ app.patch("/api/issues/:id", async (req, res) => {
         sql: `UPDATE issues SET ${updates.join(", ")} WHERE id = ?`,
         args,
       });
+
+      // Log activity for changed fields
+      if (status !== undefined && oldIssue.status !== status) {
+        await logActivity(id, 'status_changed', 'issue', user_id || null, oldIssue.status, status, oldIssue.key, title !== undefined ? title : oldIssue.title);
+      }
+      if (priority !== undefined && oldIssue.priority !== priority) {
+        await logActivity(id, 'priority_changed', 'issue', user_id || null, oldIssue.priority, priority, oldIssue.key, title !== undefined ? title : oldIssue.title);
+      }
+      if (assignee_id !== undefined && oldIssue.assignee_id !== assignee_id) {
+        await logActivity(
+          id,
+          'assignee_changed',
+          'issue',
+          user_id || null,
+          oldIssue.assignee_id?.toString() || null,
+          assignee_id?.toString() || null,
+          oldIssue.key,
+          title !== undefined ? title : oldIssue.title
+        );
+      }
     }
 
     const { rows } = await db.execute({
@@ -332,12 +379,36 @@ app.patch("/api/issues/:id", async (req, res) => {
 // Delete issue
 app.delete("/api/issues/:id", async (req, res) => {
   try {
-    const result = await db.execute({
+    const { user_id } = req.body;
+
+    // Fetch issue details before deletion for activity log
+    const { rows: existing } = await db.execute({
+      sql: "SELECT * FROM issues WHERE id = ?",
+      args: [req.params.id],
+    });
+    if (existing.length === 0)
+      return res.status(404).json({ error: "Issue not found" });
+
+    const issue = existing[0];
+    const isSubtask = issue.parent_id !== null;
+
+    // Log activity before deletion
+    await logActivity(
+      issue.id,
+      isSubtask ? 'subtask_deleted' : 'issue_deleted',
+      isSubtask ? 'subtask' : 'issue',
+      user_id || null,
+      null,
+      null,
+      issue.key,
+      issue.title
+    );
+
+    await db.execute({
       sql: "DELETE FROM issues WHERE id = ?",
       args: [req.params.id],
     });
-    if (result.rowsAffected === 0)
-      return res.status(404).json({ error: "Issue not found" });
+
     res.status(204).send();
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -381,11 +452,13 @@ app.post("/api/issues/:id/comments", async (req, res) => {
     }
 
     const { rows: issueRows } = await db.execute({
-      sql: "SELECT id FROM issues WHERE id = ?",
+      sql: "SELECT id, key, title FROM issues WHERE id = ?",
       args: [issue_id],
     });
     if (issueRows.length === 0)
       return res.status(404).json({ error: "Issue not found" });
+
+    const issue = issueRows[0];
 
     const result = await db.execute({
       sql: "INSERT INTO comments (issue_id, user_id, body) VALUES (?, ?, ?)",
@@ -394,7 +467,7 @@ app.post("/api/issues/:id/comments", async (req, res) => {
 
     const { rows } = await db.execute({
       sql: `
-        SELECT 
+        SELECT
           comments.*,
           users.name as user_name,
           users.avatar_color as user_color
@@ -404,6 +477,9 @@ app.post("/api/issues/:id/comments", async (req, res) => {
       `,
       args: [result.lastInsertRowid],
     });
+
+    // Log activity
+    await logActivity(issue_id, 'comment_added', 'comment', user_id || null, null, null, issue.key, issue.title);
 
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -448,6 +524,34 @@ app.get("/api/stats", async (req, res) => {
       review: review.rows[0].count,
       done: done.rows[0].count,
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// ACTIVITY LOG
+// ============================================
+
+app.get("/api/activity", async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const offset = parseInt(req.query.offset) || 0;
+
+    const { rows } = await db.execute({
+      sql: `
+        SELECT
+          activity_log.*,
+          users.name as user_name,
+          users.avatar_color as user_color
+        FROM activity_log
+        LEFT JOIN users ON activity_log.user_id = users.id
+        ORDER BY activity_log.created_at DESC
+        LIMIT ? OFFSET ?
+      `,
+      args: [limit, offset],
+    });
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

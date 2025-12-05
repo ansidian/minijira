@@ -6,7 +6,6 @@ const db = createClient({
 });
 
 async function init() {
-  // Create tables
   await db.execute(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,31 +43,64 @@ async function init() {
   `);
 
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS activity_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      issue_id INTEGER REFERENCES issues(id) ON DELETE SET NULL,
+      issue_key TEXT,
+      issue_title TEXT,
+      action_type TEXT NOT NULL CHECK(action_type IN (
+        'issue_created',
+        'status_changed',
+        'assignee_changed',
+        'priority_changed',
+        'comment_added',
+        'subtask_created',
+        'issue_deleted',
+        'subtask_deleted'
+      )),
+      entity_type TEXT NOT NULL CHECK(entity_type IN ('issue', 'comment', 'subtask')),
+      old_value TEXT,
+      new_value TEXT,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_activity_created_at
+      ON activity_log(created_at DESC)
+  `);
+
+  // Migration: Add issue_key and issue_title columns if they don't exist
+  try {
+    await db.execute(`ALTER TABLE activity_log ADD COLUMN issue_key TEXT`);
+  } catch (err) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.execute(`ALTER TABLE activity_log ADD COLUMN issue_title TEXT`);
+  } catch (err) {
+    // Column already exists, ignore
+  }
+
+  // Migration: Add previous_status column to issues table if it doesn't exist
+  try {
+    await db.execute(`ALTER TABLE issues ADD COLUMN previous_status TEXT`);
+  } catch (err) {
+    // Column already exists, ignore
+  }
+
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS counters (
       name TEXT PRIMARY KEY,
       value INTEGER DEFAULT 0
     )
   `);
 
-  // Migration: Add parent_id column if it doesn't exist (for existing databases)
-  try {
-    await db.execute(
-      "ALTER TABLE issues ADD COLUMN parent_id INTEGER REFERENCES issues(id) ON DELETE CASCADE"
-    );
-    console.log("  - Migration: Added parent_id column to issues table");
-  } catch (err) {
-    // Column already exists - this is expected for existing installations
-    if (!err.message.includes("duplicate column name")) {
-      throw err;
-    }
-  }
-
-  // Initialize counter (ignore if exists)
   await db.execute(`
     INSERT OR IGNORE INTO counters (name, value) VALUES ('issue_key', 0)
   `);
 
-  // Seed users
   const seedUsers = [
     { name: "Andy Su", email: "alex@team.edu", avatar_color: "#ef4444" },
     {
@@ -131,7 +163,7 @@ async function init() {
     });
   }
 
-  // Check if we need to seed issues (only if none exist)
+  // seed initial issues if not exists (new db)
   const { rows } = await db.execute("SELECT COUNT(*) as count FROM issues");
   if (rows[0].count === 0) {
     const sampleIssues = [
@@ -199,7 +231,7 @@ async function init() {
     console.log(`  - ${sampleIssues.length} sample issues created`);
   }
 
-  console.log("✓ Database initialized");
+  console.log("Database initialized");
   console.log(`  - ${seedUsers.length} users ensured`);
 }
 
