@@ -841,6 +841,11 @@ function App() {
     const oldStatus = currentIssue?.status;
     const isParentIssue = !currentIssue?.parent_id;
 
+    // Skip if status isn't actually changing (e.g., drag-drop back to same column)
+    if (oldStatus === newStatus) {
+      return;
+    }
+
     const updated = await api.patch(`/issues/${issueId}`, {
       status: newStatus,
       user_id: currentUserId,
@@ -3226,6 +3231,7 @@ function IssueDetailModal({
           label="Status"
           value={issue.status}
           onChange={(value) => onStatusChange(issue.id, value)}
+          allowDeselect={false}
           data={[
             { value: "todo", label: "To Do" },
             { value: "in_progress", label: "In Progress" },
@@ -3237,6 +3243,7 @@ function IssueDetailModal({
           label="Priority"
           value={issue.priority}
           onChange={(value) => onUpdate(issue.id, { priority: value })}
+          allowDeselect={false}
           data={[
             { value: "low", label: "Low" },
             { value: "medium", label: "Medium" },
