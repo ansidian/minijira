@@ -3,7 +3,10 @@ import ReactDOM from "react-dom/client";
 import { MantineProvider, createTheme } from "@mantine/core";
 import "@mantine/core/styles.css";
 import App from "./App.jsx";
-import "./index.css";
+import "./styles/index.css";
+import "./styles/components.css";
+import "./styles/animations.css";
+import "./styles/responsive.css";
 
 const theme = createTheme({
   colors: {

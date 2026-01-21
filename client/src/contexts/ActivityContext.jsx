@@ -9,7 +9,7 @@ import {
 import { API_BASE } from "../utils/api";
 import { useIssues } from "./IssuesContext";
 import { useUI } from "./UIContext";
-import { useActivityPolling } from "../hooks";
+import { useActivityPolling } from "../hooks/useActivityPolling";
 
 const ActivityContext = createContext(null);
 

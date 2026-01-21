@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useReducer, useRef } from "react";
 import { api } from "../utils/api";
-import { useSubtaskCache } from "../hooks";
+import { useSubtaskCache } from "../hooks/useSubtaskCache";
 
 const IssuesContext = createContext(null);
 
