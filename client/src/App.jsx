@@ -1,5 +1,6 @@
 import { AppShell } from "./AppShell";
-import { UIProvider, UsersProvider } from "./contexts";
+import { UIProvider } from "./contexts/UIContext";
+import { UsersProvider } from "./contexts/UsersContext";
 
 export default function App() {
   return (
