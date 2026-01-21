@@ -118,15 +118,12 @@ minijira/
 ├── client/                 # React frontend
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── board/     # Board and card UI
-│   │   │   ├── modals/    # Issue + activity modals
-│   │   │   └── shared/    # Shared UI pieces
 │   │   ├── contexts/      # App state providers
 │   │   ├── hooks/         # Custom hooks
 │   │   ├── utils/         # API + helpers
+│   │   ├── styles/        # core styles
 │   │   ├── App.jsx        # Main application
 │   │   ├── AppShell.jsx   # Layout shell
-│   │   ├── index.css      # Styles
 │   │   └── main.jsx       # Entry point
 │   └── index.html
 ├── server/

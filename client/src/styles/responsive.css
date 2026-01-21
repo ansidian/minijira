@@ -1,0 +1,205 @@
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+  /* Header adjustments */
+  .header {
+    padding: 12px 12px 0 12px;
+    flex-wrap: wrap;
+    height: auto;
+    min-height: var(--header-height);
+  }
+
+  .logo {
+    font-size: 16px;
+    gap: 8px;
+  }
+
+  .logo-icon {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+  }
+
+  .header-right {
+    gap: 12px;
+    width: 100%;
+    justify-content: flex-start;
+    margin-top: 8px;
+    padding-bottom: 12px;
+  }
+
+  /* hide stats on very small screens, show on slightly larger */
+  .header-stats {
+    display: none;
+    gap: 12px;
+    font-size: 11px;
+  }
+
+  .stat {
+    gap: 4px;
+  }
+
+  .stat-value {
+    font-size: 12px;
+  }
+
+  /* reduce space of user selector  */
+  .user-selector {
+    gap: 6px;
+  }
+
+  .user-select {
+    min-width: 100px;
+    max-width: 120px;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  /* Search button - show only icon on mobile */
+  .search-button {
+    min-width: auto;
+    padding: 8px;
+  }
+
+  .search-text,
+  .search-shortcut {
+    display: none;
+  }
+
+  .search-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* board - allow horizontal scroll with single column view */
+  .board {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  /* columns take full width on mobile */
+  .column {
+    min-width: 280px;
+    max-width: 100%;
+    flex: 0 0 calc(100% - 24px);
+  }
+
+  .column-header {
+    padding: 12px 16px;
+  }
+
+  .column-title {
+    font-size: 13px;
+  }
+
+  .column-count {
+    font-size: 11px;
+  }
+
+  /* simplified footer on mobile */
+  .footer {
+    padding: 10px 12px;
+  }
+
+  .footer-content {
+    font-size: 10px;
+    gap: 8px;
+  }
+
+  /* hide some footer items on small screens */
+  .footer-section:nth-child(5),
+  .footer-section:nth-child(6),
+  .footer-divider:nth-child(4) {
+    display: none;
+  }
+
+  .footer-icon {
+    width: 12px;
+    height: 12px;
+  }
+
+  .comment {
+    padding: 10px;
+  }
+
+  .comment-author {
+    font-size: 12px;
+  }
+
+  .comment-body {
+    font-size: 12px;
+  }
+
+  .user-prompt-overlay {
+    padding: 70px 12px 0 0;
+  }
+
+  .user-prompt-message {
+    font-size: 12px;
+    padding: 10px 16px;
+  }
+
+  /* better touch targets */
+  .add-issue-btn {
+    min-height: 44px;
+    font-size: 14px;
+  }
+
+  /* prevent text size adjustment on orientation change */
+  body {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* scrollbar for board on mobile */
+  .board {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .column {
+    scroll-snap-align: start;
+  }
+}
+
+/* show stats on tablet and small desktops */
+@media (min-width: 480px) and (max-width: 768px) {
+  .header-stats {
+    display: flex;
+  }
+
+  .header-right {
+    flex-wrap: wrap;
+  }
+}
+
+/* allow 2 columns on tablet landscape */
+@media (min-width: 600px) and (max-width: 1024px) {
+  .column {
+    flex: 0 0 calc(50% - 12px);
+    min-width: 280px;
+  }
+}
+
+/* show more columns on larger tablets and small laptops */
+@media (min-width: 1024px) {
+  .column {
+    flex: 1;
+    min-width: 320px;
+  }
+}
+
+@media (max-width: 768px) {
+  .subtask-toggle-mobile {
+    display: inline-flex;
+  }
+
+  .subtask-toggle-desktop {
+    display: none;
+  }
+}
+
+/* Hide hints on mobile */
+@media (max-width: 768px) {
+  .hints-container {
+    display: none;
+  }
+}
