@@ -117,7 +117,15 @@ To use `minijira.yourdomain.com`:
 minijira/
 ├── client/                 # React frontend
 │   ├── src/
+│   │   ├── components/
+│   │   │   ├── board/     # Board and card UI
+│   │   │   ├── modals/    # Issue + activity modals
+│   │   │   └── shared/    # Shared UI pieces
+│   │   ├── contexts/      # App state providers
+│   │   ├── hooks/         # Custom hooks
+│   │   ├── utils/         # API + helpers
 │   │   ├── App.jsx        # Main application
+│   │   ├── AppShell.jsx   # Layout shell
 │   │   ├── index.css      # Styles
 │   │   └── main.jsx       # Entry point
 │   └── index.html
@@ -125,6 +133,17 @@ minijira/
 │   ├── db/
 │   │   ├── connection.js  # Turso/SQLite connection
 │   │   └── init.js        # Schema + seed data
+│   ├── routes/            # Express route modules
+│   │   ├── activity-routes.js
+│   │   ├── comments-routes.js
+│   │   ├── events-routes.js
+│   │   ├── issues-routes.js
+│   │   ├── stats-routes.js
+│   │   └── users-routes.js
+│   ├── utils/
+│   │   ├── activity-logger.js
+│   │   └── queries.js
+│   ├── sse-manager.js
 │   └── index.js           # Express API
 ├── render.yaml            # Render deployment config
 └── package.json
@@ -134,7 +153,7 @@ minijira/
 
 ### Change Project Key Prefix
 
-Edit `server/index.js` and `server/db/init.js`, change `JPL-` to your preferred prefix.
+Edit `server/routes/issues-routes.js` and `server/db/init.js`, change `JPL-` to your preferred prefix.
 
 ### Add/Remove Team Members
 
