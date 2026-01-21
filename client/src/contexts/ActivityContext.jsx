@@ -1,8 +1,15 @@
-import { createContext, useContext, useEffect, useRef, useReducer } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useReducer,
+} from "react";
 import { API_BASE } from "../utils/api";
 import { useIssues } from "./IssuesContext";
 import { useUI } from "./UIContext";
-import { useActivityPolling } from "../hooks/useActivityPolling";
+import { useActivityPolling } from "../hooks";
 
 const ActivityContext = createContext(null);
 
@@ -34,6 +41,16 @@ export function ActivityProvider({ children }) {
   } = useIssues();
   const { setStatsBadgeAnimate } = useUI();
 
+  const setShowActivityLog = useCallback(
+    (value) => dispatch({ type: "SET_SHOW_ACTIVITY_LOG", value }),
+    []
+  );
+
+  const setHasNewActivity = useCallback(
+    (value) => dispatch({ type: "SET_HAS_NEW_ACTIVITY", value }),
+    []
+  );
+
   const expandedIssuesRef = useRef(expandedIssues);
   useEffect(() => {
     expandedIssuesRef.current = expandedIssues;
@@ -51,8 +68,7 @@ export function ActivityProvider({ children }) {
 
   useActivityPolling({
     showActivityLog: state.showActivityLog,
-    setHasNewActivity: (value) =>
-      dispatch({ type: "SET_HAS_NEW_ACTIVITY", value }),
+    setHasNewActivity,
   });
 
   useEffect(() => {
@@ -155,10 +171,8 @@ export function ActivityProvider({ children }) {
 
   const value = {
     ...state,
-    setShowActivityLog: (value) =>
-      dispatch({ type: "SET_SHOW_ACTIVITY_LOG", value }),
-    setHasNewActivity: (value) =>
-      dispatch({ type: "SET_HAS_NEW_ACTIVITY", value }),
+    setShowActivityLog,
+    setHasNewActivity,
   };
 
   return (
