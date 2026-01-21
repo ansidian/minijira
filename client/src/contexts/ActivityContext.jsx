@@ -10,6 +10,7 @@ import { API_BASE } from "../utils/api";
 import { useIssues } from "./IssuesContext";
 import { useUI } from "./UIContext";
 import { useActivityPolling } from "../hooks/useActivityPolling";
+import { useUsers } from "./UsersContext";
 
 const ActivityContext = createContext(null);
 
@@ -31,6 +32,7 @@ function activityReducer(state, action) {
 
 export function ActivityProvider({ children }) {
   const [state, dispatch] = useReducer(activityReducer, initialState);
+  const { currentUserId } = useUsers();
   const {
     loadData,
     fetchSubtasksForParent,
@@ -69,6 +71,7 @@ export function ActivityProvider({ children }) {
   useActivityPolling({
     showActivityLog: state.showActivityLog,
     setHasNewActivity,
+    currentUserId,
   });
 
   useEffect(() => {
@@ -95,6 +98,11 @@ export function ActivityProvider({ children }) {
 
         await loadDataRef.current();
 
+        const isSelfEvent =
+          currentUserId &&
+          data.userId &&
+          Number(data.userId) === Number(currentUserId);
+
         if (
           data.type === "issue_created" ||
           data.type === "issue_updated" ||
@@ -102,7 +110,9 @@ export function ActivityProvider({ children }) {
         ) {
           setStatsBadgeAnimate(true);
           setTimeout(() => setStatsBadgeAnimate(false), 300);
-          dispatch({ type: "SET_HAS_NEW_ACTIVITY", value: true });
+          if (!isSelfEvent) {
+            dispatch({ type: "SET_HAS_NEW_ACTIVITY", value: true });
+          }
         }
 
         if (data.type === "issue_deleted") {
@@ -164,6 +174,7 @@ export function ActivityProvider({ children }) {
     };
   }, [
     fetchSubtasksForParent,
+    currentUserId,
     setExpandedIssues,
     setStatsBadgeAnimate,
     setSubtasksCache,

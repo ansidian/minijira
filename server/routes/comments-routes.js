@@ -76,6 +76,7 @@ router.post("/:id/comments", async (req, res) => {
     sseManager.broadcast({
       type: "comment_added",
       issueId: parseInt(issue_id),
+      userId: user_id || null,
     });
 
     res.status(201).json(rows[0]);

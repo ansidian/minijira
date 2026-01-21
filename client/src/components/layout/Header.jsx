@@ -18,6 +18,7 @@ export function Header({
   toggleAllSubtasks,
   hasNewActivity,
   setShowActivityLog,
+  isUserLocked,
   colorScheme,
   setColorScheme,
   users,
@@ -26,7 +27,7 @@ export function Header({
   setCurrentUserId,
 }) {
   return (
-    <header className="header">
+    <header className={`header ${isUserLocked ? "user-locked" : ""}`}>
       <div className="logo">
         <div className="logo-icon">MJ</div>
         <span>MiniJira</span>
@@ -35,6 +36,7 @@ export function Header({
           size="sm"
           color="blue"
           onClick={toggleAllSubtasks}
+          disabled={isUserLocked}
           className="subtask-toggle-desktop"
           leftSection={
             <svg
@@ -165,6 +167,7 @@ export function Header({
         <button
           className="search-button"
           onClick={() => spotlight.open()}
+          disabled={isUserLocked}
           aria-label="Search issues"
         >
           <svg
@@ -194,6 +197,7 @@ export function Header({
               variant="default"
               size="lg"
               onClick={() => setShowActivityLog(true)}
+              disabled={isUserLocked}
               aria-label="View activity log"
             >
               <svg
@@ -237,6 +241,7 @@ export function Header({
             onClick={() =>
               setColorScheme(colorScheme === "dark" ? "light" : "dark")
             }
+            disabled={isUserLocked}
             aria-label="Toggle theme"
           >
             {colorScheme === "dark" ? (
@@ -307,6 +312,7 @@ export function Header({
             size="sm"
             color="blue"
             onClick={toggleAllSubtasks}
+            disabled={isUserLocked}
             className="subtask-toggle-mobile"
             leftSection={
               <svg

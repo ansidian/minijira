@@ -148,6 +148,7 @@ router.post("/", async (req, res) => {
       type: "issue_created",
       issueId: Number(result.lastInsertRowid),
       parentId: parent_id || undefined,
+      userId: reporter_id || null,
     });
 
     res.status(201).json(rows[0]);
@@ -282,6 +283,7 @@ router.patch("/:id", async (req, res) => {
       type: "issue_updated",
       issueId: parseInt(id),
       parentId: rows[0].parent_id || undefined,
+      userId: user_id || null,
     });
 
     res.json(rows[0]);
@@ -324,6 +326,7 @@ router.delete("/:id", async (req, res) => {
       type: "issue_deleted",
       issueId: parseInt(req.params.id),
       parentId: issue.parent_id || undefined,
+      userId: user_id || null,
     });
 
     res.status(204).send();

@@ -377,7 +377,7 @@ body {
 	inset: 0;
 	background: rgba(0, 0, 0, 0.85);
 	z-index: 50;
-	pointer-events: none;
+	pointer-events: auto;
 	display: flex;
 	align-items: flex-start;
 	justify-content: flex-end;
@@ -388,6 +388,16 @@ body {
 .header {
 	position: relative;
 	z-index: 51;
+}
+
+.header.user-locked .logo {
+	pointer-events: none;
+	opacity: 0.55;
+}
+
+.header.user-locked .header-right > :not(.user-selector) {
+	pointer-events: none;
+	opacity: 0.55;
 }
 
 .editable-field:hover {

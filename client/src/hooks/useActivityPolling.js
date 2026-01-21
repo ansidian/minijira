@@ -1,12 +1,23 @@
 import { useEffect } from "react";
 import { api } from "../utils/api";
 
-export function useActivityPolling({ showActivityLog, setHasNewActivity }) {
+export function useActivityPolling({
+  showActivityLog,
+  setHasNewActivity,
+  currentUserId,
+}) {
   useEffect(() => {
     async function checkNewActivity() {
       try {
         const [latest] = await api.get("/activity?limit=1");
         if (latest) {
+          if (
+            currentUserId &&
+            latest.user_id &&
+            Number(latest.user_id) === Number(currentUserId)
+          ) {
+            return;
+          }
           const lastViewed = localStorage.getItem("minijira_activity_viewed");
           if (!lastViewed || new Date(latest.created_at) > new Date(lastViewed)) {
             setHasNewActivity(true);
@@ -18,7 +29,7 @@ export function useActivityPolling({ showActivityLog, setHasNewActivity }) {
     }
 
     checkNewActivity();
-  }, [setHasNewActivity]);
+  }, [currentUserId, setHasNewActivity]);
 
   useEffect(() => {
     if (showActivityLog) {

@@ -76,6 +76,7 @@ function AppContent() {
   const { showActivityLog, setShowActivityLog, hasNewActivity } = useActivity();
   const { users, currentUserId, setCurrentUserId } = useUsers();
   const { allExpanded, toggleAllSubtasks } = useSubtaskToggle();
+  const isUserLocked = !currentUserId;
 
   // Theme toggle
   const { colorScheme, setColorScheme } = useMantineColorScheme();
@@ -85,11 +86,20 @@ function AppContent() {
     [
       [
         "mod+J",
-        () => setColorScheme(colorScheme === "dark" ? "light" : "dark"),
+        () => {
+          if (isUserLocked) return;
+          setColorScheme(colorScheme === "dark" ? "light" : "dark");
+        },
       ],
-      ["mod+I", () => setShowActivityLog((prev) => !prev)],
+      [
+        "mod+I",
+        () => {
+          if (isUserLocked) return;
+          setShowActivityLog((prev) => !prev);
+        },
+      ],
     ],
-    [],
+    [colorScheme, isUserLocked, setColorScheme, setShowActivityLog],
     true
   );
 
@@ -160,6 +170,7 @@ function AppContent() {
           toggleAllSubtasks={toggleAllSubtasks}
           hasNewActivity={hasNewActivity}
           setShowActivityLog={setShowActivityLog}
+          isUserLocked={isUserLocked}
           colorScheme={colorScheme}
           setColorScheme={setColorScheme}
           users={users}
