@@ -368,7 +368,7 @@ export function IssuesProvider({
       state.expandedIssues.size === 0
     ) {
       const parentsWithSubtasks = state.issues.filter(
-        (i) => !i.parent_id && i.subtask_count > 0
+        (i) => !i.parent_id && i.subtask_count > 0 && i.status !== "done"
       );
       if (parentsWithSubtasks.length > 0) {
         hasAutoExpanded.current = true;
