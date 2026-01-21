@@ -1,5 +1,6 @@
 import { Board } from "./Board";
-import { useBoard, useUI } from "../../contexts";
+import { useBoard } from "../../contexts/BoardContext";
+import { useUI } from "../../contexts/UIContext";
 
 export function BoardContainer({ isTouchDevice }) {
   const {

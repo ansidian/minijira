@@ -1,5 +1,5 @@
 import { Avatar, Badge, Checkbox, Group, Paper, Stack } from "@mantine/core";
-import { useIssueContextMenu } from "../../hooks";
+import { useIssueContextMenu } from "../../hooks/useIssueContextMenu";
 import { getPriorityColor, getStatusColor } from "../../utils/colors";
 import { UnassignedAvatar } from "../shared/UnassignedAvatar";
 
