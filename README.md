@@ -2,8 +2,6 @@
 
 A minimal, no-nonsense project management tool for small teams. Built with the KISS principle in mind.
 
-![MiniJira](https://img.shields.io/badge/version-2.5.0-blue)
-
 ## Features
 
 - **Kanban Board**: Drag-and-drop between To Do, In Progress, and Done
