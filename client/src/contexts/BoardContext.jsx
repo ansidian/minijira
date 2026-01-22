@@ -1,9 +1,8 @@
-import { createContext, useContext, useMemo } from "react";
-import { useIssues } from "./IssuesContext";
+import { useMemo } from "react";
+import { useIssues } from "./hooks/useIssues";
 import { useUsers } from "./UsersContext";
 import { useUI } from "./UIContext";
-
-const BoardContext = createContext(null);
+import { BoardContext } from "./BoardContextBase";
 
 export function BoardProvider({ children }) {
   const {
@@ -29,7 +28,7 @@ export function BoardProvider({ children }) {
         }
         return acc;
       },
-      { todo: [], in_progress: [], review: [], done: [] }
+      { todo: [], in_progress: [], review: [], done: [] },
     );
   }, [issues]);
 
@@ -52,12 +51,4 @@ export function BoardProvider({ children }) {
   return (
     <BoardContext.Provider value={value}>{children}</BoardContext.Provider>
   );
-}
-
-export function useBoard() {
-  const context = useContext(BoardContext);
-  if (!context) {
-    throw new Error("useBoard must be used within a BoardProvider");
-  }
-  return context;
 }

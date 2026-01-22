@@ -1,9 +1,9 @@
-import { createContext, useContext, useEffect, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import { api } from "../utils/api";
 import { useSubtaskCache } from "../hooks/useSubtaskCache";
+import { useIssueDelete } from "../hooks/useIssueDelete";
 import { notifyError, notifyUndo } from "../utils/notify";
-
-const IssuesContext = createContext(null);
+import { IssuesContext } from "./IssuesContextBase";
 
 const initialState = {
   issues: [],
@@ -42,7 +42,7 @@ function issuesReducer(state, action) {
       return {
         ...state,
         issues: state.issues.map((issue) =>
-          issue.id === action.value.id ? action.value : issue
+          issue.id === action.value.id ? action.value : issue,
         ),
       };
     case "ADD_ISSUE":
@@ -62,7 +62,6 @@ export function IssuesProvider({
   const stateRef = useRef(state);
   const { fetchSubtasksForParent } = useSubtaskCache();
   const hasAutoExpanded = useRef(false);
-  const pendingDeletesRef = useRef(new Map());
 
   const statusLabels = {
     todo: "To Do",
@@ -93,7 +92,7 @@ export function IssuesProvider({
       issueIds.map(async (issueId) => {
         const subtasks = await fetchSubtasksForParent(issueId);
         return { issueId, subtasks };
-      })
+      }),
     );
 
     const newCache = { ...stateRef.current.subtasksCache };
@@ -115,7 +114,7 @@ export function IssuesProvider({
   const applyStatusChange = async (
     issueId,
     newStatus,
-    { showUndo = true, showErrors = true } = {}
+    { showUndo = true, showErrors = true } = {},
   ) => {
     const currentIssue =
       stateRef.current.issues.find((i) => i.id === issueId) ||
@@ -171,7 +170,8 @@ export function IssuesProvider({
         notifyUndo({
           title: "Status changed",
           message: `Moved "${issueTitle}" to ${statusLabels[newStatus] || newStatus}.`,
-          onUndo: () => applyStatusChange(issueId, oldStatus, { showUndo: false }),
+          onUndo: () =>
+            applyStatusChange(issueId, oldStatus, { showUndo: false }),
         });
       }
     } catch (error) {
@@ -259,7 +259,7 @@ export function IssuesProvider({
       const newPriority = data.priority;
       const assigneeUpdated = Object.prototype.hasOwnProperty.call(
         data,
-        "assignee_id"
+        "assignee_id",
       );
 
       const issueTitle = currentIssue?.title || "item";
@@ -298,160 +298,16 @@ export function IssuesProvider({
     }
   };
 
-  const deleteIssue = async (issueId) => {
-    const deletedIssue =
-      stateRef.current.issues.find((i) => i.id === issueId) ||
-      stateRef.current.allIssues.find((i) => i.id === issueId);
-
-    if (!deletedIssue) return;
-
-    const existingPending = pendingDeletesRef.current.get(issueId);
-    if (existingPending) {
-      clearTimeout(existingPending.timeoutId);
-      pendingDeletesRef.current.delete(issueId);
-    }
-
-    const parentId = deletedIssue.parent_id;
-    const deletedStatus = deletedIssue.status;
-    const isParentIssue = !parentId;
-
-    const snapshot = {
-      issues: [...stateRef.current.issues],
-      allIssues: [...stateRef.current.allIssues],
-      stats: { ...stateRef.current.stats },
-      expandedIssues: new Set(stateRef.current.expandedIssues),
-      subtasksCache: { ...stateRef.current.subtasksCache },
-      selectedIssue,
-    };
-
-    const updatedIssues = stateRef.current.issues.filter(
-      (issue) => issue.id !== issueId
-    );
-    const updatedAllIssues = stateRef.current.allIssues.filter(
-      (issue) => issue.id !== issueId && issue.parent_id !== issueId
-    );
-
-    dispatch({ type: "SET_ISSUES", value: updatedIssues });
-    dispatch({ type: "SET_ALL_ISSUES", value: updatedAllIssues });
-
-    if (selectedIssue?.id === issueId) {
-      setSelectedIssue?.(null);
-    }
-
-    if (isParentIssue && deletedStatus) {
-      dispatch({
-        type: "SET_STATS",
-        value: {
-          ...stateRef.current.stats,
-          total: Math.max(0, (stateRef.current.stats.total || 0) - 1),
-          [deletedStatus]: Math.max(0, stateRef.current.stats[deletedStatus] - 1),
-        },
-      });
-    }
-
-    const optimisticExpanded = new Set(stateRef.current.expandedIssues);
-    if (optimisticExpanded.has(issueId)) {
-      optimisticExpanded.delete(issueId);
-      dispatch({ type: "SET_EXPANDED_ISSUES", value: optimisticExpanded });
-    }
-
-    const optimisticCache = { ...stateRef.current.subtasksCache };
-    delete optimisticCache[issueId];
-    if (parentId && optimisticCache[parentId]) {
-      optimisticCache[parentId] = optimisticCache[parentId].filter(
-        (subtask) => subtask.id !== issueId
-      );
-    }
-    dispatch({ type: "SET_SUBTASKS_CACHE", value: optimisticCache });
-
-    const timeoutId = setTimeout(async () => {
-      try {
-        await api.delete(`/issues/${issueId}`, { user_id: currentUserId });
-
-        const [issuesData, allIssuesData, statsData] = await Promise.all([
-          api.get("/issues"),
-          api.get("/issues?include_subtasks=true"),
-          api.get("/stats"),
-        ]);
-
-        dispatch({ type: "SET_ISSUES", value: issuesData });
-        dispatch({ type: "SET_ALL_ISSUES", value: allIssuesData });
-        dispatch({ type: "SET_STATS", value: statsData });
-        setSelectedIssue?.(null);
-
-        const expandedIssues = new Set(stateRef.current.expandedIssues);
-        if (expandedIssues.has(issueId)) {
-          expandedIssues.delete(issueId);
-          dispatch({ type: "SET_EXPANDED_ISSUES", value: expandedIssues });
-        }
-
-        const expandedIds = [...expandedIssues].filter((id) => id !== issueId);
-        if (parentId && expandedIssues.has(parentId)) {
-          expandedIds.push(parentId);
-        }
-
-        if (expandedIds.length > 0) {
-          const results = await Promise.all(
-            expandedIds.map(async (expandedId) => {
-              const subtasks = await fetchSubtasksForParent(expandedId);
-              return { issueId: expandedId, subtasks };
-            })
-          );
-          const newCache = { ...stateRef.current.subtasksCache };
-          delete newCache[issueId];
-          for (const { issueId: id, subtasks } of results) {
-            newCache[id] = subtasks;
-          }
-          dispatch({ type: "SET_SUBTASKS_CACHE", value: newCache });
-        } else {
-          const newCache = { ...stateRef.current.subtasksCache };
-          delete newCache[issueId];
-          dispatch({ type: "SET_SUBTASKS_CACHE", value: newCache });
-        }
-      } catch (error) {
-        dispatch({ type: "SET_ISSUES", value: snapshot.issues });
-        dispatch({ type: "SET_ALL_ISSUES", value: snapshot.allIssues });
-        dispatch({ type: "SET_STATS", value: snapshot.stats });
-        dispatch({
-          type: "SET_EXPANDED_ISSUES",
-          value: new Set(snapshot.expandedIssues),
-        });
-        dispatch({
-          type: "SET_SUBTASKS_CACHE",
-          value: { ...snapshot.subtasksCache },
-        });
-        setSelectedIssue?.(snapshot.selectedIssue || null);
-        notifyError("Failed to delete issue.");
-      } finally {
-        pendingDeletesRef.current.delete(issueId);
-      }
-    }, 7000);
-
-    pendingDeletesRef.current.set(issueId, { timeoutId, snapshot });
-
-    notifyUndo({
-      title: isParentIssue ? "Issue deleted" : "Subtask deleted",
-      message: `Deleted "${deletedIssue.title}".`,
-      onUndo: () => {
-        const pending = pendingDeletesRef.current.get(issueId);
-        if (!pending) return;
-        clearTimeout(pending.timeoutId);
-        pendingDeletesRef.current.delete(issueId);
-        dispatch({ type: "SET_ISSUES", value: pending.snapshot.issues });
-        dispatch({ type: "SET_ALL_ISSUES", value: pending.snapshot.allIssues });
-        dispatch({ type: "SET_STATS", value: pending.snapshot.stats });
-        dispatch({
-          type: "SET_EXPANDED_ISSUES",
-          value: new Set(pending.snapshot.expandedIssues),
-        });
-        dispatch({
-          type: "SET_SUBTASKS_CACHE",
-          value: { ...pending.snapshot.subtasksCache },
-        });
-        setSelectedIssue?.(pending.snapshot.selectedIssue || null);
-      },
-    });
-  };
+  const { deleteIssue } = useIssueDelete({
+    dispatch,
+    stateRef,
+    selectedIssue,
+    setSelectedIssue,
+    onUndo: notifyUndo,
+    onError: notifyError,
+    onRefreshSubtasks: fetchSubtasksForParent,
+    getCurrentUserId: () => currentUserId,
+  });
 
   const handleSubtaskChange = async (parentIdToExpand = null) => {
     const [issuesData, allIssuesData] = await Promise.all([
@@ -480,7 +336,7 @@ export function IssuesProvider({
         [...issueIdsToRefresh].map(async (issueId) => {
           const subtasks = await fetchSubtasksForParent(issueId);
           return { issueId, subtasks };
-        })
+        }),
       );
       const newCache = { ...stateRef.current.subtasksCache };
       for (const { issueId, subtasks } of results) {
@@ -516,11 +372,11 @@ export function IssuesProvider({
 
   const toggleAllSubtasks = async () => {
     const parentsWithSubtasks = stateRef.current.issues.filter(
-      (i) => !i.parent_id && i.subtask_count > 0
+      (i) => !i.parent_id && i.subtask_count > 0,
     );
 
     const allExpanded = parentsWithSubtasks.every((i) =>
-      stateRef.current.expandedIssues.has(i.id)
+      stateRef.current.expandedIssues.has(i.id),
     );
 
     if (allExpanded) {
@@ -530,7 +386,7 @@ export function IssuesProvider({
 
     const newExpanded = new Set(parentsWithSubtasks.map((i) => i.id));
     const missingParents = parentsWithSubtasks.filter(
-      (issue) => !stateRef.current.subtasksCache[issue.id]
+      (issue) => !stateRef.current.subtasksCache[issue.id],
     );
 
     if (missingParents.length > 0) {
@@ -538,7 +394,7 @@ export function IssuesProvider({
         missingParents.map(async (issue) => {
           const subtasks = await fetchSubtasksForParent(issue.id);
           return { issueId: issue.id, subtasks };
-        })
+        }),
       );
       const newCache = { ...stateRef.current.subtasksCache };
       for (const { issueId, subtasks } of results) {
@@ -558,7 +414,7 @@ export function IssuesProvider({
       state.expandedIssues.size === 0
     ) {
       const parentsWithSubtasks = state.issues.filter(
-        (i) => !i.parent_id && i.subtask_count > 0 && i.status !== "done"
+        (i) => !i.parent_id && i.subtask_count > 0 && i.status !== "done",
       );
       if (parentsWithSubtasks.length > 0) {
         hasAutoExpanded.current = true;
@@ -570,7 +426,7 @@ export function IssuesProvider({
             parentsWithSubtasks.map(async (issue) => {
               const subtasks = await fetchSubtasksForParent(issue.id);
               return { issueId: issue.id, subtasks };
-            })
+            }),
           );
           const newCache = { ...stateRef.current.subtasksCache };
           for (const { issueId, subtasks } of results) {
@@ -607,12 +463,4 @@ export function IssuesProvider({
       {children}
     </IssuesContext.Provider>
   );
-}
-
-export function useIssues() {
-  const context = useContext(IssuesContext);
-  if (!context) {
-    throw new Error("useIssues must be used within an IssuesProvider");
-  }
-  return context;
 }

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useIssues } from "../contexts/IssuesContext";
+import { useIssues } from "../contexts/hooks/useIssues";
 
 export function useSubtaskToggle() {
   const { issues, expandedIssues, toggleAllSubtasks } = useIssues();

@@ -1,18 +1,10 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useReducer,
-} from "react";
+import { useCallback, useEffect, useRef, useReducer } from "react";
 import { API_BASE } from "../utils/api";
-import { useIssues } from "./IssuesContext";
+import { useIssues } from "./hooks/useIssues";
 import { useUI } from "./UIContext";
 import { useActivityPolling } from "../hooks/useActivityPolling";
 import { useUsers } from "./UsersContext";
-
-const ActivityContext = createContext(null);
+import { ActivityContext } from "./ActivityContextBase";
 
 const initialState = {
   showActivityLog: false,
@@ -191,12 +183,4 @@ export function ActivityProvider({ children }) {
       {children}
     </ActivityContext.Provider>
   );
-}
-
-export function useActivity() {
-  const context = useContext(ActivityContext);
-  if (!context) {
-    throw new Error("useActivity must be used within an ActivityProvider");
-  }
-  return context;
 }
