@@ -7,7 +7,6 @@ class SSEManager {
 
   addClient(res) {
     this.clients.add(res);
-    console.log(`SSE client connected. Total clients: ${this.clients.size}`);
 
     // Send initial connection success message
     res.write('data: {"type":"connected"}\n\n');
@@ -30,12 +29,10 @@ class SSEManager {
 
   removeClient(res) {
     this.clients.delete(res);
-    console.log(`SSE client disconnected. Total clients: ${this.clients.size}`);
   }
 
   broadcast(event) {
     const data = JSON.stringify(event);
-    console.log(`Broadcasting SSE event to ${this.clients.size} clients:`, event);
 
     // Collect failed clients to remove after iteration
     const failedClients = [];
