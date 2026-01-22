@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { notifications } from "@mantine/notifications";
 import { api } from "../utils/api";
 
 export function useIssueDetailState({
@@ -76,11 +75,6 @@ export function useIssueDetailState({
     if (!editing) return;
     await onUpdate(issue.id, { title, description });
     setEditing(false);
-    notifications.show({
-      title: "Issue updated",
-      message: "Your changes have been saved",
-      color: "green",
-    });
   }
 
   async function handleAddComment() {

@@ -14,6 +14,7 @@ export function IssueDetailModal({
   currentUserId,
   onClose,
   onUpdate,
+  onMetaUpdate,
   onDelete,
   onStatusChange,
   onViewIssue,
@@ -95,7 +96,7 @@ export function IssueDetailModal({
         issue={issue}
         users={users}
         onStatusChange={onStatusChange}
-        onUpdate={onUpdate}
+        onUpdate={onMetaUpdate}
       />
 
       {/* Subtasks Section - only show for parent issues */}

@@ -1,8 +1,6 @@
 import { useEffect } from "react";
 import { useMantineColorScheme } from "@mantine/core";
 import { useHotkeys } from "@mantine/hooks";
-import { Notifications, notifications } from "@mantine/notifications";
-import "@mantine/notifications/styles.css";
 import { ContextMenuProvider } from "mantine-contextmenu";
 import "mantine-contextmenu/styles.css";
 import { BoardContainer } from "./components/board/BoardContainer";
@@ -57,7 +55,9 @@ function AppContent() {
     createIssue,
     deleteIssue,
     updateIssue,
+    updateIssueWithUndo,
     handleStatusChange,
+    handleStatusChangeSilent,
     handleSubtaskChange,
   } = useIssues();
   const {
@@ -133,20 +133,15 @@ function AppContent() {
     await updateIssue(issueId, data);
   }
 
+
   async function handleDeleteIssue(issueId) {
     await deleteIssue(issueId);
-    notifications.show({
-      title: "Issue deleted",
-      message: "The issue has been removed",
-      color: "red",
-    });
   }
 
   const currentUser = users.find((u) => u.id === currentUserId);
 
   return (
     <ContextMenuProvider submenuDelay={150}>
-      <Notifications position="top-right" autoClose={2000} />
       <SpotlightSearch
         allIssues={allIssues}
         setSelectedIssue={setSelectedIssue}
@@ -209,8 +204,9 @@ function AppContent() {
               setAutoShowSubtaskForm(false);
             }}
             onUpdate={handleUpdateIssue}
+            onMetaUpdate={handleUpdateIssue}
             onDelete={handleDeleteIssue}
-            onStatusChange={handleStatusChange}
+            onStatusChange={handleStatusChangeSilent}
             onViewIssue={handleViewIssue}
             onSubtaskChange={handleSubtaskChange}
             autoShowSubtaskForm={autoShowSubtaskForm}

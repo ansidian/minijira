@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Badge,
   Button,
@@ -12,8 +12,8 @@ import {
   TextInput,
 } from "@mantine/core";
 import { useHotkeys } from "@mantine/hooks";
-import { notifications } from "@mantine/notifications";
 import { api } from "../../utils/api";
+import { notifyError, notifyUndo } from "../../utils/notify";
 import { SubtaskRow } from "../shared/SubtaskRow";
 
 export function SubtasksSection({
@@ -32,6 +32,7 @@ export function SubtasksSection({
   const [newAssignee, setNewAssignee] = useState("");
   const [newPriority, setNewPriority] = useState("medium");
   const [loading, setLoading] = useState(true);
+  const pendingDeletesRef = useRef(new Map());
 
   useEffect(() => {
     loadSubtasks();
@@ -70,12 +71,6 @@ export function SubtasksSection({
     setNewPriority("medium");
     setShowAddForm(false);
     onSubtaskChange?.(parentIssue.id); // Pass parent ID to expand it
-
-    notifications.show({
-      title: "Subtask created",
-      message: `${newSubtask.key} has been added`,
-      color: "green",
-    });
   }
 
   // Hotkey for creating subtask when form is open (Cmd/Ctrl + Enter)
@@ -95,35 +90,80 @@ export function SubtasksSection({
   );
 
   async function handleStatusToggle(subtaskId, newStatus) {
-    const updated = await api.patch(`/issues/${subtaskId}`, {
-      status: newStatus,
-      user_id: currentUserId,
-    });
-    setSubtasks((prev) =>
-      prev.map((s) => (s.id === subtaskId ? { ...s, ...updated } : s))
-    );
-    onSubtaskChange?.();
+    const currentSubtask = subtasks.find((subtask) => subtask.id === subtaskId);
+    if (!currentSubtask || currentSubtask.status === newStatus) return;
+
+    try {
+      const updated = await api.patch(`/issues/${subtaskId}`, {
+        status: newStatus,
+        user_id: currentUserId,
+      });
+      setSubtasks((prev) =>
+        prev.map((s) => (s.id === subtaskId ? { ...s, ...updated } : s))
+      );
+      onSubtaskChange?.();
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   async function handleUpdate(subtaskId, data) {
-    const updated = await api.patch(`/issues/${subtaskId}`, {
-      ...data,
-      user_id: currentUserId,
-    });
-    setSubtasks((prev) =>
-      prev.map((s) => (s.id === subtaskId ? { ...s, ...updated } : s))
-    );
-    onSubtaskChange?.();
+    const currentSubtask = subtasks.find((subtask) => subtask.id === subtaskId);
+    if (!currentSubtask) return;
+    try {
+      const updated = await api.patch(`/issues/${subtaskId}`, {
+        ...data,
+        user_id: currentUserId,
+      });
+      setSubtasks((prev) =>
+        prev.map((s) => (s.id === subtaskId ? { ...s, ...updated } : s))
+      );
+      onSubtaskChange?.();
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   async function handleDelete(subtaskId) {
-    await api.delete(`/issues/${subtaskId}`, { user_id: currentUserId });
+    const currentSubtask = subtasks.find((subtask) => subtask.id === subtaskId);
+    if (!currentSubtask) return;
+
+    const existingPending = pendingDeletesRef.current.get(subtaskId);
+    if (existingPending) {
+      clearTimeout(existingPending.timeoutId);
+      pendingDeletesRef.current.delete(subtaskId);
+    }
+
+    const snapshot = {
+      subtasks: [...subtasks],
+    };
+
     setSubtasks((prev) => prev.filter((s) => s.id !== subtaskId));
-    onSubtaskChange?.();
-    notifications.show({
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        await api.delete(`/issues/${subtaskId}`, { user_id: currentUserId });
+        onSubtaskChange?.();
+      } catch (error) {
+        setSubtasks(snapshot.subtasks);
+        notifyError("Failed to delete subtask.");
+      } finally {
+        pendingDeletesRef.current.delete(subtaskId);
+      }
+    }, 7000);
+
+    pendingDeletesRef.current.set(subtaskId, { timeoutId, snapshot });
+
+    notifyUndo({
       title: "Subtask deleted",
-      message: "The subtask has been removed",
-      color: "red",
+      message: `Deleted "${currentSubtask.title}".`,
+      onUndo: () => {
+        const pending = pendingDeletesRef.current.get(subtaskId);
+        if (!pending) return;
+        clearTimeout(pending.timeoutId);
+        pendingDeletesRef.current.delete(subtaskId);
+        setSubtasks(pending.snapshot.subtasks);
+      },
     });
   }
 

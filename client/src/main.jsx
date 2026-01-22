@@ -1,9 +1,15 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { MantineProvider, createTheme } from "@mantine/core";
+import {
+  MantineProvider,
+  createTheme,
+  useMantineColorScheme,
+} from "@mantine/core";
+import { Toaster } from "sonner";
 import "@mantine/core/styles.css";
 import App from "./App.jsx";
 import "./styles/index.css";
+import "./styles/sonner.css";
 import "./styles/components.css";
 import "./styles/animations.css";
 import "./styles/responsive.css";
@@ -35,10 +41,23 @@ const getInitialColorScheme = () => {
   return stored || "dark";
 };
 
+function ThemedToaster() {
+  const { colorScheme } = useMantineColorScheme();
+  return (
+    <Toaster
+      position="top-center"
+      theme={colorScheme}
+      richColors
+      visibleToasts={5}
+    />
+  );
+}
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <MantineProvider theme={theme} defaultColorScheme={getInitialColorScheme()}>
       <App />
+      <ThemedToaster />
     </MantineProvider>
-  </React.StrictMode>
+  </React.StrictMode>,
 );
