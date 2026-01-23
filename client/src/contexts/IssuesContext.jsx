@@ -9,6 +9,7 @@ const initialState = {
   issues: [],
   allIssues: [],
   stats: {
+    total: 0,
     todo: 0,
     in_progress: 0,
     review: 0,
@@ -70,17 +71,31 @@ export function IssuesProvider({
     done: "Done",
   };
 
+  const toNumber = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const normalizeStats = (rawStats) => ({
+    total: toNumber(rawStats?.total),
+    todo: toNumber(rawStats?.todo),
+    in_progress: toNumber(rawStats?.in_progress),
+    review: toNumber(rawStats?.review),
+    done: toNumber(rawStats?.done),
+  });
+
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
 
   const loadData = async () => {
     dispatch({ type: "SET_LOADING", value: true });
-    const [issuesData, statsData, allIssuesData] = await Promise.all([
+    const [issuesData, statsDataRaw, allIssuesData] = await Promise.all([
       api.get("/issues"),
       api.get("/stats"),
       api.get("/issues?include_subtasks=true"),
     ]);
+    const statsData = normalizeStats(statsDataRaw);
     dispatch({ type: "SET_ISSUES", value: issuesData });
     dispatch({ type: "SET_STATS", value: statsData });
     dispatch({ type: "SET_ALL_ISSUES", value: allIssuesData });

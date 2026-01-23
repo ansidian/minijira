@@ -159,6 +159,38 @@ body {
 	font-size: 13px;
 }
 
+.stats-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-family: var(--font-mono);
+}
+
+.stats-pill-part {
+	font-weight: 600;
+}
+
+.stats-pill-sep {
+	color: var(--text-muted);
+	font-weight: 500;
+}
+
+.stats-pill-todo {
+	color: #bbbbc0;
+}
+
+.stats-pill-progress {
+	color: #3b82f6;
+}
+
+.stats-pill-review {
+	color: #a855f7;
+}
+
+.stats-pill-done {
+	color: #22c55e;
+}
+
 .header-right {
 	display: flex;
 	align-items: center;

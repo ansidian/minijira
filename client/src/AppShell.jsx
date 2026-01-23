@@ -16,7 +16,7 @@ import { IssuesProvider } from "./contexts/IssuesContext";
 import { useActivity } from "./contexts/hooks/useActivity";
 import { useIssues } from "./contexts/hooks/useIssues";
 import { useUI } from "./contexts/UIContext";
-import { UsersProvider, useUsers } from "./contexts/UsersContext";
+import { useUsers } from "./contexts/UsersContext";
 import { useStatsAnimation } from "./hooks/useStatsAnimation";
 import { useSubtaskToggle } from "./hooks/useSubtaskToggle";
 import { api } from "./utils/api";
@@ -57,8 +57,6 @@ function AppContent() {
     createIssue,
     deleteIssue,
     updateIssue,
-    updateIssueWithUndo,
-    handleStatusChange,
     handleStatusChangeSilent,
     handleSubtaskChange,
   } = useIssues();

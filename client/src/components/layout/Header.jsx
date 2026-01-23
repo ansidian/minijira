@@ -26,6 +26,14 @@ export function Header({
   currentUserId,
   setCurrentUserId,
 }) {
+  const totalStats =
+    Number.isFinite(stats?.total) && stats.total > 0
+      ? stats.total
+      : (stats?.todo || 0) +
+        (stats?.in_progress || 0) +
+        (stats?.review || 0) +
+        (stats?.done || 0);
+
   return (
     <header className={`header ${isUserLocked ? "user-locked" : ""}`}>
       <div className="logo">
@@ -63,8 +71,8 @@ export function Header({
           </span>
         </Button>
         {/* Condensed stats badge with hover detail */}
-        <HoverCard width={380} shadow="md" position="bottom" withArrow>
-          <HoverCard.Target>
+          <HoverCard width={380} shadow="md" position="bottom" withArrow>
+            <HoverCard.Target>
             <Badge
               size="lg"
               variant="light"
@@ -76,7 +84,23 @@ export function Header({
                 transform: statsBadgeAnimate ? "scale(1.15)" : "scale(1)",
               }}
             >
-              {stats.todo + stats.in_progress + stats.review + stats.done}
+              <span className="stats-badge">
+                <span className="stats-pill-part stats-pill-todo">
+                  {stats?.todo || 0}
+                </span>
+                <span className="stats-pill-sep">/</span>
+                <span className="stats-pill-part stats-pill-progress">
+                  {stats?.in_progress || 0}
+                </span>
+                <span className="stats-pill-sep">/</span>
+                <span className="stats-pill-part stats-pill-review">
+                  {stats?.review || 0}
+                </span>
+                <span className="stats-pill-sep">/</span>
+                <span className="stats-pill-part stats-pill-done">
+                  {stats?.done || 0}
+                </span>
+              </span>
             </Badge>
           </HoverCard.Target>
           <HoverCard.Dropdown>
