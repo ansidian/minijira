@@ -71,8 +71,8 @@ export function Header({
           </span>
         </Button>
         {/* Condensed stats badge with hover detail */}
-          <HoverCard width={380} shadow="md" position="bottom" withArrow>
-            <HoverCard.Target>
+        <HoverCard width={380} shadow="md" position="bottom" withArrow>
+          <HoverCard.Target>
             <Badge
               size="lg"
               variant="light"
@@ -106,6 +106,23 @@ export function Header({
           <HoverCard.Dropdown>
             <Stack gap="xs">
               <div className="stats-title">Issue Stats</div>
+              <div className="stats-hash">
+                <span className="stats-pill-part stats-pill-todo">
+                  {stats?.todo || 0}
+                </span>
+                <span className="stats-pill-sep">/</span>
+                <span className="stats-pill-part stats-pill-progress">
+                  {stats?.in_progress || 0}
+                </span>
+                <span className="stats-pill-sep">/</span>
+                <span className="stats-pill-part stats-pill-review">
+                  {stats?.review || 0}
+                </span>
+                <span className="stats-pill-sep">/</span>
+                <span className="stats-pill-part stats-pill-done">
+                  {stats?.done || 0}
+                </span>
+              </div>
               {/* Progress bars */}
               <Stack gap={8}>
                 <div className="stat-row">
@@ -118,7 +135,7 @@ export function Header({
                           stats.todo +
                             stats.in_progress +
                             stats.review +
-                            stats.done
+                            stats.done,
                         )) *
                       100
                     }
@@ -136,7 +153,7 @@ export function Header({
                           stats.todo +
                             stats.in_progress +
                             stats.review +
-                            stats.done
+                            stats.done,
                         )) *
                       100
                     }
@@ -154,7 +171,7 @@ export function Header({
                           stats.todo +
                             stats.in_progress +
                             stats.review +
-                            stats.done
+                            stats.done,
                         )) *
                       100
                     }
@@ -172,7 +189,7 @@ export function Header({
                           stats.todo +
                             stats.in_progress +
                             stats.review +
-                            stats.done
+                            stats.done,
                         )) *
                       100
                     }
@@ -181,7 +198,10 @@ export function Header({
                   <span className="stat-count">{stats.done}</span>
                 </div>
               </Stack>
-              <div className="stats-footer">Updated in real time</div>
+              <div className="stats-footer">
+                {" "}
+                ⌨️ Right-click issues for contextual actions
+              </div>
             </Stack>
           </HoverCard.Dropdown>
         </HoverCard>
@@ -319,9 +339,7 @@ export function Header({
             className="user-select"
             value={currentUserId || ""}
             onChange={(e) =>
-              setCurrentUserId(
-                e.target.value ? parseInt(e.target.value) : null
-              )
+              setCurrentUserId(e.target.value ? parseInt(e.target.value) : null)
             }
           >
             <option value="">Select yourself...</option>
