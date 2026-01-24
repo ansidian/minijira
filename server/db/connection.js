@@ -8,3 +8,11 @@ const db = createClient({
 });
 
 export default db;
+
+export async function closeDb() {
+  try {
+    await db.close();
+  } catch (err) {
+    console.error('[SHUTDOWN] Error closing database:', err);
+  }
+}

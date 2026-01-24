@@ -9,13 +9,17 @@ import activityRouter from "./routes/activity-routes.js";
 import statsRouter from "./routes/stats-routes.js";
 import eventsRouter from "./routes/events-routes.js";
 import notificationsRouter from './routes/notifications-routes.js';
-import { startQueueProcessor, stopQueueProcessor } from "./utils/queue-processor.js";
+import { startQueueProcessor, stopQueueProcessor, awaitInFlight } from "./utils/queue-processor.js";
+import { closeDb } from "./db/connection.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Shutdown state tracking
+let isShuttingDown = false;
 
 app.use(cors());
 app.use(express.json());
@@ -38,17 +42,61 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   console.log(`✓ MiniJira API running at http://localhost:${PORT}`);
-  startQueueProcessor();
+  await startQueueProcessor();
 });
 
-// Clean shutdown handler
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down...');
+// Graceful shutdown handler
+async function gracefulShutdown(signal) {
+  // Ignore duplicate signals
+  if (isShuttingDown) {
+    console.log(`[SHUTDOWN] Already shutting down, ignoring ${signal}`);
+    return;
+  }
+  isShuttingDown = true;
+
+  console.log(`[SHUTDOWN] Received ${signal}`);
+
+  // Force exit timer (30 seconds)
+  const forceExitTimer = setTimeout(() => {
+    console.error('[SHUTDOWN] Force exit after 30s timeout');
+    process.exit(1);
+  }, 30000);
+  forceExitTimer.unref();
+
+  // 1. Stop queue timer (no new cycles)
+  console.log('[SHUTDOWN] Stopping queue timer');
   stopQueueProcessor();
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
+
+  // 2. Wait for in-flight sends to complete
+  console.log('[SHUTDOWN] Waiting for in-flight sends');
+  const completed = await awaitInFlight(25000); // Leave 5s for HTTP/DB close
+  if (completed) {
+    console.log('[SHUTDOWN] In-flight sends complete');
+  } else {
+    console.log('[SHUTDOWN] In-flight sends did not complete within timeout');
+  }
+
+  // 3. Stop HTTP server
+  console.log('[SHUTDOWN] Closing HTTP server');
+  await new Promise((resolve) => {
+    server.close(() => {
+      console.log('[SHUTDOWN] HTTP server closed');
+      resolve();
+    });
   });
-});
+
+  // 4. Close database connection
+  console.log('[SHUTDOWN] Closing database connection');
+  await closeDb();
+  console.log('[SHUTDOWN] Database connection closed');
+
+  // 5. Clean exit
+  console.log('[SHUTDOWN] Complete');
+  process.exit(0);
+}
+
+// Register handlers for both signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
