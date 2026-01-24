@@ -44,17 +44,9 @@ export function useSubtaskExpansion({ state, dispatch, cacheManager }) {
     );
 
     if (missingParents.length > 0) {
-      const results = await Promise.all(
-        missingParents.map(async (issue) => {
-          const subtasks = await cacheManager.fetchSubtasksForParent(issue.id);
-          return { issueId: issue.id, subtasks };
-        }),
-      );
-      const updates = {};
-      for (const { issueId, subtasks } of results) {
-        updates[issueId] = subtasks;
-      }
-      cacheManager.mergeCached(updates);
+      const parentIds = missingParents.map((issue) => issue.id);
+      const grouped = await cacheManager.fetchSubtasksBatch(parentIds);
+      cacheManager.mergeCached(grouped);
     }
 
     dispatch({ type: "SET_EXPANDED_ISSUES", value: newExpanded });
@@ -76,17 +68,9 @@ export function useSubtaskExpansion({ state, dispatch, cacheManager }) {
         dispatch({ type: "SET_EXPANDED_ISSUES", value: newExpanded });
 
         const fetchAllSubtasks = async () => {
-          const results = await Promise.all(
-            parentsWithSubtasks.map(async (issue) => {
-              const subtasks = await cacheManager.fetchSubtasksForParent(issue.id);
-              return { issueId: issue.id, subtasks };
-            }),
-          );
-          const updates = {};
-          for (const { issueId, subtasks } of results) {
-            updates[issueId] = subtasks;
-          }
-          cacheManager.mergeCached(updates);
+          const parentIds = parentsWithSubtasks.map((issue) => issue.id);
+          const grouped = await cacheManager.fetchSubtasksBatch(parentIds);
+          cacheManager.mergeCached(grouped);
         };
 
         fetchAllSubtasks();
