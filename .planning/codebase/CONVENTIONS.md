@@ -1,221 +1,225 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-01-20
+**Analysis Date:** 2026-01-23
 
 ## Naming Patterns
 
 **Files:**
-- Component files: Single-file frontend architecture - all React components in `client/src/App.jsx`
-- Backend files: Descriptive names - `server/index.js`, `server/db/connection.js`, `server/db/init.js`, `server/sse-manager.js`
-- Test files: Pattern `*.test.js` in `tests/` directory (e.g., `tests/api.test.js`, `tests/race-conditions.test.js`)
-- Utility files: Pattern `*-utils.js` for helpers (e.g., `tests/test-utils.js`)
-- Config files: Standard patterns - `package.json`, `vite.config.js`
+- Backend routes: `kebab-case` with `-routes.js` suffix (e.g., `users-routes.js`, `issues-routes.js`)
+- Backend utilities: `kebab-case` (e.g., `sse-manager.js`, `activity-logger.js`)
+- Frontend components: `PascalCase.jsx` (e.g., `Board.jsx`, `Column.jsx`)
+- Frontend contexts: `PascalCase` with `Context` suffix (e.g., `IssuesContext.jsx`, `UIContext.jsx`)
+- Frontend hooks: `camelCase` with `use` prefix (e.g., `useSubtaskCache.js`, `useBoard.js`)
+- Frontend utilities: `camelCase.js` (e.g., `api.js`, `colors.js`, `notify.jsx`)
+- Test files: `descriptive.test.js` (e.g., `api.test.js`, `race-conditions.test.js`)
 
 **Functions:**
-- camelCase for all functions: `formatDate`, `relativeTime`, `linkifyText`, `logActivity`, `waitForServer`
-- Async functions explicitly declared with `async` keyword
-- API wrapper methods match HTTP verbs: `api.get()`, `api.post()`, `api.patch()`, `api.delete()`
-- React components use PascalCase: `App`, `Column`, `IssueCard`, `CreateIssueModal`, `ActivityLogModal`
+- Async route handlers: `(req, res) => { ... }` arrow function style
+- Utility functions: `camelCase` (e.g., `fetchSubtasksForParent`, `logActivity`, `waitForServer`)
+- Custom hooks: `use` prefix with `camelCase` (e.g., `useSubtaskCache`, `useUI`)
+- Component functions: `PascalCase` (e.g., `IssuesProvider`, `UIProvider`)
+- Helper functions: `camelCase` (e.g., `normalizeStats`, `uniqueTitle`, `getPriorityColor`)
 
 **Variables:**
-- camelCase for local variables: `issueId`, `subtaskCount`, `currentUser`
-- UPPER_SNAKE_CASE for constants: `API_BASE`, `COLUMNS`, `ACTIVITY_LOG_LIMIT`
-- Boolean variables use `is` or `has` prefix: `isSubtask`, `isTouchDevice`, `isMac`
-- Destructured parameters common in function signatures and API responses
+- State variables: `camelCase` (e.g., `selectedIssue`, `showCreateModal`, `expandedIssues`)
+- Database table names: `snake_case` (e.g., `activity_log`, `issue_key`)
+- Database column names: `snake_case` (e.g., `assignee_id`, `parent_id`, `avatar_color`)
+- Constants: `UPPER_SNAKE_CASE` (e.g., `ACTIVITY_LOG_LIMIT`, `API_BASE`, `CANVAS_DND_TOAST_ID`)
+- Request/response field names: `snake_case` (e.g., `assignee_id`, `reporter_id`, `subtask_count`)
 
-**Types:**
-- Database column names use snake_case: `assignee_id`, `created_at`, `parent_id`, `issue_key`
-- Object properties in API responses match database snake_case
-- Query parameters use snake_case: `include_subtasks`, `parent_id`, `assignee_id`
+**Types/Objects:**
+- React Context objects: `PascalCase` (e.g., `UIContext`, `IssuesContext`)
+- Reducer action types: `UPPER_SNAKE_CASE` (e.g., `SET_LOADING`, `SET_ISSUES`, `UPDATE_ISSUE`)
+- Event type names: `snake_case` (e.g., `issue_created`, `status_changed`, `comment_added`)
 
 ## Code Style
 
 **Formatting:**
-- No explicit formatter configured (no .prettierrc, .eslintrc detected)
-- Indentation: 2 spaces (consistent across all files)
-- Line length: No strict limit observed (lines up to ~100 characters common)
-- Semicolons: Not used in frontend (`client/src/App.jsx`), used in backend (`server/index.js`)
-- Quotes: Double quotes in backend, mixed in frontend
-- Trailing commas: Inconsistent (present in some object literals, absent in others)
+- No explicit formatter (Prettier/ESLint) configured at root level
+- Consistent use of 2-space indentation observed
+- JavaScript modules use ES6 `import`/`export` syntax (`"type": "module"` in package.json)
+- Single-file convention: Frontend React UI in `client/src/App.jsx` (no component files)
 
 **Linting:**
-- No linting config detected (.eslintrc, eslint.config.js not found)
-- No explicit code quality tools configured
+- No linting configuration found; code relies on manual review and vitest for validation
+- Unused variables and imports are not automatically caught
 
 ## Import Organization
 
 **Order:**
-1. External dependencies (React, Mantine, third-party)
-2. Internal utilities and helpers
-3. Styles (CSS imports)
-
-**Frontend Pattern (`client/src/App.jsx`):**
-```javascript
-import { useState, useEffect, useRef, useMemo } from "react";
-import { version } from "../package.json";
-import { Loader, Center, Button, Modal, ... } from "@mantine/core";
-import { useHotkeys } from "@mantine/hooks";
-import { Notifications, notifications } from "@mantine/notifications";
-import "@mantine/notifications/styles.css";
-```
-
-**Backend Pattern (`server/index.js`):**
-```javascript
-import express from "express";
-import cors from "cors";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import db from "./db/connection.js";
-import sseManager from "./sse-manager.js";
-```
+1. External library imports (`express`, `cors`, `@libsql/client`, `react`, Mantine components)
+2. Relative imports from project modules (`.../db`, `.../utils`, `.../routes`)
+3. React hooks and context imports
 
 **Path Aliases:**
-- None configured
-- All imports use relative paths (`./`, `../`) or package names
-- Backend uses explicit `.js` extensions for ES modules
+- No path aliases configured (full relative paths used throughout)
+- Backend: paths like `../db/connection.js`, `../utils/queries.js`
+- Frontend: paths like `../utils/api`, `../contexts/UIContext`
+
+**Example (Backend - `server/routes/issues-routes.js`):**
+```javascript
+import express from "express";
+import db from "../db/connection.js";
+import sseManager from "../sse-manager.js";
+import { logActivity } from "../utils/activity-logger.js";
+import { issueSelectWithCounts, subtaskSelect } from "../utils/queries.js";
+```
+
+**Example (Frontend - `client/src/contexts/IssuesContext.jsx`):**
+```javascript
+import { useEffect, useReducer, useRef } from "react";
+import { api } from "../utils/api";
+import { useSubtaskCache } from "../hooks/useSubtaskCache";
+```
 
 ## Error Handling
 
 **Patterns:**
+- Backend: Try-catch in route handlers with standardized error responses
+  ```javascript
+  router.get("/", async (req, res) => {
+    try {
+      const { rows } = await db.execute("SELECT * FROM users ORDER BY name");
+      res.json(rows);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  ```
+- HTTP error codes: 400 for validation, 404 for not found, 500 for server errors
+- Error messages: Plain string format (e.g., `"Title is required"`, `"User not found"`)
+- Database errors: Messages passed through directly from error object
+- Client-side: No error boundary observed; rely on API response error handling in try-catch
+- Test utilities: Errors wrapped in Error objects thrown from API wrapper
 
-**Backend API endpoints:**
-- Try-catch blocks wrap all async operations
-- Errors return JSON with `error` property: `res.status(500).json({ error: err.message })`
-- Validation errors return 400: `res.status(400).json({ error: "Title is required" })`
-- Not found errors return 404: `res.status(404).json({ error: "Issue not found" })`
-- Success responses return appropriate status codes (200, 201, 204)
-
-**Frontend API calls:**
-- No error handling in `api` object - throws errors directly
-- Errors propagate to calling code
-- Test utilities catch and parse JSON error responses:
-```javascript
-if (!res.ok) {
-  const error = await res.json().catch(() => ({ error: res.statusText }));
-  throw new Error(error.error || `HTTP ${res.status}`);
-}
-```
-
-**Database operations:**
-- Migration code uses try-catch to ignore "column exists" errors
-- Test cleanup ignores errors (issue might already be deleted)
+**Error throwing in context hooks:**
+- React context hooks throw errors if used outside provider
+  ```javascript
+  export function useUI() {
+    const context = useContext(UIContext);
+    if (!context) {
+      throw new Error("useUI must be used within a UIProvider");
+    }
+    return context;
+  }
+  ```
 
 ## Logging
 
-**Framework:** Console methods (`console.log`, `console.error`)
+**Framework:** `console` methods (no structured logging library)
 
 **Patterns:**
+- Backend: `console.error()` for SSE broadcast failures in `server/sse-manager.js`
+- Frontend: No explicit logging observed (relies on browser DevTools)
+- Test utilities: No logging, silent failures or generic error messages
 
-**Server logging:**
-- Connection events: `console.log(\`✓ MiniJira API running at http://localhost:\${PORT}\`)`
-- SSE events: `console.log(\`SSE client connected. Total clients: \${this.clients.size}\`)`
-- Database init: `console.log("Database initialized")`
-- Error logging: `console.error('Error sending SSE message to client:', error)`
-
-**Client logging:**
-- No console logging in production code
-- No structured logging framework
-
-**Test logging:**
-- No explicit logging in tests (rely on test framework output)
+**When to log:**
+- Server startup success: `console.log('✓ MiniJira API running at ...')`
+- Errors in broadcast operations: `console.error('Error sending SSE message to client:', error)`
 
 ## Comments
 
 **When to Comment:**
-- File-level docstrings for test files explaining purpose and usage
-- Section dividers in large files using banner comments:
-```javascript
-// ============================================================================
-// USERS
-// ============================================================================
-```
-- Inline comments for non-obvious logic or business rules
-- Migration code comments to explain purpose
+- Block-level section markers: `// ========== SECTION NAME ==========` (used in test files)
+- JSDoc-style comments for test utilities explaining purpose and usage
+- In-code comments for non-obvious logic (e.g., cleanup order considerations)
+- Notes about behavior changes (e.g., "// Last status in sequence")
 
 **JSDoc/TSDoc:**
-- Not used
-- No type annotations or function documentation
-- Test utility functions have simple docstring comments:
-```javascript
-/**
- * Wait for server to be available
- */
-export async function waitForServer(maxAttempts = 10, delayMs = 500) {
-```
+- Minimal usage; found only in test utilities (`test-utils.js`) with basic JSDoc blocks
+- Example from `test-utils.js`:
+  ```javascript
+  /**
+   * Simple fetch wrapper for API calls
+   */
+  export const api = { ... }
+
+  /**
+   * Track created resources for cleanup
+   */
+  export class TestCleanup { ... }
+  ```
+- No strict JSDoc enforcement on backend routes or client components
 
 ## Function Design
 
 **Size:**
-- Backend endpoints: 20-80 lines typical
-- React components: Inline in single file, range from 20-200+ lines
-- Helper functions: 10-50 lines typical
-- Large functions common (e.g., main `App` component is 2300+ lines)
+- Route handlers: 20-40 lines typical (build and execute database query + error handling)
+- Reducer functions: 10-30 lines (switch statement with action handling)
+- Utility functions: 5-20 lines (focused, single responsibility)
+- Custom hooks: 10-25 lines (state setup + side effect handling)
 
 **Parameters:**
-- Destructured objects for multiple related parameters
-- API functions use single object parameter: `api.post(path, data)`
-- React components use props object
-- Default parameters common: `formatDate(dateStr)`, `waitForServer(maxAttempts = 10, delayMs = 500)`
+- Route handlers: Always `(req, res)` for Express routes
+- Database queries: Parametrized using `{ sql, args }` object format (prevent SQL injection)
+  ```javascript
+  db.execute({
+    sql: "SELECT * FROM users WHERE id = ?",
+    args: [req.params.id],
+  })
+  ```
+- Component/hook props: Destructured in function signature
+- Optional parameters: Default values used (e.g., `maxAttempts = 10, delayMs = 500`)
 
 **Return Values:**
-- Backend endpoints return JSON via `res.json()`
-- API functions return promises that resolve to parsed JSON
-- Helper functions return primitive values or objects
-- React components return JSX
-- No explicit return type documentation
+- Route handlers: No explicit return, response sent via `res.json()` or `res.status().json()`
+- Utility functions: Return data directly (arrays, objects, booleans, promises)
+- React hooks: Return objects with action/state methods
+  ```javascript
+  export function useSubtaskCache() {
+    return { fetchSubtasksForParent };
+  }
+  ```
+- Async functions: Return promises with resolved data
 
 ## Module Design
 
 **Exports:**
-
-**Backend:**
-- Default export for singletons: `export default db`, `export default new SSEManager()`
-- Named exports for utilities: `export const api = { ... }`
-- Test utilities use named exports: `export class TestCleanup { ... }`
-
-**Frontend:**
-- Single default export for main App component
-- No modularization (entire frontend in one file)
+- Backend routes: Single `export default router` per route file
+- Utilities: Named exports for functions/constants
+  ```javascript
+  export const api = { ... }
+  export function waitForServer() { ... }
+  export class TestCleanup { ... }
+  ```
+- Frontend contexts: Named exports for provider and hook
+  ```javascript
+  export function UIProvider({ children }) { ... }
+  export function useUI() { ... }
+  ```
 
 **Barrel Files:**
-- Not used
-- No index.js re-export patterns
+- Not used; all imports are direct file references
+- `server/utils/queries.js` acts as a query template module (not a barrel)
+  ```javascript
+  export const issueSelect = `...`
+  export const issueSelectWithCounts = `...`
+  ```
 
-## Database Conventions
+## State Management
 
-**Table naming:**
-- Plural lowercase: `users`, `issues`, `comments`, `counters`, `activity_log`
+**Frontend:**
+- Reducer pattern used in contexts (`useReducer`)
+- State shape includes arrays, sets, and objects:
+  ```javascript
+  const initialState = {
+    issues: [],
+    expandedIssues: new Set(),
+    subtasksCache: {},
+    stats: { total: 0, todo: 0, ... }
+  };
+  ```
+- Actions dispatched as objects with `type` and `value` properties
+  ```javascript
+  dispatch({ type: "SET_ISSUES", value: issuesData })
+  dispatch({ type: "UPDATE_ISSUE", value: updatedIssue })
+  ```
 
-**Column naming:**
-- snake_case: `assignee_id`, `created_at`, `issue_key`, `parent_id`
-- Foreign keys: `{table}_id` pattern
-- Timestamps: `created_at`, `updated_at` (DATETIME DEFAULT CURRENT_TIMESTAMP)
-
-**SQL style:**
-- Uppercase keywords in schema definitions
-- Parameterized queries using `?` placeholders
-- Template literals for complex multi-line queries
-
-## API Conventions
-
-**Endpoint patterns:**
-- RESTful structure: `GET /api/users`, `POST /api/issues`, `PATCH /api/issues/:id`
-- Nested resources: `GET /api/issues/:id/comments`, `GET /api/issues/:id/subtasks`
-- Query parameters for filtering: `?status=todo`, `?include_subtasks=true`
-
-**Request/Response format:**
-- JSON content type
-- Snake_case for all JSON keys (matching database)
-- Timestamps as SQLite datetime strings
-
-**Status codes:**
-- 200 for successful GET/PATCH
-- 201 for successful POST
-- 204 for successful DELETE
-- 400 for validation errors
-- 404 for not found
-- 500 for server errors
+**Backend:**
+- No state management; stateless Express routes
+- SSE manager maintains client connections (singleton instance in `server/sse-manager.js`)
+- Test cleanup utility tracks resources for teardown
 
 ---
 
-*Convention analysis: 2026-01-20*
+*Convention analysis: 2026-01-23*

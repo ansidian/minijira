@@ -1,242 +1,240 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-01-20
+**Analysis Date:** 2026-01-23
 
 ## Tech Debt
 
-**3400+ Line Monolithic Frontend File:**
-- Issue: Entire React application lives in a single file `client/src/App.jsx` (3432 lines)
-- Files: `client/src/App.jsx`
-- Impact: Difficult to navigate, high cognitive load, merge conflicts likely in team environments, performance implications (entire file re-parses on changes)
-- Fix approach: Extract components into separate files (`components/IssueCard.jsx`, `components/CreateIssueModal.jsx`, `components/ActivityLogModal.jsx`, etc.), extract hooks into `hooks/` directory, move utilities to `utils/` directory
+**Large monolithic React components:**
+- Issue: Multiple pages worth of logic in single files (`Header.jsx` 385 lines, `SubtasksSection.jsx` 322 lines, `IssuesContext.jsx` 481 lines)
+- Files: `client/src/contexts/IssuesContext.jsx`, `client/src/components/layout/Header.jsx`, `client/src/components/modals/SubtasksSection.jsx`
+- Impact: Difficult to test, hard to reason about, increases cognitive load for changes, difficult to extract reusable logic
+- Fix approach: Break components into smaller, focused pieces; extract custom hooks for complex state logic; move utility functions to standalone modules
 
-**Hardcoded Project Key Prefix:**
-- Issue: Project key prefix "JPL-" is hardcoded in two separate locations, seed data uses different prefix "MJ-"
-- Files: `server/index.js` (line 232), `server/db/init.js` (line 214 uses "MJ-", rest uses "JPL-")
-- Impact: Inconsistent seeded data, requires manual code changes in multiple places to customize, prone to desync between locations
-- Fix approach: Extract to environment variable or single config file, update seed script to use same prefix as production code
+**Stale reference pattern with useRef:**
+- Issue: `stateRef` in `IssuesContext.jsx` maintains manual reference to state to work around closure issues, scattered throughout the file (lines 63, 88, etc.)
+- Files: `client/src/contexts/IssuesContext.jsx` (lines 63, 105-182, 232-257, etc.)
+- Impact: Creates potential for accessing stale state; makes it harder to track which value is current vs stale; increases likelihood of bugs when state updates
+- Fix approach: Refactor to use proper dependency arrays in `useEffect` hooks; consider extracting state management to a custom hook with clear dependency tracking
 
-**Manual Schema Migrations via Try-Catch:**
-- Issue: Database schema changes use try-catch blocks to silently ignore errors if columns already exist
-- Files: `server/db/init.js` (lines 74-91 for `issue_key`, `issue_title`, `previous_status` columns)
-- Impact: Migration failures are hidden, no tracking of which migrations have run, impossible to know database schema version, rollback not possible
-- Fix approach: Implement proper migration system (e.g., `node-pg-migrate`, `knex`, or custom migrations table tracking version numbers)
+**API client lacks error handling:**
+- Issue: `api` utility (`client/src/utils/api.js`) doesn't check response status or handle errors consistently - just calls `.json()` on all responses
+- Files: `client/src/utils/api.js` (lines 4-30)
+- Impact: Failed requests silently pass through; errors from server aren't distinguishable from valid responses; causes downstream components to receive malformed data
+- Fix approach: Add status checking; throw errors with descriptive messages; differentiate between network errors and server errors; add retry logic where appropriate
 
-**Deleted Activity Logs:**
-- Issue: Activity log automatically deletes old entries beyond 20 most recent on every insert
-- Files: `server/index.js` (lines 26, 35-41 in `logActivity` function)
-- Impact: Permanent loss of audit trail data, no way to investigate historical issues or user behavior patterns
-- Fix approach: Either remove deletion logic entirely, or implement archival strategy (move to separate table, export to log files, increase limit significantly)
+**Subtasks cache synchronization inconsistencies:**
+- Issue: Multiple places manage subtasks cache (`toggleSubtasks`, `toggleAllSubtasks`, `refreshSubtasksCache`, `handleSubtaskChange`), each with slightly different logic
+- Files: `client/src/contexts/IssuesContext.jsx` (lines 105-422), `client/src/hooks/useSubtaskCache.js`, `client/src/hooks/useIssueDelete.js`
+- Impact: Changes in one area can create cache inconsistencies; difficult to ensure all code paths properly invalidate/update cache
+- Fix approach: Centralize cache management into a single hook or context provider; define clear rules for when cache should be invalidated
 
-**Activity Log References Deleted Issues:**
-- Issue: `activity_log.issue_id` uses `ON DELETE SET NULL`, but retains `issue_key` and `issue_title` separately
-- Files: `server/db/init.js` (line 48)
-- Impact: Orphaned activity log entries with partial data, inconsistent data model (issue ID nullified but key/title remain)
-- Fix approach: Either use `ON DELETE CASCADE` to fully remove activity when issue deleted, or remove the foreign key constraint entirely and rely solely on denormalized `issue_key`/`issue_title`
+**Excessive data refetching:**
+- Issue: Many operations fetch full issue list from server multiple times (`applyStatusChange`, `createIssue`, `updateIssue`, `deleteIssue` all fetch `/issues` and `/issues?include_subtasks=true`)
+- Files: `client/src/contexts/IssuesContext.jsx` (lines 91-101, 129-196, 210-229, 232-257)
+- Impact: Network overhead; increases latency on every mutation; scales poorly as data grows
+- Fix approach: Use server response for optimistic updates; only refetch when necessary; implement differential sync or partial updates
 
-**No Request Deduplication on Backend:**
-- Issue: Multiple concurrent requests for subtasks can cause duplicate database queries
-- Files: `client/src/App.jsx` (lines 522-549 implement client-side deduplication, but backend has no protection)
-- Impact: Wasted database queries, potential race conditions if results arrive out of order
-- Fix approach: Implement request coalescing or caching layer on backend
-
-## Known Bugs
-
-**Inconsistent Project Key Prefix in Seed Data:**
-- Symptoms: Seed data creates issues with "MJ-" prefix, but new issues use "JPL-" prefix
-- Files: `server/db/init.js` (line 214)
-- Trigger: Running `npm run db:init` creates "MJ-" issues, but creating new issues via API generates "JPL-" keys
-- Workaround: Manually change line 214 to use "JPL-" to match production code
-
-**SSE Memory Leak on Client Disconnect:**
-- Symptoms: Heartbeat intervals continue running after client disconnect if cleanup doesn't execute properly
-- Files: `server/sse-manager.js` (lines 16-22)
-- Trigger: Client disconnect before heartbeat interval fires or network interruption
-- Workaround: Heartbeat will eventually detect disconnected client and clear itself, but intervals accumulate
-
-## Security Considerations
-
-**No Authentication or Authorization:**
-- Risk: Any user can view, modify, or delete any data. User identity is purely client-side (localStorage) and trivially spoofed
-- Files: All API endpoints in `server/index.js` (lines 64-612), `client/src/App.jsx` (lines 509-512 for user selection)
-- Current mitigation: None - documented as "Zero Config Auth: Trust your small team" feature
-- Recommendations: Add at minimum basic auth middleware, JWT tokens, or session cookies. Validate user_id on server side. Document this is NOT suitable for untrusted environments
-
-**No Input Sanitization:**
-- Risk: Stored XSS via issue titles, descriptions, comments. SQL injection unlikely due to parameterized queries but malicious content can be stored and rendered
-- Files: `server/index.js` (no validation beyond required field checks), `client/src/App.jsx` (renders user content directly)
-- Current mitigation: React automatically escapes JSX preventing XSS execution, but malicious links still clickable
-- Recommendations: Add server-side input validation library (e.g., `validator.js`), sanitize HTML/script tags, limit field lengths
-
-**No Rate Limiting:**
-- Risk: API endpoints can be spammed infinitely, causing database overload or DoS
-- Files: `server/index.js` (no rate limiting middleware)
-- Current mitigation: None
-- Recommendations: Add `express-rate-limit` middleware to API endpoints, especially write operations (POST/PATCH/DELETE)
-
-**Environment Variables in Client Build:**
-- Risk: Potential exposure if environment variables are accidentally bundled into client code
-- Files: `client/vite.config.js` (no explicit env filtering visible)
-- Current mitigation: No sensitive env vars currently used in client
-- Recommendations: Explicitly whitelist allowed env vars in Vite config, audit build output for leaks
-
-**CORS Wide Open:**
-- Risk: Any origin can make requests to API
-- Files: `server/index.js` (line 14: `app.use(cors())` with no options)
-- Current mitigation: None
-- Recommendations: Restrict CORS to specific origins in production via `cors({ origin: process.env.ALLOWED_ORIGIN })`
-
-## Performance Bottlenecks
-
-**N+1 Query Problem for Subtask Counts:**
-- Problem: Every issue fetch includes two subqueries to count total and done subtasks
-- Files: `server/index.js` (lines 106-107, 182-183, 257-259, 396-397)
-- Cause: Subqueries executed per-row instead of JOINed or aggregated
-- Improvement path: Use LEFT JOIN with GROUP BY to compute counts in single query, or cache counts in parent issue table and update via triggers
-
-**Full Table Scan for Activity Deletion:**
-- Problem: Deleting old activity logs requires sorting entire table to identify top 20
-- Files: `server/index.js` (lines 36-40)
-- Cause: `ORDER BY created_at DESC LIMIT 20` on full table, then DELETE on inverse
-- Improvement path: Index already exists on `created_at`, but query could be optimized to use window functions or row_number
-
-**Client Fetches All Issues on Every SSE Event:**
-- Problem: Every issue update triggers full reload of all issues, subtasks, stats, and users
-- Files: `client/src/App.jsx` (lines 686, 669 calling `loadData()`)
-- Cause: Simplistic synchronization strategy
-- Improvement path: Implement incremental updates - SSE events should include changed data and client should merge into existing state
-
-**Expanded Subtasks Fetch on Every Parent Expand:**
-- Problem: Collapsing and re-expanding a parent re-fetches subtasks even if cached
-- Files: `client/src/App.jsx` (lines 818-840 implement caching, but cache is cleared on issue updates)
-- Cause: Overly aggressive cache invalidation
-- Improvement path: Implement smarter cache invalidation - only invalidate specific parent when its subtasks change, not all caches
-
-## Fragile Areas
-
-**SSE State Synchronization with Stale Closures:**
-- Files: `client/src/App.jsx` (lines 525-529, 657-658, 725 use refs to avoid stale closures)
-- Why fragile: SSE event handlers capture state at component mount, refs used to get current values but pattern is error-prone
-- Safe modification: Always use refs for values read inside SSE handlers, never directly access state. Add thorough comments explaining closure scope
-- Test coverage: No automated tests for SSE synchronization behavior
-
-**Issue Key Counter Race Conditions:**
-- Files: `server/index.js` (lines 228-232), `tests/race-conditions.test.js` (lines 27-82)
-- Why fragile: Relies on database atomic `UPDATE...RETURNING` to prevent duplicate keys
-- Safe modification: Do not change to separate SELECT then UPDATE. Maintain RETURNING clause. Test suite validates concurrent behavior
-- Test coverage: Comprehensive race condition tests exist in `tests/race-conditions.test.js`
-
-**Subtasks Cache Invalidation Logic:**
-- Files: `client/src/App.jsx` (lines 713-721, 755-761)
-- Why fragile: Multiple code paths update subtasks cache (SSE events, manual actions, deletion cleanup), easy to miss a path
-- Safe modification: Always update cache through centralized `setSubtasksCache` calls, never directly mutate. Document all cache invalidation triggers
-- Test coverage: No automated tests for cache consistency
-
-**Activity Log Timestamp Parsing:**
-- Files: `client/src/App.jsx` (lines 101-102: `dateStr.replace(" ", "T") + "Z"`)
-- Why fragile: Assumes SQLite datetime format "YYYY-MM-DD HH:MM:SS" and manually converts to ISO 8601
-- Safe modification: Do not change SQLite datetime format or this parsing will break. Consider server-side ISO 8601 formatting
-- Test coverage: No automated tests for timestamp parsing
-
-**DELETE CASCADE on Subtasks:**
-- Files: `server/db/init.js` (line 29: `parent_id INTEGER REFERENCES issues(id) ON DELETE CASCADE`)
-- Why fragile: Deleting a parent issue silently deletes all subtasks, no warning to user, no way to recover
-- Safe modification: Consider soft deletes instead, or require explicit confirmation before cascading delete
-- Test coverage: No automated tests for cascade delete behavior
-
-## Scaling Limits
-
-**Single SQLite File in Production:**
-- Current capacity: SQLite handles ~1M rows easily, but single-writer limitation exists
-- Limit: Concurrent writes will serialize, causing latency under load
-- Scaling path: Turso (libSQL) provides replication and distribution, but still ultimately SQLite. For high-concurrency, migrate to PostgreSQL
-
-**Server-Sent Events Connection Limits:**
-- Current capacity: Node.js default max sockets ~65k, but realistic limit much lower (~10k concurrent SSE connections)
-- Limit: Each SSE client holds open HTTP connection indefinitely, exhausting server resources
-- Scaling path: Move to WebSockets with connection pooling, or use managed service like Pusher/Ably for pub/sub
-
-**No Pagination on Issues List:**
-- Current capacity: All parent issues fetched on every page load
-- Limit: Breaks down around 1000+ issues (slow API response, large JSON payload, client rendering lag)
-- Scaling path: Implement cursor-based pagination, virtual scrolling, or infinite scroll
-
-**Activity Log Hardcoded 20 Item Limit:**
-- Current capacity: Only retains 20 most recent activity entries
-- Limit: Any historical activity beyond last 20 actions is permanently deleted
-- Scaling path: Remove deletion logic, implement proper archival/rotation, add pagination to activity log API
-
-## Dependencies at Risk
-
-**Mantine v7.x:**
-- Risk: Rapidly evolving UI library, breaking changes common between major versions
-- Impact: Upgrading to v8 will likely require significant refactoring of component props and styling
-- Migration plan: Pin to `^7.0.0` in package.json until resources available for migration, monitor Mantine changelog
-
-**@libsql/client 0.6.0:**
-- Risk: Relatively new package, API not stable (currently pre-1.0)
-- Impact: Database client changes could require rewriting all query code
-- Migration plan: Pin exact version `0.6.0` not `^0.6.0`, test thoroughly before any upgrades
-
-**No Linting or Formatting:**
-- Risk: Code style will drift without eslint/prettier, especially in team environment
-- Impact: Merge conflicts, inconsistent code quality, harder to review
-- Migration plan: Add `eslint` and `prettier` with standard configs, run `--fix` on entire codebase
-
-## Missing Critical Features
-
-**No Database Backups:**
-- Problem: Production Turso database has no automated backup strategy documented
-- Blocks: Disaster recovery, accidental deletion recovery, point-in-time restore
-- Priority: High - Single database failure loses all data
-
-**No Error Tracking:**
-- Problem: Backend errors only logged to console, no aggregation or alerting
-- Blocks: Production debugging, error rate monitoring, user impact assessment
-- Priority: Medium - Errors currently invisible until user reports
-
-**No Logging Infrastructure:**
-- Problem: Only console.log used, no structured logging, no log aggregation
-- Blocks: Production debugging, audit trails, security incident investigation
-- Priority: Medium - Consider adding `winston` or `pino` logger
-
-**No Health Check Endpoint:**
-- Problem: No `/health` or `/status` endpoint to verify service is running
-- Blocks: Proper monitoring, load balancer health checks, uptime tracking
-- Priority: Low - Render provides basic uptime monitoring, but explicit endpoint better
-
-## Test Coverage Gaps
-
-**No Frontend Tests:**
-- What's not tested: All React components, user interactions, drag-and-drop, context menus, SSE handling
-- Files: `client/src/App.jsx` (0% coverage)
-- Risk: UI regressions undetected, refactoring breaks functionality silently
-- Priority: High - 3400 line file with zero automated tests
-
-**No API Integration Tests for Comments:**
-- What's not tested: Comment creation, retrieval, user association, activity logging
-- Files: `server/index.js` (lines 470-542 comment endpoints)
-- Risk: Breaking changes to comment API go unnoticed
-- Priority: Medium - Comments are core feature
-
-**No SSE Tests:**
-- What's not tested: SSE connection, disconnection, heartbeat, event broadcasting, client reconnection
-- Files: `server/sse-manager.js` (0% coverage), `server/index.js` (lines 48-58)
-- Risk: Real-time sync can break without detection, memory leaks undetected
-- Priority: Medium - SSE is critical for multi-user experience
-
-**No Migration Tests:**
-- What's not tested: Schema migrations, rollback capability, idempotency
-- Files: `server/db/init.js` (lines 74-91)
-- Risk: Production database corruption during schema changes
-- Priority: High - Manual migrations very risky
-
-**No Deletion Cascade Tests:**
-- What's not tested: Deleting parent issue deletes subtasks, orphaned comments handling, activity log cleanup
-- Files: Foreign key constraints in `server/db/init.js`
-- Risk: Data loss or orphaned records not validated
-- Priority: Medium - Deletes are destructive
+**Console logging left in production code:**
+- Issue: 9 instances of `console.error()` in client source code, left without warning comments or proper error reporting
+- Files: `client/src/hooks/useActivityPolling.js`, `client/src/components/modals/ActivityLogModal.jsx`, `client/src/components/modals/SubtasksSection.jsx` (lines 106, 123, 149)
+- Impact: Silent failures in production; errors not captured or reported; hard to debug user issues
+- Fix approach: Replace `console.error()` with proper error tracking; add error boundaries; notify users of issues
 
 ---
 
-*Concerns audit: 2026-01-20*
+## Known Bugs
+
+**Stats update doesn't account for subtasks:**
+- Issue: Only parent issues affect stats counts; moving subtask to different status doesn't update stats, but moving parent does
+- Files: `client/src/contexts/IssuesContext.jsx` (lines 150-159), `server/routes/issues-routes.js` (line 236)
+- Trigger: Create a subtask, move it to "done" status; the main stats counter won't reflect it
+- Workaround: Move parent issue to see accurate count
+
+**Concurrent deletion can corrupt state:**
+- Issue: `useIssueDelete` hook stores snapshot but doesn't prevent multiple concurrent deletes of same issue; second delete might undo work
+- Files: `client/src/hooks/useIssueDelete.js` (lines 14-146)
+- Trigger: Rapidly click delete multiple times before 7-second timer expires
+- Impact: Confusing undo behavior; state becomes inconsistent
+
+**Stats normalization missing type safety:**
+- Issue: `normalizeStats()` in `IssuesContext` attempts to handle non-numeric values, but doesn't validate that required fields exist
+- Files: `client/src/contexts/IssuesContext.jsx` (lines 79-85)
+- Impact: Silent failures; if API returns malformed stats, UI shows undefined values instead of failing visibly
+
+---
+
+## Security Considerations
+
+**No authentication or authorization:**
+- Risk: Anyone with access to the API can create, modify, or delete any issue; user identity is client-side only (localStorage)
+- Files: `client/src/contexts/UsersContext.jsx`, `server/index.js`
+- Current mitigation: None - relies on network isolation (not accessible from outside)
+- Recommendations: Implement proper auth if exposed to internet; at minimum, add CSRF tokens; validate user_id on server side; don't trust client-side user selection
+
+**Client-side user impersonation:**
+- Risk: Any user can set `localStorage.setItem("minijira_user", anyId)` to act as anyone
+- Files: `client/src/contexts/UsersContext.jsx` (localStorage usage)
+- Current mitigation: None
+- Recommendations: Use signed JWTs or session cookies; server must validate and set user context; never accept user_id from client
+
+**No input validation on issue keys:**
+- Risk: Issue key prefix "JPL-" is hardcoded in two places; if changed inconsistently, could corrupt data
+- Files: `server/index.js` (line 111), `server/db/init.js`
+- Current mitigation: Database constraint checks only status/priority values
+- Recommendations: Move key prefix to environment config; validate all inputs server-side; implement schema validation
+
+**CORS is wide open:**
+- Risk: `app.use(cors())` with no origin restrictions
+- Files: `server/index.js` (line 18)
+- Current mitigation: None
+- Recommendations: Restrict CORS to specific origin in production; whitelist allowed domains
+
+---
+
+## Performance Bottlenecks
+
+**N+1 query problem on issue listing:**
+- Problem: Main board loads parent issues; expanding subtasks triggers separate query per parent
+- Files: `server/routes/issues-routes.js` (lines 49-63), `client/src/contexts/IssuesContext.jsx` (lines 369-386)
+- Cause: Subtasks fetched one parent at a time when expanding, even if multiple parents expand simultaneously
+- Improvement path: Batch fetch subtasks for multiple parents in single request; add `/issues/subtasks?parent_ids=[1,2,3]` endpoint
+
+**Heavy DOM rendering on large issue lists:**
+- Problem: Header component calculates stats by summing all counts; Board renders all columns and issues without virtualization
+- Files: `client/src/components/layout/Header.jsx` (lines 29-35), `client/src/components/board/Board.jsx`
+- Cause: Even with 100+ issues, all rendered to DOM at once
+- Improvement path: Implement virtual scrolling for columns; memoize expensive calculations; debounce stat updates
+
+**Subquery overhead in every issue fetch:**
+- Problem: Every issue request runs two subqueries to count subtasks
+- Files: `server/utils/queries.js` (lines 11-12)
+- Cause: Counting happens on every fetch even when subtask count not displayed
+- Improvement path: Add optional `with_counts=true` parameter; cache counts separately; denormalize counts to parent table
+
+**SSE heartbeat at 30-second intervals:**
+- Problem: Creates unnecessary traffic; affects battery on mobile devices
+- Files: `server/sse-manager.js` (line 21)
+- Cause: Keeping connections alive for activity polling
+- Improvement path: Use adaptive heartbeat based on client visibility; switch to polling with exponential backoff on mobile
+
+---
+
+## Fragile Areas
+
+**Subtask cache and expanded issues state:**
+- Files: `client/src/contexts/IssuesContext.jsx` (lines 19-20, 369-422), `client/src/hooks/useSubtaskCache.js`, `client/src/hooks/useIssueDelete.js`
+- Why fragile: Two separate pieces of state (`expandedIssues` Set and `subtasksCache` object) that must stay synchronized; cache can become stale; Set mutations are hard to trace
+- Safe modification: Always use `dispatch()` for updates; add invariant tests to verify cache matches expanded state; add logging for state transitions
+- Test coverage: Multiple places update cache but not all paths are tested; `useIssueDelete` has complex snapshot logic that needs integration tests
+
+**Issue deletion with undo and 7-second delay:**
+- Files: `client/src/hooks/useIssueDelete.js` (lines 83-144)
+- Why fragile: Maintains optimistic state, then reverts if server fails; snapshot stored in ref; multiple concurrent deletes can interfere; undo callback can be called after deletion completes
+- Safe modification: Never delete or undo same issue twice; ensure cleanup always runs; validate snapshot exists before restoring; add timeout to prevent stale undos
+- Test coverage: Race condition tests exist but don't cover all edge cases (e.g., rapid undo + new delete, network timeout during undo)
+
+**Stats calculations across multiple state sources:**
+- Files: `client/src/contexts/IssuesContext.jsx` (lines 11-17, 79-85, 150-159, 216-223), `server/routes/stats-routes.js`
+- Why fragile: Stats can come from three places (reducer state, API response, or computed from issues list); not always synchronized
+- Safe modification: Always normalize stats after API calls; add validation that computed stats match server stats; don't compute stats on client
+- Test coverage: No test verifies stats stay consistent after multiple operations; no test for stats with many subtasks
+
+**Activity log SSE events can lag:**
+- Files: `server/sse-manager.js`, `client/src/contexts/ActivityContext.jsx`, `client/src/hooks/useActivityPolling.js`
+- Why fragile: Events sent via SSE but also polled; if connection drops briefly, events missed; no ordering guarantees
+- Safe modification: Use server-provided timestamps; verify events in correct order before applying; handle duplicate events
+- Test coverage: No tests for SSE reliability; no tests for out-of-order event handling
+
+---
+
+## Scaling Limits
+
+**Database query complexity with subqueries:**
+- Current capacity: Works fine with <1000 issues, subqueries on every fetch become slow at 10k+
+- Limit: Subquery counts on `issues.*` multiplied for each row; O(n²) complexity with deep subtask trees
+- Scaling path: Denormalize counts to parent; use materialized views; implement count-only endpoint separate from detail fetch
+
+**Memory usage for expanded subtasks:**
+- Current capacity: Can hold ~100-200 expanded issue subtasks in cache before noticeable slowdown
+- Limit: Every subtask in cache is a full object in memory; no garbage collection of old caches
+- Scaling path: Implement LRU cache with size limits; periodically clean old cached subtasks; use IndexedDB for larger caches
+
+**SSE client connections:**
+- Current capacity: Handles ~100 concurrent connections on small server
+- Limit: All clients stored in memory; no clustering or load balancing
+- Scaling path: Add Redis pub/sub for multi-server broadcasting; implement client pooling; add connection limits per IP
+
+**Activity log table unbounded growth:**
+- Current capacity: Stores all activity forever; no pruning; performance acceptable with <50k rows
+- Limit: Full table scan for activity queries becomes slow; database file grows indefinitely
+- Scaling path: Archive old activity; add retention policy; implement pagination with cursor; index on user_id and issue_id
+
+---
+
+## Dependencies at Risk
+
+**@libsql/client 0.6.0 - actively developed:**
+- Risk: Early version number; API may change; limited maturity in production
+- Impact: Upgrades could break code; community size smaller than traditional SQLite libraries
+- Migration plan: Monitor releases; pin version until 1.0; consider migration to better-supported client if issues arise
+
+**sonner 2.0.7 - toast library with no rollback UI:**
+- Risk: Single dependency for critical UX (undo buttons); if library has bugs, no toast functionality
+- Impact: Users can't see notifications or undo actions
+- Migration plan: Consider implementing custom toast instead; or add fallback notification mechanism; ensure tests cover toast failure scenarios
+
+---
+
+## Missing Critical Features
+
+**No transaction support across operations:**
+- Problem: Creating issue + setting assignee + creating comment happens in separate requests; any can fail independently leaving partial state
+- Blocks: Atomic multi-step operations; rollback on partial failure
+- Impact: Database inconsistency possible if network fails mid-operation
+
+**No concurrent edit prevention:**
+- Problem: Two users can edit same issue simultaneously; last write wins
+- Blocks: Safe collaborative editing; preventing accidental overwrites
+- Impact: Data loss; frustration in multi-user scenarios
+
+**No pagination or filtering beyond basic query params:**
+- Problem: All issues loaded at once; no way to filter by reporter or other complex criteria
+- Blocks: Usability with 1000+ issues; specific issue finding; admin features
+- Impact: UI becomes unusable as data grows; memory leaks from massive lists
+
+**No audit trail or soft deletes:**
+- Problem: Deleted issues are gone forever; no way to see who deleted what or when
+- Blocks: Compliance requirements; accidental deletion recovery; audit requirements
+- Impact: Can't recover from mistakes; no compliance audit trail
+
+---
+
+## Test Coverage Gaps
+
+**Concurrent operations not fully tested:**
+- What's not tested: Race conditions in issue creation + subtask creation; concurrent subtask deletions; concurrent status changes on parent + child
+- Files: `tests/race-conditions.test.js`, `client/src/contexts/IssuesContext.jsx`
+- Risk: Data corruption under load; stats become incorrect; deleted issues reappear; cache inconsistencies
+- Priority: High - affects data integrity
+
+**State synchronization edge cases:**
+- What's not tested: What happens when API fails mid-deletion and undo is called; concurrent undo operations; undo after state changed; subtask cache invalidated while user has detail modal open
+- Files: `client/src/hooks/useIssueDelete.js`, `client/src/contexts/IssuesContext.jsx`
+- Risk: Stale state displayed; undo broken; orphaned state refs; silent failures
+- Priority: High - affects core operations
+
+**API error handling:**
+- What's not tested: 500 errors from server; malformed JSON responses; network timeouts; API returning wrong data structure
+- Files: `tests/api.test.js`, `client/src/utils/api.js`
+- Risk: Silent failures; uncaught exceptions; user confusion about what went wrong
+- Priority: Medium - affects reliability
+
+**LSH (localStorage) usage and persistence:**
+- What's not tested: localStorage quota exceeded; localStorage disabled; user selection persisted across sessions; activity viewing timestamp
+- Files: `client/src/contexts/UsersContext.jsx`, `client/src/hooks/useActivityPolling.js`
+- Risk: User selection lost; activity viewed state lost; can't clear localStorage; private browsing breaks features
+- Priority: Medium - affects UX
+
+---
+
+*Concerns audit: 2026-01-23*

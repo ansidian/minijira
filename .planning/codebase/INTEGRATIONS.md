@@ -1,99 +1,129 @@
 # External Integrations
 
-**Analysis Date:** 2026-01-20
+**Analysis Date:** 2026-01-23
 
 ## APIs & External Services
 
-**None detected:**
-- No external API integrations (Stripe, AWS, third-party services, etc.)
-- Self-contained application with all logic in-process
+**Internal REST API:**
+- Client-to-server communication uses fetch-based REST API
+- Base URL: `/api`
+- Client implementation: `client/src/utils/api.js`
+- HTTP methods: GET, POST, PATCH, DELETE
+- Content-Type: application/json
+
+**Real-time Events (Server-Sent Events):**
+- Endpoint: `GET /api/events`
+- Implementation: `server/sse-manager.js` and `server/routes/events-routes.js`
+- Protocol: HTTP Server-Sent Events (text/event-stream)
+- Used for: Broadcasting state changes to connected clients (issues, comments, activity)
+- Heartbeat: 30-second keep-alive mechanism
 
 ## Data Storage
 
-**Databases:**
-- SQLite (local) / Turso (cloud)
-  - Connection: `@libsql/client` package
-  - Config in: `server/db/connection.js`
-  - Local file: `file:server/db/minijira.db`
-  - Cloud connection: `TURSO_DATABASE_URL` env var
-  - Cloud auth: `TURSO_AUTH_TOKEN` env var
-  - Schema initialization: `server/db/init.js`
-  - Tables: users, issues, comments, activity_log
+**Database:**
+- Type: SQLite (local development) or Turso/libSQL (production)
+- Client: `@libsql/client` 0.6.0
+- Connection: `server/db/connection.js`
+- Development: Local file at `file:server/db/minijira.db`
+- Production: Turso cloud (via `TURSO_DATABASE_URL` env var)
+
+**Tables:**
+- `users` - User accounts with email, name, avatar color
+- `issues` - Issues/tasks with parent_id for subtask hierarchy
+- `comments` - Comments on issues
+- `activity_log` - Audit trail of changes
+- `counters` - Auto-increment tracking for issue keys (e.g., JPL-1)
 
 **File Storage:**
-- Local filesystem only (avatar colors stored as text in database)
-- No external file storage service
+- Not used; images and attachments not supported
 
 **Caching:**
-- None - No Redis, Memcached, or caching layer
-- Frontend uses in-memory React state for subtasks caching (`subtasksCache` object)
+- Frontend: In-memory subtasks cache in React context
+- Server: No external cache (all state in database)
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- None - No authentication system
-  - User selection stored in browser `localStorage` (key: `mantine-color-scheme` for theme, user ID not visible in reviewed code)
-  - No password verification
-  - No session management
-  - Client-side only user selection
+- None; no authentication system
+
+**User Management:**
+- Client-side user selection via `localStorage`
+- Any user can impersonate any other user (no access control)
+- Users stored in `users` table with email, name, and avatar color
+- No password or OAuth integration
+
+**Session/Storage:**
+- localStorage: Stores current user ID, theme preference (color scheme), activity view timestamp
+- SessionStorage: Not used
+- Keys: `minijira_current_user`, `mantine-color-scheme`, `minijira_activity_viewed`
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- None - No Sentry, Rollbar, or error tracking service
+- Not integrated; errors logged to console only
 
 **Logs:**
-- Console-based logging only
-  - Server: `console.log` statements in `server/index.js` and `server/sse-manager.js`
-  - SSE connection logging: Client connect/disconnect events
-  - No structured logging framework
+- Console.log for server startup and errors
+- Activity log stored in database (`activity_log` table) for audit trail
+- Client errors printed to browser console
+
+**Observability:**
+- No third-party monitoring (no Sentry, DataDog, etc.)
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Render.com (configured in `render.yaml`)
-  - Service type: web
-  - Runtime: Node.js
-  - Build command: `npm install && npm run build && npm run db:init`
-  - Start command: `npm start`
+- Self-hosted (any Node.js environment)
+- Not integrated with specific cloud platform
 
 **CI Pipeline:**
-- None - No GitHub Actions, CircleCI, or automated CI
-- Manual deployment via Render platform
+- Not detected; no CI/CD configuration found
+
+**Build Process:**
+- `npm run build` - Builds frontend with Vite, outputs to `client/dist`
+- `npm start` - Runs production server serving built static assets
 
 ## Environment Configuration
 
 **Required env vars:**
-- None for local development (defaults to local SQLite)
+- `PORT` (optional; defaults to 3001) - Express server port
+- `NODE_ENV` (optional; defaults to development) - Set to "production" for production mode
+- `TURSO_DATABASE_URL` (optional) - Turso database URL; if not set, uses local SQLite
+- `TURSO_AUTH_TOKEN` (optional) - Turso authentication token
 
-**Optional env vars (production):**
-- `NODE_ENV=production` - Enables serving static client build
-- `PORT` - HTTP server port (defaults to 3001)
-- `TURSO_DATABASE_URL` - Turso cloud database URL
-- `TURSO_AUTH_TOKEN` - Turso authentication token
+**Database Connection Logic:**
+- If `TURSO_DATABASE_URL` is set, connect to Turso cloud
+- Otherwise, use local SQLite at `file:server/db/minijira.db`
 
 **Secrets location:**
-- Environment variables (not committed to repository)
-- `.env` files not detected in codebase (excluded via `.gitignore` pattern)
+- Environment variables (e.g., `.env` file or deployment secrets)
+- No hardcoded secrets in codebase
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- None - No webhook endpoints detected
+- Not used; no webhook endpoints
 
 **Outgoing:**
-- None - No outbound webhooks or callback URLs
+- Not used; no external service callbacks
 
-## Real-Time Communication
+## API Endpoints Summary
 
-**Server-Sent Events (SSE):**
-- Custom implementation in `server/sse-manager.js`
-  - Endpoint: `GET /api/events`
-  - Purpose: Broadcast activity updates to all connected clients
-  - Heartbeat: 30-second interval to keep connections alive
-  - Manager: Singleton SSE manager tracking connected clients
-  - Usage: Activity log updates trigger broadcasts via `sseManager.broadcast()`
+**Server Routes:**
+- `server/routes/users-routes.js` - User CRUD operations
+- `server/routes/issues-routes.js` - Issue CRUD, status/priority/assignee updates
+- `server/routes/comments-routes.js` - Comment CRUD on issues
+- `server/routes/activity-routes.js` - Activity log queries
+- `server/routes/stats-routes.js` - Statistics and dashboards
+- `server/routes/events-routes.js` - SSE streaming endpoint
+
+**Data Flow:**
+1. Frontend makes fetch request to `/api/[resource]`
+2. Express routes to appropriate handler
+3. Handler queries SQLite/Turso database
+4. SSE broadcasts changes to all connected clients
+5. Frontend updates local state and re-renders
 
 ---
 
-*Integration audit: 2026-01-20*
+*Integration audit: 2026-01-23*

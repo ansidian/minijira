@@ -1,90 +1,104 @@
 # Technology Stack
 
-**Analysis Date:** 2026-01-20
+**Analysis Date:** 2026-01-23
 
 ## Languages
 
 **Primary:**
-- JavaScript (ES6+) - Both frontend and backend using ES modules (`"type": "module"`)
+- JavaScript (ES2022) - Both frontend and backend
+- JSX - React component syntax in frontend
 
-**Secondary:**
-- None - Pure JavaScript codebase
+**TypeScript:**
+- Not used; JavaScript with optional type hints via JSDoc in some files
 
 ## Runtime
 
 **Environment:**
-- Node.js >=18 (specified in `package.json` engines)
-- Current detected version: v25.2.1
+- Node.js >= 18
 
 **Package Manager:**
-- npm 11.6.2
-- Lockfiles present:
-  - Root: `package-lock.json`
-  - Client: `client/package-lock.json`
+- npm
+- Lockfile: present (`package-lock.json`)
 
 ## Frameworks
 
-**Core:**
-- React 18.2.0 - Frontend UI library (`client/package.json`)
-- Express 4.18.2 - Backend HTTP server (`package.json`)
-- Vite 5.2.0 - Frontend build tool and dev server (`client/package.json`)
-- Mantine UI 8.3.9 - React component library for UI (`client/package.json`)
+**Frontend:**
+- React 18.2.0 - UI framework
+- Vite 5.2.0 - Build tool and dev server
+- Mantine 8.3.9 - Component library
+- React DOM 18.2.0 - React rendering
+
+**Backend:**
+- Express.js 4.18.2 - REST API server
+- Node.js built-in `http` module - SSE (Server-Sent Events)
 
 **Testing:**
-- Vitest 4.0.15 - Test runner configured in `vitest.config.js`
+- Vitest 4.0.15 - Test runner and assertion library
+- Test configuration: `vitest.config.js`
 
 **Build/Dev:**
-- Vite 5.2.0 - Frontend bundler with React plugin
-- @vitejs/plugin-react 4.2.1 - Vite React integration
-- concurrently 8.2.2 - Run client and server simultaneously in development
-- PostCSS 8.5.6 - CSS processing with Mantine presets
+- Vite plugin for React - `@vitejs/plugin-react` 4.2.1
+- Concurrently 8.2.2 - Run server and client concurrently during development
 
 ## Key Dependencies
 
 **Critical:**
-- @libsql/client 0.6.0 - Database client supporting both local SQLite and Turso cloud (seamless switching)
-- cors 2.8.5 - CORS middleware for API access
 
-**Infrastructure:**
-- react-dom 18.2.0 - React rendering layer
-- @mantine/core 8.3.9 - Core Mantine components
-- @mantine/hooks 8.3.9 - Mantine React hooks
-- @mantine/notifications 8.3.9 - Toast notifications
-- @mantine/spotlight 8.3.9 - Command palette/search
-- mantine-contextmenu 7.17.1 - Right-click context menus
-- @tabler/icons-react 3.35.0 - Icon library
+- `@libsql/client` 0.6.0 - Database client for SQLite (local) and Turso (cloud). Abstracts database connectivity.
+- `express` 4.18.2 - REST API server framework
+- `cors` 2.8.5 - Cross-Origin Resource Sharing middleware for Express
+- `react` 18.2.0 - Core UI framework
+- `@mantine/core` 8.3.9 - Mantine component library (buttons, modals, inputs, layout)
+- `@mantine/hooks` 8.3.9 - Mantine React hooks (useDisclosure, useMediaQuery, etc.)
+- `@mantine/notifications` 8.3.9 - Toast notifications
+- `@mantine/spotlight` 8.3.9 - Command palette/search interface
+- `sonner` 2.0.7 - Alternative toast notification system
+- `mantine-contextmenu` 7.17.1 - Context menu component
+- `@tabler/icons-react` 3.35.0 - Icon library
+
+**Styling:**
+- `postcss` 8.5.6 - CSS processing
+- `postcss-preset-mantine` 1.18.0 - Mantine CSS preset
+- `postcss-simple-vars` 7.0.1 - CSS variable support
+
+**Types:**
+- `@types/react` 18.2.66 - React TypeScript definitions
+- `@types/react-dom` 18.2.22 - React DOM TypeScript definitions
 
 ## Configuration
 
 **Environment:**
-- Development: No environment variables required (uses local SQLite file at `server/db/minijira.db`)
-- Production: Optional Turso cloud database via:
-  - `TURSO_DATABASE_URL` - Turso database connection URL
-  - `TURSO_AUTH_TOKEN` - Turso authentication token
-- `NODE_ENV=production` - Enables static file serving from `client/dist`
-- `PORT` - HTTP server port (defaults to 3001)
+- Development: Local SQLite database at `file:server/db/minijira.db`
+- Production: Turso cloud database (configured via env vars)
+- Database configuration: `server/db/connection.js`
 
-**Build:**
-- `vite.config.js` - Vite configuration with React plugin and dev proxy (`/api` → `http://localhost:3001`)
-- `postcss.config.cjs` - PostCSS with Mantine preset and responsive breakpoints
-- `vitest.config.js` - Test configuration (sequential execution, 30s timeout)
-- `.gitignore` - Excludes `*.db` files, node_modules, build artifacts
+**Build Config:**
+- Frontend: `client/vite.config.js` - Vite dev server on port 5173, proxies `/api` to `http://localhost:3001`
+- Styling: `client/postcss.config.cjs` - PostCSS with Mantine preset and CSS variables
+- Testing: `vitest.config.js` - Sequential test execution (no parallelism due to shared database)
+
+**API:**
+- Base URL: `/api` (relative)
+- CORS enabled via `cors` middleware on Express server
 
 ## Platform Requirements
 
 **Development:**
-- Node.js >=18
-- npm (any recent version)
-- No additional tools required (SQLite embedded via @libsql/client)
+- Node.js >= 18
+- npm
+- Local SQLite support (via libSQL)
 
 **Production:**
-- Node.js >=18 runtime
-- Deployment target: Render.com (configured in `render.yaml`)
-  - Service type: web
-  - Build: `npm install && npm run build && npm run db:init`
-  - Start: `npm start`
-- Database: Local SQLite file or Turso cloud (libSQL)
+- Node.js >= 18
+- Turso cloud database account (or local SQLite if using local deployment)
+- Environment variables: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` (optional; defaults to local SQLite)
+- Environment variable: `PORT` (optional; defaults to 3001)
+- Environment variable: `NODE_ENV=production` for production mode
+
+**Deployment Target:**
+- Works on any platform supporting Node.js 18+
+- Can be deployed to serverless (with persistent storage) or traditional VPS
 
 ---
 
-*Stack analysis: 2026-01-20*
+*Stack analysis: 2026-01-23*

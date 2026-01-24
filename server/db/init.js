@@ -101,6 +101,41 @@ async function init() {
     INSERT OR IGNORE INTO counters (name, value) VALUES ('issue_key', 0)
   `);
 
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS notification_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      issue_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      event_type TEXT NOT NULL,
+      event_payload TEXT NOT NULL,
+      scheduled_at TEXT NOT NULL,
+      status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'processing', 'sent', 'failed')),
+      attempt_count INTEGER DEFAULT 0,
+      processing_started_at TEXT,
+      sent_at TEXT,
+      error_message TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  await db.execute(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_queue_debounce
+      ON notification_queue(issue_id, user_id, status)
+      WHERE status = 'pending'
+  `);
+
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_queue_pending
+      ON notification_queue(status, scheduled_at)
+      WHERE status = 'pending'
+  `);
+
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_queue_cleanup
+      ON notification_queue(status, sent_at)
+      WHERE status IN ('sent', 'failed')
+  `);
+
   const seedUsers = [
     { name: "Andy Su", email: "alex@team.edu", avatar_color: "#ef4444" },
     {

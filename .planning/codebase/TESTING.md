@@ -1,47 +1,48 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-01-20
+**Analysis Date:** 2026-01-23
 
 ## Test Framework
 
 **Runner:**
 - Vitest 4.0.15
-- Config: Not explicitly configured (relies on Vite defaults)
+- Config: `vitest.config.js`
 
 **Assertion Library:**
-- Vitest built-in assertions (expect API)
+- Vitest built-in assertions (no separate assertion library; standard methods like `expect()`, `toBe()`, `toThrow()`)
 
 **Run Commands:**
 ```bash
-npm test              # Run all tests once
-npm run test:watch    # Watch mode
-npm run test:race     # Run only race condition tests
+npm test              # Run all tests (vitest run)
+npm run test:watch   # Watch mode (vitest)
+npm run test:race    # Run only race condition tests (vitest run --testNamePattern='race|concurrent')
 ```
 
 ## Test File Organization
 
 **Location:**
-- Tests in separate `tests/` directory at project root (not co-located with source)
-- Test files live outside `client/` and `server/` directories
+- Separate from source code: `tests/` directory in project root
+- Not co-located with source files
 
 **Naming:**
-- Pattern: `*.test.js`
-- Examples: `tests/api.test.js`, `tests/race-conditions.test.js`
-- Test utilities: `tests/test-utils.js`
+- Descriptive test names with `.test.js` suffix
+- Examples: `api.test.js`, `race-conditions.test.js`
 
 **Structure:**
 ```
-minijira/
-├── tests/
-│   ├── api.test.js                    # CRUD and filtering tests
-│   ├── race-conditions.test.js        # Concurrency tests
-│   └── test-utils.js                  # Shared test helpers
+tests/
+├── api.test.js                # API integration tests
+├── race-conditions.test.js     # Concurrency and stress tests
+└── test-utils.js              # Shared utilities (not a test file)
 ```
 
 ## Test Structure
 
 **Suite Organization:**
 ```javascript
+import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { api, TestCleanup, waitForServer, uniqueTitle } from "./test-utils.js";
+
 describe("API Integration Tests", () => {
   const cleanup = new TestCleanup();
 
@@ -57,65 +58,166 @@ describe("API Integration Tests", () => {
     it("GET /users - should return list of users", async () => {
       const users = await api.get("/users");
       expect(Array.isArray(users)).toBe(true);
+      expect(users.length).toBeGreaterThan(0);
     });
   });
 });
 ```
 
 **Patterns:**
-- Nested `describe` blocks for logical grouping (e.g., "Users API", "Issues API - CRUD", "Issues API - Filtering")
-- Top-level suite creates cleanup instance
-- `beforeAll` waits for server availability
-- `afterEach` cleans up test data
-- Test names follow pattern: `HTTP_METHOD /endpoint - should description`
-- Descriptive test names explain expected behavior
+- Setup: `beforeAll()` waits for server availability (one-time setup)
+- Teardown: `afterEach()` runs `cleanup.cleanup()` to delete created resources after each test
+- Nested describes: Logical grouping by API endpoint/feature (Users API, Issues CRUD, Filtering, etc.)
+- Test names: Descriptive sentence format starting with HTTP method or action
+  - Example: `"POST /issues - should create an issue with minimal data"`
+  - Example: `"should generate unique keys when creating 10 issues concurrently"`
 
 ## Mocking
 
-**Framework:** None (integration tests only)
+**Framework:** No explicit mocking library; manual stubs and real API calls
 
 **Patterns:**
-- No mocking - tests run against real server
-- Tests require `npm run dev` to be running
-- Database operations are real (SQLite/Turso)
-- Server must be available before tests start
+- No mocks used; tests hit real running server (`npm run dev` required)
+- Real database used (SQLite or Turso depending on environment)
+- Test utilities provide a wrapper around native `fetch()` that adds error handling
+  ```javascript
+  export const api = {
+    async get(path) {
+      const res = await fetch(`${API_BASE}${path}`);
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(error.error || `HTTP ${res.status}`);
+      }
+      return res.json();
+    },
+    async post(path, data) { ... },
+    async patch(path, data) { ... },
+    async delete(path) { ... }
+  };
+  ```
 
 **What to Mock:**
-- Nothing mocked in current test suite
-- All tests are integration tests hitting real API
+- Nothing explicitly mocked; integration tests require live server
 
 **What NOT to Mock:**
-- Database calls (tests use actual database)
-- HTTP requests (tests use fetch to real server)
-- Server responses (tests verify actual API behavior)
+- Database calls (use real SQLite or Turso)
+- HTTP requests (hit real API endpoints)
+- SSE/EventSource connections (test real broadcasts)
 
 ## Fixtures and Factories
 
 **Test Data:**
+- No fixture files; data generated dynamically per test
+- Unique issue titles generated with timestamp and random string:
+  ```javascript
+  export function uniqueTitle(prefix = "Test Issue") {
+    return `${prefix} ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+  ```
+- User data fetched from running server (`GET /users`)
 
-**Unique title generation:**
+**Location:**
+- Test utilities in `tests/test-utils.js`
+- Data generation functions: `uniqueTitle()`, `api` wrapper
+
+## Coverage
+
+**Requirements:** No coverage requirements enforced or measured
+
+**View Coverage:** No commands available; coverage tracking not configured
+
+## Test Types
+
+**Unit Tests:**
+- Not present; only integration tests exist
+- No isolated unit test files
+
+**Integration Tests:**
+- Location: `tests/api.test.js`
+- Scope: Full API endpoint tests including database interactions
+- Approach: Start with server running, hit endpoints, verify responses and database state
+- Coverage areas:
+  - Users CRUD: Get all, get one, 404 handling
+  - Issues CRUD: Create with minimal/full data, get, update, delete
+  - Filtering: By status, assignee, priority
+  - Subtasks: Creation, listing, hierarchy enforcement
+  - Comments: Create, update, delete
+  - Activity logging: Verify action tracking
+  - Stats: Count calculations
+
+**Race Condition Tests:**
+- Location: `tests/race-conditions.test.js`
+- Scope: Concurrency and stress testing
+- Approach: Fire multiple concurrent requests to same or different endpoints
+- Coverage areas:
+  - Atomic issue key generation (no duplicate keys under concurrent creation)
+  - Concurrent status changes (data consistency)
+  - Concurrent subtask operations (parent/child consistency)
+  - Rapid mutations on same resource
+
+## Common Patterns
+
+**Async Testing:**
 ```javascript
-export function uniqueTitle(prefix = "Test Issue") {
-  return `${prefix} ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-```
+it("POST /issues - should create an issue with all fields", async () => {
+  const users = await api.get("/users");
+  const issue = await api.post("/issues", {
+    title: uniqueTitle("Full Issue"),
+    description: "This is a test description",
+  });
+  cleanup.trackIssue(issue.id);
 
-**API wrapper:**
+  expect(issue.title).toContain("Full Issue");
+});
+```
+- Pattern: `await` API calls sequentially or with `Promise.all()` for concurrent operations
+- Cleanup tracked immediately after creation: `cleanup.trackIssue(issue.id)`
+
+**Error Testing:**
 ```javascript
-export const api = {
-  async get(path) {
-    const res = await fetch(`${API_BASE}${path}`);
-    if (!res.ok) {
-      const error = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(error.error || `HTTP ${res.status}`);
-    }
-    return res.json();
-  },
-  // ... post, patch, delete
-};
-```
+it("GET /users/:id - should return 404 for non-existent user", async () => {
+  await expect(api.get("/users/99999")).rejects.toThrow("User not found");
+});
 
-**Cleanup helper:**
+it("POST /issues - should reject issue without title", async () => {
+  await expect(
+    api.post("/issues", { description: "No title" })
+  ).rejects.toThrow("Title is required");
+});
+```
+- Pattern: Use `expect(...).rejects.toThrow()` to catch expected errors
+- Verify error message matches expected string
+
+**Concurrent Request Testing:**
+```javascript
+it("should generate unique keys when creating 10 issues concurrently", async () => {
+  const NUM_CONCURRENT = 10;
+
+  const createPromises = Array.from({ length: NUM_CONCURRENT }, (_, i) =>
+    api.post("/issues", {
+      title: uniqueTitle(`Concurrent Issue ${i}`),
+    })
+  );
+
+  const results = await Promise.all(createPromises);
+  results.forEach((issue) => cleanup.trackIssue(issue.id));
+
+  const keys = results.map((r) => r.key);
+  const uniqueKeys = new Set(keys);
+  expect(uniqueKeys.size).toBe(NUM_CONCURRENT);
+});
+```
+- Pattern: Use `Array.from()` to generate parallel requests
+- Use `Promise.all()` to fire simultaneously
+- Verify uniqueness/consistency of results
+
+## Test Cleanup
+
+**TestCleanup Class:**
+- Tracks issue IDs created during tests
+- Deletes resources in reverse order (subtasks before parents to avoid cascade issues)
+- Ignores errors during cleanup (resources may be deleted already)
+
 ```javascript
 export class TestCleanup {
   constructor() {
@@ -139,141 +241,53 @@ export class TestCleanup {
 }
 ```
 
-**Location:**
-- All test utilities in `tests/test-utils.js`
-- No separate fixtures directory
-- Test data created inline in tests using `api.post()`
+## Test Configuration
 
-## Coverage
-
-**Requirements:** None enforced
-
-**Configuration:** No coverage config detected
-
-**View Coverage:**
-- No coverage reporting configured
-- Vitest supports coverage via `vitest --coverage` but not set up in package.json
-
-## Test Types
-
-**Unit Tests:**
-- Not present in current suite
-
-**Integration Tests:**
-- All tests are integration tests
-- Test full request/response cycle through Express API
-- Verify database state changes
-- Test files: `tests/api.test.js`, `tests/race-conditions.test.js`
-
-**E2E Tests:**
-- Not present
-- No browser automation (Playwright, Cypress) detected
-
-## Common Patterns
-
-**Async Testing:**
+**Vitest Config (`vitest.config.js`):**
 ```javascript
-it("POST /issues - should create an issue with minimal data", async () => {
-  const issue = await api.post("/issues", {
-    title: uniqueTitle("Minimal Issue"),
-  });
-  cleanup.trackIssue(issue.id);
-
-  expect(issue.id).toBeDefined();
-  expect(issue.key).toMatch(/^JPL-\d+$/);
+export default defineConfig({
+  test: {
+    fileParallelism: false,     // Run test files sequentially
+    sequence: {
+      concurrent: false,        // Run tests within files sequentially too
+    },
+    testTimeout: 30000,         // 30s timeout (for stress tests)
+    hookTimeout: 10000,         // 10s timeout for beforeAll/afterEach
+  },
 });
 ```
 
-**Error Testing:**
+**Why Sequential Execution:**
+- Tests share a single SQLite database
+- Concurrent execution would cause race conditions and test interference
+- Stress tests intentionally use concurrency to test application-level race conditions
+
+## Server Requirements
+
+**Startup:**
+- Tests require `npm run dev` to be running (both server and client)
+- `waitForServer()` utility polls `GET /api/users` until server responds
+- Default: 10 attempts, 500ms delay between attempts
+- Throws if server not available after max attempts
+
 ```javascript
-it("POST /issues - should reject issue without title", async () => {
-  await expect(
-    api.post("/issues", { description: "No title" })
-  ).rejects.toThrow("Title is required");
-});
-
-it("GET /users/:id - should return 404 for non-existent user", async () => {
-  await expect(api.get("/users/99999")).rejects.toThrow("User not found");
-});
+export async function waitForServer(maxAttempts = 10, delayMs = 500) {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      await api.get("/users");
+      return true;
+    } catch (e) {
+      if (i === maxAttempts - 1) {
+        throw new Error(
+          `Server not available after ${maxAttempts} attempts. Make sure 'npm run dev' is running.`
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
 ```
-
-**Concurrent Testing:**
-```javascript
-it("should generate unique keys when creating 10 issues concurrently", async () => {
-  const NUM_CONCURRENT = 10;
-
-  const createPromises = Array.from({ length: NUM_CONCURRENT }, (_, i) =>
-    api.post("/issues", {
-      title: uniqueTitle(`Concurrent Issue ${i}`),
-    })
-  );
-
-  const results = await Promise.all(createPromises);
-  results.forEach((issue) => cleanup.trackIssue(issue.id));
-
-  const keys = results.map((r) => r.key);
-  const uniqueKeys = new Set(keys);
-  expect(uniqueKeys.size).toBe(NUM_CONCURRENT);
-});
-```
-
-**State Verification:**
-```javascript
-it("should update parent subtask_count and subtask_done_count", async () => {
-  const parent = await api.post("/issues", {
-    title: uniqueTitle("Count Test Parent"),
-  });
-  cleanup.trackIssue(parent.id);
-
-  let parentData = await api.get(`/issues/${parent.id}`);
-  expect(parentData.subtask_count).toBe(0);
-  expect(parentData.subtask_done_count).toBe(0);
-
-  // Create subtasks...
-
-  parentData = await api.get(`/issues/${parent.id}`);
-  expect(parentData.subtask_count).toBe(2);
-  expect(parentData.subtask_done_count).toBe(1);
-});
-```
-
-## Test Data Management
-
-**Creating test data:**
-- Use `api.post()` to create issues, comments, etc.
-- Track created IDs with `cleanup.trackIssue(id)`
-- Generate unique titles to avoid conflicts: `uniqueTitle("My Test")`
-
-**Cleaning up:**
-- `afterEach` hook calls `cleanup.cleanup()`
-- Cleanup deletes in reverse order (subtasks before parents)
-- Ignores deletion errors (cascade deletes, already deleted)
-- Clears tracking array after cleanup
-
-**Server dependency:**
-- `beforeAll` waits up to 10 attempts (5 seconds) for server
-- Throws error if server not available
-- Tests expect server at `http://localhost:3001`
-
-## Test Characteristics
-
-**Test isolation:**
-- Each test creates its own data
-- Cleanup after each test prevents pollution
-- Tests can run in any order (no interdependencies)
-
-**Assertions:**
-- Use Vitest's `expect` API
-- Common matchers: `.toBe()`, `.toEqual()`, `.toHaveLength()`, `.toMatch()`, `.toBeDefined()`, `.rejects.toThrow()`
-- Verify response structure and values
-- Check computed fields (subtask counts, joined user data)
-
-**Test organization:**
-- Grouped by resource (Users, Issues, Comments, Stats)
-- Further grouped by operation type (CRUD, Filtering)
-- Separate file for race condition tests
-- Comment blocks divide major sections
 
 ---
 
-*Testing analysis: 2026-01-20*
+*Testing analysis: 2026-01-23*
