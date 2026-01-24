@@ -72,16 +72,18 @@ const toastComponent = ({
         }}
         disabled={disabled}
       >
-        <span className="sonner-custom-toast__pause-slot" aria-hidden="true">
-          <svg
-            aria-hidden="true"
-            className={pauseIconClassName}
-            viewBox="0 0 10 10"
-          >
-            <rect x="1" y="1" width="3" height="8" rx="1" />
-            <rect x="6" y="1" width="3" height="8" rx="1" />
-          </svg>
-        </span>
+        {hasCountdown && (
+          <span className="sonner-custom-toast__pause-slot" aria-hidden="true">
+            <svg
+              aria-hidden="true"
+              className={pauseIconClassName}
+              viewBox="0 0 10 10"
+            >
+              <rect x="1" y="1" width="3" height="8" rx="1" />
+              <rect x="6" y="1" width="3" height="8" rx="1" />
+            </svg>
+          </span>
+        )}
         <span className="sonner-custom-toast__button-label">
           <span className="sonner-custom-toast__button-action">
             {actionText}
