@@ -13,7 +13,7 @@ import {
 } from "@mantine/core";
 import { useHotkeys } from "@mantine/hooks";
 import { api } from "../../utils/api";
-import { notifyError, notifyUndo } from "../../utils/notify";
+import { notifyApiError, notifyError, notifyUndo } from "../../utils/notify";
 import { SubtaskRow } from "../shared/SubtaskRow";
 
 export function SubtasksSection({
@@ -103,7 +103,10 @@ export function SubtasksSection({
       );
       onSubtaskChange?.();
     } catch (error) {
-      console.error(error);
+      notifyApiError({
+        error,
+        operation: "update subtask status"
+      });
     }
   }
 
@@ -120,7 +123,10 @@ export function SubtasksSection({
       );
       onSubtaskChange?.();
     } catch (error) {
-      console.error(error);
+      notifyApiError({
+        error,
+        operation: "update subtask"
+      });
     }
   }
 
