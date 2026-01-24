@@ -6,8 +6,10 @@ import {
   useMantineColorScheme,
 } from "@mantine/core";
 import { Toaster } from "sonner";
+import { ErrorBoundary } from "react-error-boundary";
 import "@mantine/core/styles.css";
 import App from "./App.jsx";
+import { RootErrorFallback } from "./components/errors/ErrorFallback.jsx";
 import "./styles/index.css";
 import "./styles/sonner.css";
 import "./styles/components.css";
@@ -56,7 +58,9 @@ function ThemedToaster() {
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <MantineProvider theme={theme} defaultColorScheme={getInitialColorScheme()}>
-      <App />
+      <ErrorBoundary FallbackComponent={RootErrorFallback}>
+        <App />
+      </ErrorBoundary>
       <ThemedToaster />
     </MantineProvider>
   </React.StrictMode>,
