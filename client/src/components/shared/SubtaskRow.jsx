@@ -25,8 +25,11 @@ export function SubtaskRow({
 
   return (
     <Group
+      className="subtask-row"
       gap="sm"
       p="xs"
+      data-pending={subtask._isPending ? "true" : undefined}
+      data-failing={subtask._isFailing ? "true" : undefined}
       style={{
         backgroundColor: "var(--bg-tertiary)",
         borderRadius: "4px",
@@ -61,13 +64,14 @@ export function SubtaskRow({
       />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
+          className={subtask.key ? undefined : "issue-key-pending"}
           style={{
             fontSize: "0.8rem",
             color: "var(--text-secondary)",
             marginBottom: "2px",
           }}
         >
-          {subtask.key}
+          {subtask.key || "..."}
         </div>
         <div
           style={{

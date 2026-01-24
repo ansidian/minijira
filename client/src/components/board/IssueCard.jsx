@@ -62,7 +62,9 @@ export function IssueCard({
     <div style={{ marginBottom: "0.5rem" }}>
       <Paper
         data-issue-card
-        className={dragging ? "dragging" : ""}
+        className={dragging ? "dragging" : "issue-card"}
+        data-pending={issue._isPending ? "true" : undefined}
+        data-failing={issue._isFailing ? "true" : undefined}
         onClick={() => onClick(issue)}
         onContextMenu={handleContextMenu}
         draggable
@@ -83,13 +85,14 @@ export function IssueCard({
         <Stack gap="xs">
           <Group justify="space-between" gap="xs">
             <div
+              className={issue.key ? undefined : "issue-key-pending"}
               style={{
                 fontSize: "0.75rem",
                 color: "var(--text-secondary)",
                 fontWeight: 500,
               }}
             >
-              {issue.key}
+              {issue.key || "Creating..."}
             </div>
           </Group>
           <div
