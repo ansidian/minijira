@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { ApiError, NetworkError } from "./api.js";
 
 export const CANVAS_DND_TOAST_ID = "canvas-dnd-override";
 export const dismissToast = (id) => toast.dismiss(id);
@@ -287,4 +288,43 @@ export const notifyUndo = ({
   });
 
   return () => toast.dismiss(id);
+};
+
+export const notifyApiError = ({ error, operation, onRetry }) => {
+  let title = `Failed to ${operation}`;
+  let description = "";
+  let showRetryButton = false;
+
+  if (error instanceof NetworkError) {
+    // Network errors - always show retry
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      description = "You appear to be offline";
+    } else {
+      description = "Network error";
+    }
+    showRetryButton = true;
+  } else if (error instanceof ApiError) {
+    // API errors - show server message and retry for 5xx only
+    const serverMessage = error.serverMessage || "";
+    const errorCode = `Error ${error.status}`;
+    description = serverMessage
+      ? `${serverMessage} (${errorCode})`
+      : errorCode;
+    showRetryButton = error.status >= 500;
+  } else {
+    // Unknown errors - show message, no retry
+    description = error.message || "An unexpected error occurred";
+    showRetryButton = false;
+  }
+
+  const duration = showRetryButton ? 7000 : 5000;
+
+  return showToast({
+    title,
+    description,
+    actionLabel: showRetryButton ? "Retry" : undefined,
+    onAction: showRetryButton ? onRetry : undefined,
+    duration,
+    type: "error",
+  });
 };
