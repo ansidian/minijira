@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-24)
 ## Current Position
 
 Phase: 8 of 8 (Data Management)
-Plan: 3 of 5 in current phase (Wave 3 in progress)
+Plan: 4 of 5 in current phase (Wave 3 in progress)
 Status: In progress
-Last activity: 2026-01-24 — Completed 08-03-PLAN.md
+Last activity: 2026-01-24 — Completed 08-04-PLAN.md
 
-Progress: [==============] 100.0% (10/9 plans complete across all phases)
+Progress: [==============] 100.0% (11/9 plans complete across all phases)
 
 ## Completed Milestones
 
@@ -52,6 +52,10 @@ Recent decisions affecting current work:
 - [v1.1]: Temporary IDs use crypto.randomUUID() with temp- prefix for collision resistance
 - [v1.1]: Optimistic issues tracked via _isPending flag for visual indicators
 - [v1.1]: Failed creates removed and stats reverted on error
+- [v1.1]: Snapshot entire issue for rollback, not just changed fields (simpler, more reliable)
+- [v1.1]: _iPending flag set during optimistic phase, removed when server confirms
+- [v1.1]: Stats updates are immediate for parent issues (consistent with status change UX)
+- [v1.1]: notifyApiError provides retry button instead of generic error toast
 
 ### Pending Todos
 
@@ -64,7 +68,7 @@ None.
 ## Session Continuity
 
 Last session: 2026-01-24
-Stopped at: Completed 08-03-PLAN.md
+Stopped at: Completed 08-04-PLAN.md
 Resume file: None
 
-**Next step:** Continue with remaining Phase 8 plans (08-04, 08-05) or proceed to next phase.
+**Next step:** Continue with remaining Phase 8 plan (08-05) to complete data management.

@@ -29,8 +29,13 @@ export function SubtasksSection({
   } = useSubtaskForm({
     parentIssue,
     currentUserId,
-    onSubtaskCreated: (newSubtask) => setSubtasks([...subtasks, newSubtask]),
+    onSubtaskCreated: () => {
+      // This callback is for non-optimistic side effects (e.g., updating parent stats)
+      // The subtasks state is updated optimistically inside the hook
+    },
     onSubtaskChange,
+    subtasks,
+    setSubtasks,
   });
 
   const { handleDelete } = useSubtaskDelete({
@@ -111,7 +116,7 @@ export function SubtasksSection({
         onUpdate={handleUpdate}
         onDelete={(subtaskId) => {
           const subtask = subtasks.find((s) => s.id === subtaskId);
-          handleDelete(subtaskId, subtask?.title || "", subtasks);
+          handleDelete(subtaskId, subtask?.title || "", parentIssue.id);
         }}
         isTouchDevice={isTouchDevice}
       />
