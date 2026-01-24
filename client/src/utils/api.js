@@ -2,6 +2,9 @@ import { ApiError, NetworkError } from "./ApiError.js";
 
 export const API_BASE = "/api";
 
+// Re-export error classes for convenient single-file imports
+export { ApiError, NetworkError };
+
 /**
  * Handle fetch response, checking status and parsing errors
  */
