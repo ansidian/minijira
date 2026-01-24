@@ -41,6 +41,20 @@ export function issuesReducer(state, action) {
       };
     case "ADD_ISSUE":
       return { ...state, issues: [action.value, ...state.issues] };
+    case "ADD_TO_ALL_ISSUES":
+      return { ...state, allIssues: [action.value, ...state.allIssues] };
+    case "UPDATE_IN_ALL_ISSUES":
+      return {
+        ...state,
+        allIssues: state.allIssues.map((issue) =>
+          issue.id === action.value.id ? action.value : issue,
+        ),
+      };
+    case "REMOVE_FROM_ALL_ISSUES":
+      return {
+        ...state,
+        allIssues: state.allIssues.filter((issue) => issue.id !== action.value),
+      };
     default:
       return state;
   }

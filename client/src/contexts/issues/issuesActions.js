@@ -46,13 +46,14 @@ export function createStatusChangeActions(dispatch, stateRef, deps) {
         await refreshSubtasksCache([updated.parent_id]);
       }
 
+      // Update allIssues with the updated issue
+      dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: updated });
+
       if (updated.parent_id) {
         const parentIssue = await api.get(`/issues/${updated.parent_id}`);
         dispatch({ type: "UPDATE_ISSUE", value: parentIssue });
+        dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: parentIssue });
       }
-
-      const allIssuesData = await api.get("/issues?include_subtasks=true");
-      dispatch({ type: "SET_ALL_ISSUES", value: allIssuesData });
 
       if (showUndo) {
         const issueTitle = currentIssue?.title || "item";
@@ -86,6 +87,7 @@ export function createIssueActions(dispatch, stateRef, deps) {
   const createIssue = async (data) => {
     const newIssue = await api.post("/issues", data);
     dispatch({ type: "ADD_ISSUE", value: newIssue });
+    dispatch({ type: "ADD_TO_ALL_ISSUES", value: newIssue });
 
     if (!data.parent_id) {
       const status = data.status || "todo";
@@ -97,10 +99,12 @@ export function createIssueActions(dispatch, stateRef, deps) {
           [status]: stateRef.current.stats[status] + 1,
         },
       });
+    } else {
+      // If subtask, update parent's subtask_count
+      const parentIssue = await api.get(`/issues/${data.parent_id}`);
+      dispatch({ type: "UPDATE_ISSUE", value: parentIssue });
+      dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: parentIssue });
     }
-
-    const allIssuesData = await api.get("/issues?include_subtasks=true");
-    dispatch({ type: "SET_ALL_ISSUES", value: allIssuesData });
 
     return newIssue;
   };
@@ -108,6 +112,7 @@ export function createIssueActions(dispatch, stateRef, deps) {
   const updateIssue = async (issueId, data) => {
     const updated = await api.patch(`/issues/${issueId}`, { ...data, user_id: currentUserId });
     dispatch({ type: "UPDATE_ISSUE", value: updated });
+    dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: updated });
 
     if (selectedIssue?.id === issueId) {
       setSelectedIssue?.(updated);
@@ -120,10 +125,8 @@ export function createIssueActions(dispatch, stateRef, deps) {
 
       const parentIssue = await api.get(`/issues/${updated.parent_id}`);
       dispatch({ type: "UPDATE_ISSUE", value: parentIssue });
+      dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: parentIssue });
     }
-
-    const allIssuesData = await api.get("/issues?include_subtasks=true");
-    dispatch({ type: "SET_ALL_ISSUES", value: allIssuesData });
 
     return updated;
   };

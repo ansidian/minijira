@@ -118,13 +118,7 @@ export function IssuesProvider({
   });
 
   const handleSubtaskChange = async (parentIdToExpand = null) => {
-    const [issuesData, allIssuesData] = await Promise.all([
-      api.get("/issues"),
-      api.get("/issues?include_subtasks=true"),
-    ]);
-    dispatch({ type: "SET_ISSUES", value: issuesData });
-    dispatch({ type: "SET_ALL_ISSUES", value: allIssuesData });
-
+    // Refresh only specific caches, not full issue list
     const issueIdsToRefresh = new Set(stateRef.current.expandedIssues);
 
     if (selectedIssue && !selectedIssue.parent_id) {
@@ -156,6 +150,8 @@ export function IssuesProvider({
     if (selectedIssue) {
       const updated = await api.get(`/issues/${selectedIssue.id}`);
       setSelectedIssue?.(updated);
+      dispatch({ type: "UPDATE_ISSUE", value: updated });
+      dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: updated });
     }
   };
 
