@@ -3,6 +3,7 @@ import db from "../db/connection.js";
 import sseManager from "../sse-manager.js";
 import { logActivity } from "../utils/activity-logger.js";
 import { issueSelectWithCounts, subtaskSelect } from "../utils/queries.js";
+import { queueNotification } from '../utils/notification-queue.js';
 
 const router = express.Router();
 
@@ -152,6 +153,22 @@ router.post("/", async (req, res) => {
     });
 
     res.status(201).json(rows[0]);
+
+    // Queue notification (don't await - don't block response)
+    queueNotification(
+      Number(result.lastInsertRowid),
+      reporter_id || 1,
+      'create',
+      {
+        action_type: 'issue_created',
+        issue_key: key,
+        issue_title: title,
+        description: description || null,
+        is_subtask: !!parent_id
+      }
+    ).catch(err => {
+      console.error('[Queue] Failed to queue issue creation:', err.message);
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -179,6 +196,9 @@ router.patch("/:id", async (req, res) => {
       return res.status(404).json({ error: "Issue not found" });
 
     const oldIssue = { ...existing[0] };
+
+    // Track changes for notification (separate from activity log)
+    const notificationChanges = [];
 
     const updates = [];
     const args = [];
@@ -269,6 +289,24 @@ router.patch("/:id", async (req, res) => {
           title !== undefined ? title : oldIssue.title
         );
       }
+
+      // Build notification changes - use structure matching extractChangesFromPayload
+      // Each change needs action_type for the recursive parser to work correctly
+      if (status !== undefined && oldIssue.status !== status) {
+        notificationChanges.push({ action_type: 'status_changed', old_value: oldIssue.status, new_value: status });
+      }
+      if (assignee_id !== undefined && String(oldIssue.assignee_id) !== String(assignee_id)) {
+        notificationChanges.push({ action_type: 'assignee_changed', old_value: oldIssue.assignee_id, new_value: assignee_id });
+      }
+      if (priority !== undefined && oldIssue.priority !== priority) {
+        notificationChanges.push({ action_type: 'priority_changed', old_value: oldIssue.priority, new_value: priority });
+      }
+      if (title !== undefined && oldIssue.title !== title) {
+        notificationChanges.push({ action_type: 'title_changed', old_value: oldIssue.title, new_value: title });
+      }
+      if (description !== undefined && oldIssue.description !== description) {
+        notificationChanges.push({ action_type: 'description_changed', old_value: oldIssue.description, new_value: description });
+      }
     }
 
     const { rows } = await db.execute({
@@ -287,6 +325,23 @@ router.patch("/:id", async (req, res) => {
     });
 
     res.json(rows[0]);
+
+    // Queue notification only if actual changes occurred
+    if (notificationChanges.length > 0) {
+      queueNotification(
+        parseInt(id),
+        user_id || 1,
+        'update',
+        {
+          action_type: 'issue_updated',
+          issue_key: oldIssue.key,
+          issue_title: title !== undefined ? title : oldIssue.title,
+          changes: notificationChanges
+        }
+      ).catch(err => {
+        console.error('[Queue] Failed to queue issue update:', err.message);
+      });
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -305,6 +360,16 @@ router.delete("/:id", async (req, res) => {
 
     const issue = existing[0];
     const isSubtask = issue.parent_id !== null;
+
+    // Capture subtask count before deletion (for notification)
+    let subtaskCount = 0;
+    if (!isSubtask) {
+      const { rows: subtasks } = await db.execute({
+        sql: "SELECT COUNT(*) as count FROM issues WHERE parent_id = ?",
+        args: [req.params.id]
+      });
+      subtaskCount = Number(subtasks[0].count);
+    }
 
     await logActivity(
       issue.id,
@@ -330,6 +395,22 @@ router.delete("/:id", async (req, res) => {
     });
 
     res.status(204).send();
+
+    // Queue notification (response already sent, runs async)
+    queueNotification(
+      Number(req.params.id),
+      user_id || 1,
+      'delete',
+      {
+        action_type: 'issue_deleted',
+        issue_key: issue.key,
+        issue_title: issue.title,
+        is_subtask: isSubtask,
+        subtasks_deleted: subtaskCount
+      }
+    ).catch(err => {
+      console.error('[Queue] Failed to queue issue deletion:', err.message);
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
