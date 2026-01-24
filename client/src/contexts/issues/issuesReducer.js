@@ -55,6 +55,38 @@ export function issuesReducer(state, action) {
         ...state,
         allIssues: state.allIssues.filter((issue) => issue.id !== action.value),
       };
+    case "REPLACE_TEMP_ISSUE":
+      // Replace optimistic issue with server-confirmed issue
+      // action: { tempId: string, value: Issue }
+      return {
+        ...state,
+        issues: state.issues.map((issue) =>
+          issue.id === action.tempId ? action.value : issue,
+        ),
+        allIssues: state.allIssues.map((issue) =>
+          issue.id === action.tempId ? action.value : issue,
+        ),
+      };
+    case "REMOVE_ISSUE":
+      // Remove issue by ID (for failed optimistic creates)
+      // action: { id: string|number }
+      return {
+        ...state,
+        issues: state.issues.filter((issue) => issue.id !== action.id),
+        allIssues: state.allIssues.filter((issue) => issue.id !== action.id),
+      };
+    case "SET_ISSUE_PENDING":
+      // Toggle _isPending flag on issue
+      // action: { id: string|number, pending: boolean }
+      return {
+        ...state,
+        issues: state.issues.map((issue) =>
+          issue.id === action.id ? { ...issue, _isPending: action.pending } : issue,
+        ),
+        allIssues: state.allIssues.map((issue) =>
+          issue.id === action.id ? { ...issue, _isPending: action.pending } : issue,
+        ),
+      };
     default:
       return state;
   }
