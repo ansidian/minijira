@@ -140,6 +140,18 @@ async function processReadyNotifications() {
         // Prepare payload (fetches issue, user, subtasks)
         const payload = await prepareNotificationPayload(notification, db);
 
+        // Check if notification should be skipped (net-zero changes)
+        if (payload.skip) {
+          console.log(`[Queue Processor] Skipping notification ${notification.id} - ${payload.reason}`);
+          await db.execute({
+            sql: `UPDATE notification_queue
+                  SET status = 'sent', sent_at = datetime('now')
+                  WHERE id = ?`,
+            args: [notification.id]
+          });
+          continue;
+        }
+
         // Send to Discord
         const result = await sendDiscordNotification(webhookUrl, payload);
 

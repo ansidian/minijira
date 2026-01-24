@@ -255,6 +255,11 @@ export async function prepareNotificationPayload(notificationRow, dbClient) {
   // Extract changes from event payload
   const changes = extractChangesFromPayload(eventPayload, notificationRow.event_type);
 
+  // Skip notification if all changes were filtered out (net-zero)
+  if (changes.length === 0) {
+    return { skip: true, reason: 'net-zero changes' };
+  }
+
   // Add description for created events
   if (eventPayload.action_type === 'issue_created' && eventPayload.description) {
     options.description = eventPayload.description;
