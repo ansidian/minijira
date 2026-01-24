@@ -8,6 +8,8 @@ import commentsRouter from "./routes/comments-routes.js";
 import activityRouter from "./routes/activity-routes.js";
 import statsRouter from "./routes/stats-routes.js";
 import eventsRouter from "./routes/events-routes.js";
+import notificationsRouter from './routes/notifications-routes.js';
+import { startQueueProcessor, stopQueueProcessor } from "./utils/queue-processor.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -28,6 +30,7 @@ app.use("/api/issues", commentsRouter);
 app.use("/api/activity", activityRouter);
 app.use("/api/stats", statsRouter);
 app.use("/api/events", eventsRouter);
+app.use('/api/notifications', notificationsRouter);
 
 if (process.env.NODE_ENV === "production") {
   app.get("*", (req, res) => {
@@ -35,6 +38,17 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`✓ MiniJira API running at http://localhost:${PORT}`);
+  startQueueProcessor();
+});
+
+// Clean shutdown handler
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down...');
+  stopQueueProcessor();
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
 });
