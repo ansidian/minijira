@@ -12,6 +12,8 @@ export function useIssueDelete({
   getCurrentUserId,
 }) {
   const pendingDeletesRef = useRef(new Map());
+  // Track issues with in-progress API calls to prevent concurrent deletes
+  const deletingNowRef = useRef(new Set());
 
   const deleteIssue = async (issueId) => {
     const userId = getCurrentUserId();
@@ -20,6 +22,11 @@ export function useIssueDelete({
       stateRef.current.allIssues.find((i) => i.id === issueId);
 
     if (!deletedIssue) return;
+
+    // Prevent deletion if API call already in progress
+    if (deletingNowRef.current.has(issueId)) {
+      return;
+    }
 
     const existingPending = pendingDeletesRef.current.get(issueId);
     if (existingPending) {
@@ -81,6 +88,8 @@ export function useIssueDelete({
     dispatch({ type: "SET_SUBTASKS_CACHE", value: optimisticCache });
 
     const timeoutId = setTimeout(async () => {
+      // Mark as actively deleting to prevent concurrent operations
+      deletingNowRef.current.add(issueId);
       try {
         await api.delete(`/issues/${issueId}`, { user_id: userId });
 
@@ -139,6 +148,7 @@ export function useIssueDelete({
         setSelectedIssue?.(snapshot.selectedIssue || null);
         onError("Failed to delete issue.");
       } finally {
+        deletingNowRef.current.delete(issueId);
         pendingDeletesRef.current.delete(issueId);
       }
     }, 7000);
@@ -149,6 +159,8 @@ export function useIssueDelete({
       title: isParentIssue ? "Issue deleted" : "Subtask deleted",
       message: `Deleted "${deletedIssue.title}".`,
       onUndo: () => {
+        // Can't undo if API call is already in progress
+        if (deletingNowRef.current.has(issueId)) return;
         const pending = pendingDeletesRef.current.get(issueId);
         if (!pending) return;
         clearTimeout(pending.timeoutId);

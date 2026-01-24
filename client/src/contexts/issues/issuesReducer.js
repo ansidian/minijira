@@ -21,8 +21,18 @@ export function issuesReducer(state, action) {
       return { ...state, issues: action.value };
     case "SET_ALL_ISSUES":
       return { ...state, allIssues: action.value };
-    case "SET_STATS":
-      return { ...state, stats: action.value };
+    case "SET_STATS": {
+      // Normalize stats with defaults to handle malformed API responses
+      const rawStats = action.value || {};
+      const normalizedStats = {
+        total: Number(rawStats.total) || 0,
+        todo: Number(rawStats.todo) || 0,
+        in_progress: Number(rawStats.in_progress) || 0,
+        review: Number(rawStats.review) || 0,
+        done: Number(rawStats.done) || 0,
+      };
+      return { ...state, stats: normalizedStats };
+    }
     case "SET_EXPANDED_ISSUES":
       return { ...state, expandedIssues: new Set(action.value) };
     case "SET_SUBTASKS_CACHE":

@@ -67,102 +67,137 @@ export function ActivityProvider({ children }) {
   });
 
   useEffect(() => {
-    const eventSource = new EventSource(`${API_BASE}/events`);
+    let eventSource = null;
     let isInitialConnection = true;
 
-    eventSource.onopen = () => {
-      console.log("SSE connected");
-      if (!isInitialConnection) {
-        loadDataRef.current();
-      }
-      isInitialConnection = false;
-    };
-
-    eventSource.onmessage = async (event) => {
-      try {
-        const data = JSON.parse(event.data);
-
-        if (data.type === "connected") {
-          return;
+    const setupEventHandlers = (es) => {
+      es.onopen = () => {
+        console.log("SSE connected");
+        if (!isInitialConnection) {
+          loadDataRef.current();
         }
+        isInitialConnection = false;
+      };
 
-        console.log("SSE event received:", data);
+      es.onmessage = async (event) => {
+        try {
+          const data = JSON.parse(event.data);
 
-        await loadDataRef.current();
-
-        const isSelfEvent =
-          currentUserId &&
-          data.userId &&
-          Number(data.userId) === Number(currentUserId);
-
-        if (
-          data.type === "issue_created" ||
-          data.type === "issue_updated" ||
-          data.type === "issue_deleted"
-        ) {
-          setStatsBadgeAnimate(true);
-          setTimeout(() => setStatsBadgeAnimate(false), 300);
-          if (!isSelfEvent) {
-            dispatch({ type: "SET_HAS_NEW_ACTIVITY", value: true });
-          }
-        }
-
-        if (data.type === "issue_deleted") {
-          const newExpanded = new Set(expandedIssuesRef.current);
-          if (newExpanded.has(data.issueId)) {
-            newExpanded.delete(data.issueId);
-            setExpandedIssues(newExpanded);
+          if (data.type === "connected") {
+            return;
           }
 
-          if (subtasksCacheRef.current[data.issueId]) {
+          console.log("SSE event received:", data);
+
+          await loadDataRef.current();
+
+          const isSelfEvent =
+            currentUserId &&
+            data.userId &&
+            Number(data.userId) === Number(currentUserId);
+
+          if (
+            data.type === "issue_created" ||
+            data.type === "issue_updated" ||
+            data.type === "issue_deleted"
+          ) {
+            setStatsBadgeAnimate(true);
+            setTimeout(() => setStatsBadgeAnimate(false), 300);
+            if (!isSelfEvent) {
+              dispatch({ type: "SET_HAS_NEW_ACTIVITY", value: true });
+            }
+          }
+
+          if (data.type === "issue_deleted") {
+            const newExpanded = new Set(expandedIssuesRef.current);
+            if (newExpanded.has(data.issueId)) {
+              newExpanded.delete(data.issueId);
+              setExpandedIssues(newExpanded);
+            }
+
+            if (subtasksCacheRef.current[data.issueId]) {
+              const newCache = { ...subtasksCacheRef.current };
+              delete newCache[data.issueId];
+              setSubtasksCache(newCache);
+            }
+          }
+
+          const parentsToRefresh = new Set(expandedIssuesRef.current);
+          if (data.parentId) {
+            parentsToRefresh.add(data.parentId);
+          }
+          if (data.type === "issue_deleted") {
+            parentsToRefresh.delete(data.issueId);
+          }
+
+          if (parentsToRefresh.size > 0) {
+            const parentIds = Array.from(parentsToRefresh);
+            const results = await Promise.all(
+              parentIds.map(async (issueId) => {
+                try {
+                  const subtasks = await fetchSubtasksForParent(issueId);
+                  return { issueId, subtasks };
+                } catch (error) {
+                  console.error(
+                    `Failed to fetch subtasks for issue ${issueId}:`,
+                    error
+                  );
+                  return { issueId, subtasks: [] };
+                }
+              })
+            );
+
             const newCache = { ...subtasksCacheRef.current };
-            delete newCache[data.issueId];
+            for (const { issueId, subtasks } of results) {
+              newCache[issueId] = subtasks;
+            }
             setSubtasksCache(newCache);
           }
+        } catch (error) {
+          console.error("Error processing SSE event:", error);
         }
+      };
 
-        const parentsToRefresh = new Set(expandedIssuesRef.current);
-        if (data.parentId) {
-          parentsToRefresh.add(data.parentId);
-        }
-        if (data.type === "issue_deleted") {
-          parentsToRefresh.delete(data.issueId);
-        }
+      es.onerror = (error) => {
+        console.error("SSE error:", error);
+      };
+    };
 
-        if (parentsToRefresh.size > 0) {
-          const parentIds = Array.from(parentsToRefresh);
-          const results = await Promise.all(
-            parentIds.map(async (issueId) => {
-              try {
-                const subtasks = await fetchSubtasksForParent(issueId);
-                return { issueId, subtasks };
-              } catch (error) {
-                console.error(
-                  `Failed to fetch subtasks for issue ${issueId}:`,
-                  error
-                );
-                return { issueId, subtasks: [] };
-              }
-            })
-          );
+    const connect = () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+      eventSource = new EventSource(`${API_BASE}/events`);
+      setupEventHandlers(eventSource);
+    };
 
-          const newCache = { ...subtasksCacheRef.current };
-          for (const { issueId, subtasks } of results) {
-            newCache[issueId] = subtasks;
-          }
-          setSubtasksCache(newCache);
-        }
-      } catch (error) {
-        console.error("Error processing SSE event:", error);
+    const disconnect = () => {
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
       }
     };
 
-    eventSource.onerror = (error) => {
-      console.error("SSE error:", error);
+    // Handle tab visibility to save battery
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        // Reconnect when tab becomes visible
+        connect();
+      } else {
+        // Disconnect when tab is hidden to save battery
+        disconnect();
+      }
     };
 
+    // Initial connection
+    connect();
+
+    // Listen for visibility changes
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
-      eventSource.close();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      disconnect();
     };
   }, [
     fetchSubtasksForParent,
