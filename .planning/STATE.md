@@ -4,23 +4,24 @@
 
 See: .planning/PROJECT.md (updated 2026-01-24)
 
-**Core value:** Improved code quality, testability, and reliability
-**Current focus:** Phase 8 complete - Milestone ready for audit
+**Core value:** Team visibility into MiniJira activity via Discord without notification spam
+**Current focus:** Phase 9 - API Performance
 
 ## Current Position
 
-Phase: 8 of 8 (Data Management) ✓
-Plan: 5 of 5 in current phase (complete)
-Status: Phase complete and verified
-Last activity: 2026-01-24 — Completed quick task 001: Fix retry toast button centering
+Phase: 9 of 12 (API Performance)
+Plan: 1 of 2
+Status: In progress
+Last activity: 2026-01-24 — Completed 09-01-PLAN.md (Batch Subtasks and Conditional Counts)
 
-Progress: [==============] 100.0% (12/12 plans complete across all phases)
+Progress: [████████░░] 67% (8/12 phases complete)
 
 ## Completed Milestones
 
 | Version | Name | Phases | Shipped |
 |---------|------|--------|---------|
 | v1.0 | Discord Integration | 1-4 | 2026-01-24 |
+| v1.1 | Tech Debt Cleanup | 5-8 | 2026-01-24 |
 
 See: .planning/MILESTONES.md for details.
 
@@ -33,32 +34,11 @@ Recent decisions affecting current work:
 
 - [v1.0]: Native fetch over axios for HTTP client
 - [v1.0]: Database queue over in-memory for persistence
-- [v1.1]: ApiError includes HTTP method in message for debugging context
-- [v1.1]: Error classes re-exported from api.js for single-file imports
-- [v1.1]: Category property distinguishes network/client/server errors
-- [v1.1]: Retry button shown for network errors and 5xx server errors only, not client errors
-- [v1.1]: ThemedToaster placed outside ErrorBoundary so toasts work during error states
-- [v1.1]: Subtask status and field update errors show specific operation names in toast
-- [v1.1]: Activity log fetch errors show 'load activity log' operation name
-- [v1.1]: Desktop subtask toggle kept inline in Header.jsx (part of core layout)
-- [v1.1]: Custom hooks extract complex state logic for reusability and testability
-- [v1.1]: Presentational components separate UI from business logic for composition
-- [v1.1]: Cache manager receives state and setter from parent, doesn't own state
-- [v1.1]: Functional state updates handled via wrapper in IssuesContext for cache operations
-- [v1.1]: Fetch deduplication integrated into cache manager from old useSubtaskCache
+- [v1.1]: Subtasks cache centralized with clear ownership patterns
 - [v1.1]: Server response data trusted as source of truth for mutations
-- [v1.1]: Full refetch only on tab visibility after 30+ seconds inactive
-- [v1.1]: Parent issue fetched only for subtask_count updates, not full list
-- [v1.1]: Temporary IDs use crypto.randomUUID() with temp- prefix for collision resistance
-- [v1.1]: Optimistic issues tracked via _isPending flag for visual indicators
-- [v1.1]: Failed creates removed and stats reverted on error
-- [v1.1]: Snapshot entire issue for rollback, not just changed fields (simpler, more reliable)
-- [v1.1]: _iPending flag set during optimistic phase, removed when server confirms
-- [v1.1]: Stats updates are immediate for parent issues (consistent with status change UX)
-- [v1.1]: notifyApiError provides retry button instead of generic error toast
-- [v1.1]: Subtask hooks use local state for modal context, not cache manager
-- [v1.1]: Ghost animation duration 500ms for visual closure on failed creates
-- [v1.1]: Rollback restores subtask at original position for better UX
+- [v1.1]: Optimistic updates provide instant feedback for common operations
+- [v1.2]: Batch subtasks endpoint returns grouped object by parent ID
+- [v1.2]: with_counts defaults to true for backwards compatibility
 
 ### Pending Todos
 
@@ -73,11 +53,12 @@ None.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 001 | Fix retry toast button centering | 2026-01-24 | e1fc2a1 | [001-fix-retry-toast-button-centering](./quick/001-fix-retry-toast-button-centering/) |
+| 002 | Cancel zero-net-change notifications | 2026-01-24 | 3b86b6f | [002-cancel-zero-net-change-notifications](./quick/002-cancel-zero-net-change-notifications/) |
 
 ## Session Continuity
 
 Last session: 2026-01-24
-Stopped at: Phase 8 complete - all 5 plans executed, verified
+Stopped at: Completed 09-01-PLAN.md
 Resume file: None
 
-**Next step:** Run `/gsd:audit-milestone` to verify requirements, cross-phase integration, and E2E flows before archiving v1.1.
+**Next step:** Execute 09-02-PLAN.md (Frontend batch adoption).

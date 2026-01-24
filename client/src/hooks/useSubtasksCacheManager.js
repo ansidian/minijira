@@ -158,6 +158,31 @@ export function useSubtasksCacheManager(cacheState, setCacheState) {
     return fetchPromise;
   }, []);
 
+  /**
+   * Fetch subtasks for multiple parent issues in a single request.
+   * Returns grouped object: { [parentId]: subtasks[] }
+   * @param {Array<number>} parentIds - Array of parent issue IDs
+   * @returns {Promise<Object>} Object mapping parent IDs to subtask arrays
+   */
+  const fetchSubtasksBatch = useCallback(
+    async (parentIds) => {
+      if (!parentIds || parentIds.length === 0) {
+        return {};
+      }
+
+      // For single parent, use existing function (already has deduplication)
+      if (parentIds.length === 1) {
+        const subtasks = await fetchSubtasksForParent(parentIds[0]);
+        return { [parentIds[0]]: subtasks };
+      }
+
+      // Batch fetch for multiple parents
+      const idsParam = parentIds.join(",");
+      return api.get(`/issues/subtasks/batch?parent_ids=${idsParam}`);
+    },
+    [fetchSubtasksForParent],
+  );
+
   return {
     getCached,
     setCached,
@@ -167,5 +192,6 @@ export function useSubtasksCacheManager(cacheState, setCacheState) {
     addCachedSubtask,
     removeCachedSubtask,
     fetchSubtasksForParent,
+    fetchSubtasksBatch,
   };
 }
