@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-24)
 ## Current Position
 
 Phase: 8 of 8 (Data Management)
-Plan: 4 of 5 in current phase (Wave 3 in progress)
-Status: In progress
-Last activity: 2026-01-24 — Completed 08-04-PLAN.md
+Plan: 5 of 5 in current phase (Wave 4 complete)
+Status: Phase complete
+Last activity: 2026-01-24 — Completed 08-05-PLAN.md
 
-Progress: [==============] 100.0% (11/9 plans complete across all phases)
+Progress: [==============] 100.0% (12/12 plans complete across all phases)
 
 ## Completed Milestones
 
@@ -56,6 +56,9 @@ Recent decisions affecting current work:
 - [v1.1]: _iPending flag set during optimistic phase, removed when server confirms
 - [v1.1]: Stats updates are immediate for parent issues (consistent with status change UX)
 - [v1.1]: notifyApiError provides retry button instead of generic error toast
+- [v1.1]: Subtask hooks use local state for modal context, not cache manager
+- [v1.1]: Ghost animation duration 500ms for visual closure on failed creates
+- [v1.1]: Rollback restores subtask at original position for better UX
 
 ### Pending Todos
 
@@ -68,7 +71,7 @@ None.
 ## Session Continuity
 
 Last session: 2026-01-24
-Stopped at: Completed 08-04-PLAN.md
+Stopped at: Completed 08-05-PLAN.md (Phase 8 complete)
 Resume file: None
 
-**Next step:** Continue with remaining Phase 8 plan (08-05) to complete data management.
+**Next step:** Phase 8 (Data Management) complete. All optimistic update patterns implemented and tested.
