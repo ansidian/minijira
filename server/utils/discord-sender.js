@@ -117,6 +117,14 @@ export async function sendDiscordNotification(webhookUrl, embed) {
 
 /**
  * Extract changes array from event payload
+ *
+ * Supports all MiniJira event types and structures:
+ * - update events: status_changed, assignee_changed, priority_changed (with old/new values)
+ * - comment events: comment_added (with comment_body)
+ * - create events: issue_created (with optional description)
+ * - delete events: issue_deleted (with issue metadata)
+ * - grouped events: Multiple changes in a single payload (for EMBED-05 batching)
+ *
  * @param {Object} eventPayload - Parsed event_payload JSON
  * @param {string} eventType - Event type (update, create, delete, comment)
  * @returns {Array<{type, old?, new?, value?}>} Changes array for embed builder
