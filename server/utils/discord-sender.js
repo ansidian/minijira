@@ -5,7 +5,6 @@
  * Prepares notification payloads with subtask summaries and event parsing.
  */
 
-import db from '../db/connection.js';
 import { buildEmbed } from './discord-embed-builder.js';
 
 /**
@@ -140,7 +139,10 @@ export function extractChangesFromPayload(eventPayload, eventType) {
     priority_changed: 'priority',
     comment_added: 'comment',
     issue_created: 'created',
-    issue_deleted: 'deleted'
+    issue_deleted: 'deleted',
+    subtask_created: 'created',
+    subtask_updated: 'subtask_updated',
+    subtask_deleted: 'deleted'
   };
 
   const changeType = actionTypeMap[actionType] || actionType;
@@ -151,14 +153,33 @@ export function extractChangesFromPayload(eventPayload, eventType) {
       type: 'comment',
       value: eventPayload.comment_body
     });
-  } else if (actionType === 'issue_created') {
+  } else if (actionType === 'issue_created' || actionType === 'subtask_created') {
     changes.push({
-      type: 'created'
+      type: 'created',
+      isSubtask: actionType === 'subtask_created' || eventPayload.is_subtask || false,
+      title: eventPayload.issue_title || null
     });
-  } else if (actionType === 'issue_deleted') {
+  } else if (actionType === 'issue_deleted' || actionType === 'subtask_deleted') {
     changes.push({
-      type: 'deleted'
+      type: 'deleted',
+      isSubtask: actionType === 'subtask_deleted' || eventPayload.is_subtask || false,
+      title: eventPayload.issue_title || null
     });
+  } else if (actionType === 'subtask_updated') {
+    // Subtask updates contain a changes array with the actual field changes
+    // Process them with isSubtask flag so they're labeled as subtask changes
+    if (Array.isArray(eventPayload.changes)) {
+      eventPayload.changes.forEach(change => {
+        const subChangeType = actionTypeMap[change.action_type] || change.action_type;
+        changes.push({
+          type: subChangeType,
+          old: change.old_value,
+          new: change.new_value,
+          isSubtask: true,
+          subtaskKey: eventPayload.issue_key
+        });
+      });
+    }
   } else if (eventPayload.old_value !== undefined && eventPayload.new_value !== undefined) {
     // Standard update event with old/new values
     changes.push({
@@ -166,10 +187,9 @@ export function extractChangesFromPayload(eventPayload, eventType) {
       old: eventPayload.old_value,
       new: eventPayload.new_value
     });
-  }
-
-  // Handle grouped events (array of changes)
-  if (Array.isArray(eventPayload.changes)) {
+  } else if (Array.isArray(eventPayload.changes)) {
+    // Handle grouped events (array of changes from merged payloads)
+    // Only process if not already handled above (e.g., subtask_updated)
     eventPayload.changes.forEach(change => {
       const subChanges = extractChangesFromPayload(change, eventType);
       changes.push(...subChanges);

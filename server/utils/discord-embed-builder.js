@@ -88,8 +88,21 @@ export function formatChange(oldVal, newVal, type = null) {
 }
 
 /**
+ * Format field name for display
+ * Capitalizes first letter and replaces underscores with spaces
+ * @param {string} type - Field type (e.g., 'description_changed')
+ * @returns {string} Formatted name (e.g., 'Description Changed')
+ */
+function formatFieldName(type) {
+  return type
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+/**
  * Build Discord fields array from changes
- * @param {Array} changes - Array of {type, old, new, value?}
+ * @param {Array} changes - Array of {type, old, new, value?, isSubtask?, title?}
  * @returns {Array} Discord fields with name, value, inline
  */
 export function formatChangeFields(changes) {
@@ -112,25 +125,50 @@ export function formatChangeFields(changes) {
   });
 
   return sortedChanges.map(change => {
-    const { type, old, new: newVal, value } = change;
+    const { type, old, new: newVal, value, isSubtask, title, subtaskKey } = change;
 
     // Handle comment fields
     if (type === 'comment') {
       return {
-        name: 'Comment',
+        name: 'Comment Added',
         value: truncate(value || newVal || '', 200),
         inline: false
       };
     }
 
-    // Format field name (capitalize first letter)
-    const fieldName = type.charAt(0).toUpperCase() + type.slice(1);
+    // Handle created events
+    if (type === 'created') {
+      const itemType = isSubtask ? 'Subtask' : 'Issue';
+      return {
+        name: `${itemType} Created`,
+        value: title ? `"${truncate(title, 100)}"` : 'New item',
+        inline: false
+      };
+    }
+
+    // Handle deleted events
+    if (type === 'deleted') {
+      const itemType = isSubtask ? 'Subtask' : 'Issue';
+      return {
+        name: `${itemType} Deleted`,
+        value: title ? `"${truncate(title, 100)}"` : 'Item removed',
+        inline: false
+      };
+    }
+
+    // Format field name (capitalize and replace underscores)
+    let fieldName = formatFieldName(type);
+
+    // Prefix with subtask key for subtask field changes
+    if (isSubtask && subtaskKey) {
+      fieldName = `${subtaskKey} ${fieldName}`;
+    }
 
     // Format the change
     const fieldValue = formatChange(old, newVal, type);
 
-    // Short fields are inline (assignee, status, priority)
-    const isShortField = ['assignee', 'status', 'priority'].includes(type);
+    // Short fields are inline (assignee, status, priority) - but not subtask changes
+    const isShortField = !isSubtask && ['assignee', 'status', 'priority'].includes(type);
 
     return {
       name: fieldName,
@@ -138,6 +176,52 @@ export function formatChangeFields(changes) {
       inline: isShortField
     };
   });
+}
+
+/**
+ * Format timestamp to PST timezone string
+ * @param {string|Date} timestamp - ISO 8601 timestamp or SQLite datetime string
+ * @returns {string} Formatted time in PST (e.g., "Jan 24, 10:36 AM PST")
+ */
+function formatPSTTime(timestamp) {
+  const date = parseTimestamp(timestamp);
+  return date.toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  }) + ' PST';
+}
+
+/**
+ * Parse timestamp ensuring UTC interpretation
+ * SQLite datetime() returns UTC without timezone indicator (e.g., "2026-01-24 16:26:00")
+ * JavaScript's Date() would parse this as local time, causing incorrect times
+ * @param {string|Date} timestamp - ISO 8601 timestamp or SQLite datetime string
+ * @returns {Date} Date object with correct UTC interpretation
+ */
+function parseTimestamp(timestamp) {
+  if (timestamp instanceof Date) {
+    return timestamp;
+  }
+  // If timestamp doesn't have timezone indicator, treat as UTC
+  if (typeof timestamp === 'string' && !timestamp.endsWith('Z') && !timestamp.includes('+') && !timestamp.includes('-', 10)) {
+    return new Date(timestamp + 'Z');
+  }
+  return new Date(timestamp);
+}
+
+/**
+ * Format timestamp as Discord relative time syntax
+ * @param {string|Date} timestamp - ISO 8601 timestamp or SQLite datetime string
+ * @returns {string} Discord timestamp syntax (e.g., "<t:1706123456:R>" renders as "2 minutes ago")
+ */
+function formatDiscordRelativeTime(timestamp) {
+  const date = parseTimestamp(timestamp);
+  const unixSeconds = Math.floor(date.getTime() / 1000);
+  return `<t:${unixSeconds}:R>`;
 }
 
 /**
@@ -185,12 +269,12 @@ export function buildEmbed(issue, changes, user, timestamp, options = {}) {
   const embed = {
     title: `[${issue.key}] ${issue.title}`,
     url: `${process.env.APP_URL || 'http://localhost:5173'}/issues/${issue.id}`,
+    description: formatDiscordRelativeTime(timestamp),
     color: color,
     fields: fields,
     footer: {
-      text: `Changed by ${user.name}`
-    },
-    timestamp: new Date(timestamp).toISOString()
+      text: `Changed by ${user.name} • ${formatPSTTime(timestamp)}`
+    }
   };
 
   return {

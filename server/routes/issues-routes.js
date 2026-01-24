@@ -155,12 +155,13 @@ router.post("/", async (req, res) => {
     res.status(201).json(rows[0]);
 
     // Queue notification (don't await - don't block response)
+    // Subtasks queue under parent's ID so they merge with parent notifications
     queueNotification(
-      Number(result.lastInsertRowid),
+      parent_id ? Number(parent_id) : Number(result.lastInsertRowid),
       reporter_id || 1,
       'create',
       {
-        action_type: 'issue_created',
+        action_type: parent_id ? 'subtask_created' : 'issue_created',
         issue_key: key,
         issue_title: title,
         description: description || null,
@@ -327,15 +328,18 @@ router.patch("/:id", async (req, res) => {
     res.json(rows[0]);
 
     // Queue notification only if actual changes occurred
+    // Subtasks queue under parent's ID so they merge with parent notifications
     if (notificationChanges.length > 0) {
+      const isSubtask = !!oldIssue.parent_id;
       queueNotification(
-        parseInt(id),
+        isSubtask ? Number(oldIssue.parent_id) : parseInt(id),
         user_id || 1,
         'update',
         {
-          action_type: 'issue_updated',
+          action_type: isSubtask ? 'subtask_updated' : 'issue_updated',
           issue_key: oldIssue.key,
           issue_title: title !== undefined ? title : oldIssue.title,
+          is_subtask: isSubtask,
           changes: notificationChanges
         }
       ).catch(err => {
@@ -397,12 +401,13 @@ router.delete("/:id", async (req, res) => {
     res.status(204).send();
 
     // Queue notification (response already sent, runs async)
+    // Subtasks queue under parent's ID so they merge with parent notifications
     queueNotification(
-      Number(req.params.id),
+      isSubtask ? Number(issue.parent_id) : Number(req.params.id),
       user_id || 1,
       'delete',
       {
-        action_type: 'issue_deleted',
+        action_type: isSubtask ? 'subtask_deleted' : 'issue_deleted',
         issue_key: issue.key,
         issue_title: issue.title,
         is_subtask: isSubtask,

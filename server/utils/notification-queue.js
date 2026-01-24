@@ -1,10 +1,40 @@
 import db from '../db/connection.js';
 
+// Timing configuration for notification debouncing
+const DEBOUNCE_WINDOW = '+60 seconds';  // Sliding window - each new event resets timer
+const MAX_WAIT = '+3 minutes';          // Maximum wait from first event in batch
+
+/**
+ * Merge a new event into an existing payload's changes array.
+ * Deduplicates by action_type (later change of same type wins).
+ * @param {object} existingPayload - Existing event_payload from queue
+ * @param {object} newPayload - New event to merge
+ * @returns {object} Merged payload with changes array
+ */
+function mergePayloads(existingPayload, newPayload) {
+  // Get existing changes array, or convert single event to array
+  let changes = existingPayload.changes || [existingPayload];
+
+  // Check if we already have a change of this type
+  const existingIndex = changes.findIndex(c => c.action_type === newPayload.action_type);
+
+  if (existingIndex >= 0) {
+    // Replace existing change of same type (e.g., multiple status changes → keep latest)
+    changes[existingIndex] = newPayload;
+  } else {
+    // Add new change type
+    changes.push(newPayload);
+  }
+
+  return { changes };
+}
+
 /**
  * Queue a notification for an issue activity event.
  * Uses UPSERT to implement sliding window debounce with max-wait:
- * - 30-second sliding window: each new event resets the timer
- * - 3-minute max-wait: from first event in batch, notification sends regardless
+ * - DEBOUNCE_WINDOW: each new event resets the timer
+ * - MAX_WAIT: from first event in batch, notification sends regardless
+ * - Multiple changes within window are merged into a single notification
  *
  * @param {number} issueId - The issue ID
  * @param {number} userId - The user who performed the action
@@ -15,36 +45,36 @@ export async function queueNotification(issueId, userId, eventType, eventPayload
   // Check if a pending notification already exists for this issue+user
   const existing = await db.execute({
     sql: `
-      SELECT id, first_queued_at FROM notification_queue
+      SELECT id, first_queued_at, event_payload FROM notification_queue
       WHERE issue_id = ? AND user_id = ? AND status = 'pending'
       LIMIT 1
     `,
-    args: [issueId, userId]
+    args: [issueId, userId],
   });
 
   if (existing.rows.length > 0) {
+    // Merge new change into existing payload
+    const existingPayload = JSON.parse(existing.rows[0].event_payload);
+    const mergedPayload = mergePayloads(existingPayload, eventPayload);
+
     // Update existing pending notification (sliding window with max-wait cap)
-    // scheduled_at = minimum of (now + 30s) or (first_queued_at + 3min)
+    // scheduled_at = minimum of (now + DEBOUNCE_WINDOW) or (first_queued_at + MAX_WAIT)
     await db.execute({
       sql: `
         UPDATE notification_queue
         SET scheduled_at = MIN(
-              datetime('now', '+30 seconds'),
-              datetime(first_queued_at, '+3 minutes')
+              datetime('now', '${DEBOUNCE_WINDOW}'),
+              datetime(first_queued_at, '${MAX_WAIT}')
             ),
             event_payload = ?,
             event_type = ?
         WHERE id = ?
       `,
-      args: [
-        JSON.stringify(eventPayload),
-        eventType,
-        existing.rows[0].id
-      ]
+      args: [JSON.stringify(mergedPayload), eventType, existing.rows[0].id],
     });
   } else {
     // Insert new notification
-    // First event: scheduled_at = now + 30s, first_queued_at = now
+    // First event: scheduled_at = now + DEBOUNCE_WINDOW, first_queued_at = now
     await db.execute({
       sql: `
         INSERT INTO notification_queue (
@@ -55,14 +85,9 @@ export async function queueNotification(issueId, userId, eventType, eventPayload
           scheduled_at,
           first_queued_at,
           status
-        ) VALUES (?, ?, ?, ?, datetime('now', '+30 seconds'), datetime('now'), 'pending')
+        ) VALUES (?, ?, ?, ?, datetime('now', '${DEBOUNCE_WINDOW}'), datetime('now'), 'pending')
       `,
-      args: [
-        issueId,
-        userId,
-        eventType,
-        JSON.stringify(eventPayload)
-      ]
+      args: [issueId, userId, eventType, JSON.stringify(eventPayload)],
     });
   }
 }
