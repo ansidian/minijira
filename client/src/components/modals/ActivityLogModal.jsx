@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Avatar, Badge, Modal, Stack } from "@mantine/core";
 import { api } from "../../utils/api";
+import { notifyApiError } from "../../utils/notify";
 import {
   formatActivityDescription,
   relativeTime,
@@ -34,7 +35,10 @@ export function ActivityLogModal({ opened, onClose, onViewIssue }) {
       const data = await api.get("/activity?limit=20");
       setActivities(data);
     } catch (error) {
-      console.error("Failed to fetch activity:", error);
+      notifyApiError({
+        error,
+        operation: "load activity log"
+      });
     }
     setLoading(false);
   }
