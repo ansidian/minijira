@@ -136,6 +136,13 @@ async function init() {
       WHERE status IN ('sent', 'failed')
   `);
 
+  // Migration: Add first_queued_at column for max-wait debounce logic
+  try {
+    await db.execute(`ALTER TABLE notification_queue ADD COLUMN first_queued_at TEXT`);
+  } catch (err) {
+    // Column already exists, ignore
+  }
+
   const seedUsers = [
     { name: "Andy Su", email: "alex@team.edu", avatar_color: "#ef4444" },
     {
