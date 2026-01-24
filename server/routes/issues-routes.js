@@ -47,6 +47,48 @@ router.get("/", async (req, res) => {
   }
 });
 
+// Batch fetch subtasks for multiple parents in one request
+// Must be defined BEFORE /:id routes to avoid :id capturing "subtasks"
+router.get("/subtasks/batch", async (req, res) => {
+  try {
+    const { parent_ids } = req.query;
+
+    if (!parent_ids) {
+      return res.status(400).json({ error: "parent_ids required" });
+    }
+
+    const ids = parent_ids.split(',').map(Number).filter(n => !isNaN(n));
+
+    if (ids.length === 0) {
+      return res.status(400).json({ error: "No valid parent IDs" });
+    }
+
+    // SQLite IN clause efficient for <1000 items
+    const placeholders = ids.map(() => '?').join(',');
+    const { rows } = await db.execute({
+      sql: `
+        ${subtaskSelect}
+        WHERE issues.parent_id IN (${placeholders})
+        ORDER BY issues.parent_id, issues.created_at ASC
+      `,
+      args: ids,
+    });
+
+    // Group by parent_id for frontend consumption
+    const grouped = {};
+    for (const id of ids) {
+      grouped[id] = []; // Initialize all requested parents (even if empty)
+    }
+    for (const subtask of rows) {
+      grouped[subtask.parent_id].push(subtask);
+    }
+
+    res.json(grouped);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get("/:id/subtasks", async (req, res) => {
   try {
     const { rows } = await db.execute({
