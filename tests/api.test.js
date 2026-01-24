@@ -486,22 +486,22 @@ describe("API Integration Tests", () => {
       const withSubtask = await api.get("/stats");
       const reviewWithSubtask = withSubtask.review;
 
-      // Delete subtask (shouldn't change stats)
+      // Delete subtask
       await api.delete(`/issues/${subtask.id}`);
       cleanup.issueIds = cleanup.issueIds.filter((id) => id !== subtask.id);
 
       const afterSubtaskDelete = await api.get("/stats");
 
-      // Stats should be the same since subtasks aren't counted
+      // Subtasks aren't counted
       expect(afterSubtaskDelete.review).toBe(reviewWithSubtask);
 
-      // Delete parent (should change stats)
+      // Delete parent
       await api.delete(`/issues/${parent.id}`);
       cleanup.issueIds = cleanup.issueIds.filter((id) => id !== parent.id);
 
       const afterParentDelete = await api.get("/stats");
 
-      // Review count should decrease by 1 (only parent counted)
+      // Review count decrease by 1 (only parent counted)
       expect(afterParentDelete.review).toBe(reviewWithSubtask - 1);
     });
   });

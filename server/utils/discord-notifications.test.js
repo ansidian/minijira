@@ -202,7 +202,6 @@ describe('buildEmbed', () => {
     const unixMatch = embed.description.match(/<t:(\d+):R>/);
     const unixSeconds = parseInt(unixMatch[1]);
 
-    // 2026-01-24 16:30:00 UTC should be around 1769270000
     assert.ok(unixSeconds > 1700000000, 'Unix timestamp should be in the future');
     assert.ok(unixSeconds < 1900000000, 'Unix timestamp should be reasonable');
   });
@@ -348,47 +347,54 @@ describe('Integration: Full embed generation', () => {
     // Simulates a merged payload after batching
     const mergedPayload = {
       changes: [
-        { action_type: 'status_changed', old_value: 'todo', new_value: 'in_progress' },
-        { action_type: 'subtask_created', issue_title: 'testing subtasks', is_subtask: true }
-      ]
+        {
+          action_type: "status_changed",
+          old_value: "todo",
+          new_value: "in_progress",
+        },
+        {
+          action_type: "subtask_created",
+          issue_title: "testing subtasks",
+          is_subtask: true,
+        },
+      ],
     };
 
-    const changes = extractChangesFromPayload(mergedPayload, 'update');
+    const changes = extractChangesFromPayload(mergedPayload, "update");
     const result = buildEmbed(mockIssue, changes, mockUser, mockTimestamp);
 
     const embed = result.embeds[0];
 
-    // Should have 2 fields: status change and subtask created
     assert.strictEqual(embed.fields.length, 2);
 
     // Status field
-    const statusField = embed.fields.find(f => f.name === 'Status');
+    const statusField = embed.fields.find((f) => f.name === "Status");
     assert.ok(statusField);
-    assert.strictEqual(statusField.value, 'To Do → In Progress');
+    assert.strictEqual(statusField.value, "To Do → In Progress");
 
     // Subtask created field
-    const subtaskField = embed.fields.find(f => f.name === 'Subtask Created');
+    const subtaskField = embed.fields.find((f) => f.name === "Subtask Created");
     assert.ok(subtaskField);
     assert.strictEqual(subtaskField.value, '"testing subtasks"');
   });
 
   it('generates correct embed for subtask field changes', () => {
     const payload = {
-      action_type: 'subtask_updated',
-      issue_key: 'JPL-465',
+      action_type: "subtask_updated",
+      issue_key: "JPL-465",
       changes: [
-        { action_type: 'status_changed', old_value: 'todo', new_value: 'done' }
-      ]
+        { action_type: "status_changed", old_value: "todo", new_value: "done" },
+      ],
     };
 
-    const changes = extractChangesFromPayload(payload, 'update');
+    const changes = extractChangesFromPayload(payload, "update");
     const result = buildEmbed(mockIssue, changes, mockUser, mockTimestamp);
 
     const embed = result.embeds[0];
 
-    // Should show "JPL-465 Status" not just "Status"
-    assert.strictEqual(embed.fields[0].name, 'JPL-465 Status');
-    assert.strictEqual(embed.fields[0].value, 'To Do → Done');
+    // "JPL-465 Status"
+    assert.strictEqual(embed.fields[0].name, "JPL-465 Status");
+    assert.strictEqual(embed.fields[0].value, "To Do → Done");
     assert.strictEqual(embed.fields[0].inline, false);
   });
 });
