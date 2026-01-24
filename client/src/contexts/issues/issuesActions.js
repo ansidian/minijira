@@ -7,7 +7,7 @@ import { notifyError, notifyUndo, notifyApiError } from "../../utils/notify";
 import { generateTempId } from "../../utils/tempId";
 
 export function createStatusChangeActions(dispatch, stateRef, deps) {
-  const { currentUserId, selectedIssue, setSelectedIssue, refreshSubtasksCache, statusLabels } = deps;
+  const { currentUserId, selectedIssue, setSelectedIssue, refreshSubtasksCache, statusLabels, cacheManager } = deps;
 
   const applyStatusChange = async (issueId, newStatus, { showUndo = true, showErrors = true } = {}) => {
     const currentIssue =
@@ -17,45 +17,64 @@ export function createStatusChangeActions(dispatch, stateRef, deps) {
     const isParentIssue = !currentIssue?.parent_id;
 
     if (oldStatus === newStatus) return;
+    if (!currentIssue) return;
+
+    // 1. Snapshot for rollback
+    const snapshot = { ...currentIssue };
+
+    // 2. Optimistic update - instant visual feedback
+    const optimisticIssue = { ...currentIssue, status: newStatus, _isPending: true };
+    dispatch({ type: "UPDATE_ISSUE", value: optimisticIssue });
+    dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: optimisticIssue });
+
+    // Update stats immediately for parent issues
+    if (isParentIssue) {
+      dispatch({
+        type: "SET_STATS",
+        value: {
+          ...stateRef.current.stats,
+          [oldStatus]: Math.max(0, stateRef.current.stats[oldStatus] - 1),
+          [newStatus]: stateRef.current.stats[newStatus] + 1,
+        },
+      });
+    }
 
     try {
+      // 3. Server mutation
       const updated = await api.patch(`/issues/${issueId}`, { status: newStatus, user_id: currentUserId });
-      dispatch({ type: "UPDATE_ISSUE", value: updated });
 
-      if (isParentIssue && oldStatus && oldStatus !== newStatus) {
-        dispatch({
-          type: "SET_STATS",
-          value: {
-            ...stateRef.current.stats,
-            [oldStatus]: Math.max(0, stateRef.current.stats[oldStatus] - 1),
-            [newStatus]: stateRef.current.stats[newStatus] + 1,
-          },
-        });
-      }
+      // 4. Replace optimistic with server response (remove pending)
+      dispatch({ type: "UPDATE_ISSUE", value: { ...updated, _isPending: false } });
+      dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: updated });
 
       if (selectedIssue?.id === issueId) {
         setSelectedIssue?.(updated);
       }
 
+      // 5. Handle cache invalidation for subtasks
       const { expandedIssues } = stateRef.current;
 
       if (updated.subtask_count > 0 && expandedIssues.has(issueId)) {
-        await refreshSubtasksCache([issueId]);
+        cacheManager?.invalidateCache([issueId]);
+        // Refetch this parent's subtasks
+        const subtasks = await cacheManager?.fetchSubtasksForParent(issueId);
+        if (subtasks) cacheManager?.setCached(issueId, subtasks);
       }
 
       if (updated.parent_id && expandedIssues.has(updated.parent_id)) {
-        await refreshSubtasksCache([updated.parent_id]);
+        cacheManager?.invalidateCache([updated.parent_id]);
+        const subtasks = await cacheManager?.fetchSubtasksForParent(updated.parent_id);
+        if (subtasks) cacheManager?.setCached(updated.parent_id, subtasks);
       }
 
-      // Update allIssues with the updated issue
-      dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: updated });
-
+      // 6. Update parent's subtask counts if this is a subtask
       if (updated.parent_id) {
         const parentIssue = await api.get(`/issues/${updated.parent_id}`);
         dispatch({ type: "UPDATE_ISSUE", value: parentIssue });
         dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: parentIssue });
       }
 
+      // 7. Show undo notification
       if (showUndo) {
         const issueTitle = currentIssue?.title || "item";
         notifyUndo({
@@ -65,8 +84,28 @@ export function createStatusChangeActions(dispatch, stateRef, deps) {
         });
       }
     } catch (error) {
+      // 8. Rollback on failure
+      dispatch({ type: "UPDATE_ISSUE", value: { ...snapshot, _isPending: false } });
+      dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: snapshot });
+
+      // Revert stats
+      if (isParentIssue) {
+        dispatch({
+          type: "SET_STATS",
+          value: {
+            ...stateRef.current.stats,
+            [oldStatus]: stateRef.current.stats[oldStatus] + 1,
+            [newStatus]: Math.max(0, stateRef.current.stats[newStatus] - 1),
+          },
+        });
+      }
+
       if (showErrors) {
-        notifyError("Failed to change status.");
+        notifyApiError({
+          error,
+          operation: "change status",
+          onRetry: () => applyStatusChange(issueId, newStatus, { showUndo, showErrors }),
+        });
       }
     }
   };
@@ -172,25 +211,64 @@ export function createIssueActions(dispatch, stateRef, deps) {
   };
 
   const updateIssue = async (issueId, data) => {
-    const updated = await api.patch(`/issues/${issueId}`, { ...data, user_id: currentUserId });
-    dispatch({ type: "UPDATE_ISSUE", value: updated });
-    dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: updated });
+    const currentIssue =
+      stateRef.current.issues.find((i) => i.id === issueId) ||
+      stateRef.current.allIssues.find((i) => i.id === issueId);
+
+    if (!currentIssue) {
+      throw new Error(`Issue ${issueId} not found`);
+    }
+
+    // 1. Snapshot for rollback
+    const snapshot = { ...currentIssue };
+
+    // 2. Optimistic update - instant visual feedback
+    const optimisticIssue = { ...currentIssue, ...data, _isPending: true };
+    dispatch({ type: "UPDATE_ISSUE", value: optimisticIssue });
+    dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: optimisticIssue });
 
     if (selectedIssue?.id === issueId) {
-      setSelectedIssue?.(updated);
+      setSelectedIssue?.(optimisticIssue);
     }
 
-    if (updated.parent_id) {
-      if (stateRef.current.expandedIssues.has(updated.parent_id)) {
-        await refreshSubtasksCache([updated.parent_id]);
+    try {
+      // 3. Server mutation
+      const updated = await api.patch(`/issues/${issueId}`, { ...data, user_id: currentUserId });
+
+      // 4. Replace optimistic with server response (remove pending)
+      dispatch({ type: "UPDATE_ISSUE", value: { ...updated, _isPending: false } });
+      dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: updated });
+
+      if (selectedIssue?.id === issueId) {
+        setSelectedIssue?.(updated);
       }
 
-      const parentIssue = await api.get(`/issues/${updated.parent_id}`);
-      dispatch({ type: "UPDATE_ISSUE", value: parentIssue });
-      dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: parentIssue });
-    }
+      // 5. Handle cache invalidation for subtasks
+      if (updated.parent_id) {
+        if (stateRef.current.expandedIssues.has(updated.parent_id)) {
+          deps.cacheManager?.invalidateCache([updated.parent_id]);
+          const subtasks = await deps.cacheManager?.fetchSubtasksForParent(updated.parent_id);
+          if (subtasks) deps.cacheManager?.setCached(updated.parent_id, subtasks);
+        }
 
-    return updated;
+        const parentIssue = await api.get(`/issues/${updated.parent_id}`);
+        dispatch({ type: "UPDATE_ISSUE", value: parentIssue });
+        dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: parentIssue });
+      }
+
+      return updated;
+    } catch (error) {
+      // 6. Rollback on failure
+      dispatch({ type: "UPDATE_ISSUE", value: { ...snapshot, _isPending: false } });
+      dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: snapshot });
+
+      if (selectedIssue?.id === issueId) {
+        setSelectedIssue?.(snapshot);
+      }
+
+      // 7. Re-throw to let caller handle notification
+      throw error;
+    }
   };
 
   const updateIssueWithUndo = async (issueId, data) => {
@@ -229,14 +307,33 @@ export function createIssueActions(dispatch, stateRef, deps) {
           try {
             await updateIssue(issueId, previousValues);
           } catch (error) {
-            notifyError("Failed to undo change.");
+            notifyApiError({
+              error,
+              operation: "undo change",
+              onRetry: () => updateIssue(issueId, previousValues),
+            });
           }
         },
       });
 
       return updated;
     } catch (error) {
-      notifyError("Failed to update issue.");
+      // Determine operation name for better error messages
+      let operation = "update issue";
+      if (data.priority) {
+        operation = "change priority";
+      } else if (data.assignee_id !== undefined) {
+        operation = "change assignee";
+      } else if (data.title || data.description) {
+        operation = "update issue";
+      }
+
+      notifyApiError({
+        error,
+        operation,
+        onRetry: () => updateIssueWithUndo(issueId, data),
+      });
+
       return undefined;
     }
   };
