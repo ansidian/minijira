@@ -182,11 +182,19 @@ export function extractChangesFromPayload(eventPayload, eventType) {
     }
   } else if (eventPayload.old_value !== undefined && eventPayload.new_value !== undefined) {
     // Standard update event with old/new values
-    changes.push({
-      type: changeType,
-      old: eventPayload.old_value,
-      new: eventPayload.new_value
-    });
+    // Check for net-zero change (first_old_value exists and equals new_value)
+    const firstOld = eventPayload.first_old_value !== undefined
+      ? eventPayload.first_old_value
+      : eventPayload.old_value;
+
+    // Skip if net-zero change (e.g., todo -> in_progress -> todo)
+    if (firstOld !== eventPayload.new_value) {
+      changes.push({
+        type: changeType,
+        old: firstOld,
+        new: eventPayload.new_value
+      });
+    }
   } else if (Array.isArray(eventPayload.changes)) {
     // Handle grouped events (array of changes from merged payloads)
     // Only process if not already handled above (e.g., subtask_updated)

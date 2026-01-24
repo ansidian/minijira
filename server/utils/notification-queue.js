@@ -7,6 +7,7 @@ const MAX_WAIT = '+3 minutes';          // Maximum wait from first event in batc
 /**
  * Merge a new event into an existing payload's changes array.
  * Deduplicates by action_type (later change of same type wins).
+ * Preserves the first old_value for net-zero change detection.
  * @param {object} existingPayload - Existing event_payload from queue
  * @param {object} newPayload - New event to merge
  * @returns {object} Merged payload with changes array
@@ -19,8 +20,17 @@ function mergePayloads(existingPayload, newPayload) {
   const existingIndex = changes.findIndex(c => c.action_type === newPayload.action_type);
 
   if (existingIndex >= 0) {
-    // Replace existing change of same type (e.g., multiple status changes → keep latest)
-    changes[existingIndex] = newPayload;
+    // Replace existing change of same type, but preserve the original old_value
+    // This allows us to detect net-zero changes (e.g., todo -> in_progress -> todo)
+    const existingChange = changes[existingIndex];
+    const firstOldValue = existingChange.first_old_value !== undefined
+      ? existingChange.first_old_value
+      : existingChange.old_value;
+
+    changes[existingIndex] = {
+      ...newPayload,
+      first_old_value: firstOldValue
+    };
   } else {
     // Add new change type
     changes.push(newPayload);
