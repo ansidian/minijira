@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-export function useSubtaskExpansion({ state, dispatch, fetchSubtasksForParent }) {
+export function useSubtaskExpansion({ state, dispatch, cacheManager }) {
   const hasAutoExpanded = useRef(false);
   const stateRef = useRef(state);
 
@@ -15,12 +15,9 @@ export function useSubtaskExpansion({ state, dispatch, fetchSubtasksForParent })
       expandedIssues.delete(issueId);
     } else {
       expandedIssues.add(issueId);
-      if (!stateRef.current.subtasksCache[issueId]) {
-        const subtasks = await fetchSubtasksForParent(issueId);
-        dispatch({
-          type: "MERGE_SUBTASKS_CACHE",
-          value: { [issueId]: subtasks },
-        });
+      if (!cacheManager.getCached(issueId)) {
+        const subtasks = await cacheManager.fetchSubtasksForParent(issueId);
+        cacheManager.mergeCached({ [issueId]: subtasks });
       }
     }
 
@@ -43,21 +40,21 @@ export function useSubtaskExpansion({ state, dispatch, fetchSubtasksForParent })
 
     const newExpanded = new Set(parentsWithSubtasks.map((i) => i.id));
     const missingParents = parentsWithSubtasks.filter(
-      (issue) => !stateRef.current.subtasksCache[issue.id],
+      (issue) => !cacheManager.getCached(issue.id),
     );
 
     if (missingParents.length > 0) {
       const results = await Promise.all(
         missingParents.map(async (issue) => {
-          const subtasks = await fetchSubtasksForParent(issue.id);
+          const subtasks = await cacheManager.fetchSubtasksForParent(issue.id);
           return { issueId: issue.id, subtasks };
         }),
       );
-      const newCache = { ...stateRef.current.subtasksCache };
+      const updates = {};
       for (const { issueId, subtasks } of results) {
-        newCache[issueId] = subtasks;
+        updates[issueId] = subtasks;
       }
-      dispatch({ type: "SET_SUBTASKS_CACHE", value: newCache });
+      cacheManager.mergeCached(updates);
     }
 
     dispatch({ type: "SET_EXPANDED_ISSUES", value: newExpanded });
@@ -81,15 +78,15 @@ export function useSubtaskExpansion({ state, dispatch, fetchSubtasksForParent })
         const fetchAllSubtasks = async () => {
           const results = await Promise.all(
             parentsWithSubtasks.map(async (issue) => {
-              const subtasks = await fetchSubtasksForParent(issue.id);
+              const subtasks = await cacheManager.fetchSubtasksForParent(issue.id);
               return { issueId: issue.id, subtasks };
             }),
           );
-          const newCache = { ...stateRef.current.subtasksCache };
+          const updates = {};
           for (const { issueId, subtasks } of results) {
-            newCache[issueId] = subtasks;
+            updates[issueId] = subtasks;
           }
-          dispatch({ type: "SET_SUBTASKS_CACHE", value: newCache });
+          cacheManager.mergeCached(updates);
         };
 
         fetchAllSubtasks();

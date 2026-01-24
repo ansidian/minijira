@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useRef } from "react";
 import { api } from "../utils/api";
-import { useSubtaskCache } from "../hooks/useSubtaskCache";
+import { useSubtasksCacheManager } from "../hooks/useSubtasksCacheManager";
 import { useIssueDelete } from "../hooks/useIssueDelete";
 import { notifyError, notifyUndo } from "../utils/notify";
 import { IssuesContext } from "./IssuesContextBase";
@@ -16,7 +16,18 @@ export function IssuesProvider({
 }) {
   const [state, dispatch] = useReducer(issuesReducer, initialState);
   const stateRef = useRef(state);
-  const { fetchSubtasksForParent } = useSubtaskCache();
+
+  // Centralized cache manager
+  const cacheManager = useSubtasksCacheManager(
+    state.subtasksCache,
+    (value) => {
+      if (typeof value === 'function') {
+        dispatch({ type: 'SET_SUBTASKS_CACHE', value: value(stateRef.current.subtasksCache) });
+      } else {
+        dispatch({ type: 'SET_SUBTASKS_CACHE', value });
+      }
+    }
+  );
 
   const statusLabels = {
     todo: "To Do",
@@ -59,25 +70,21 @@ export function IssuesProvider({
   const refreshSubtasksCache = async (issueIds) => {
     const results = await Promise.all(
       issueIds.map(async (issueId) => {
-        const subtasks = await fetchSubtasksForParent(issueId);
+        const subtasks = await cacheManager.fetchSubtasksForParent(issueId);
         return { issueId, subtasks };
       }),
     );
 
-    const newCache = { ...stateRef.current.subtasksCache };
+    const updates = {};
     for (const { issueId, subtasks } of results) {
-      newCache[issueId] = subtasks;
+      updates[issueId] = subtasks;
     }
 
-    dispatch({ type: "SET_SUBTASKS_CACHE", value: newCache });
+    cacheManager.mergeCached(updates);
   };
 
   const setExpandedIssues = (expandedIssues) => {
     dispatch({ type: "SET_EXPANDED_ISSUES", value: expandedIssues });
-  };
-
-  const setSubtasksCache = (subtasksCache) => {
-    dispatch({ type: "SET_SUBTASKS_CACHE", value: subtasksCache });
   };
 
   // Wire up action factories
@@ -86,6 +93,7 @@ export function IssuesProvider({
     selectedIssue,
     setSelectedIssue,
     refreshSubtasksCache,
+    cacheManager,
     statusLabels,
   });
 
@@ -94,6 +102,7 @@ export function IssuesProvider({
     selectedIssue,
     setSelectedIssue,
     refreshSubtasksCache,
+    cacheManager,
     statusLabels,
   });
 
@@ -104,7 +113,7 @@ export function IssuesProvider({
     setSelectedIssue,
     onUndo: notifyUndo,
     onError: notifyError,
-    onRefreshSubtasks: fetchSubtasksForParent,
+    onRefreshSubtasks: cacheManager.fetchSubtasksForParent,
     getCurrentUserId: () => currentUserId,
   });
 
@@ -133,15 +142,15 @@ export function IssuesProvider({
     if (issueIdsToRefresh.size > 0) {
       const results = await Promise.all(
         [...issueIdsToRefresh].map(async (issueId) => {
-          const subtasks = await fetchSubtasksForParent(issueId);
+          const subtasks = await cacheManager.fetchSubtasksForParent(issueId);
           return { issueId, subtasks };
         }),
       );
-      const newCache = { ...stateRef.current.subtasksCache };
+      const updates = {};
       for (const { issueId, subtasks } of results) {
-        newCache[issueId] = subtasks;
+        updates[issueId] = subtasks;
       }
-      dispatch({ type: "SET_SUBTASKS_CACHE", value: newCache });
+      cacheManager.mergeCached(updates);
     }
 
     if (selectedIssue) {
@@ -154,7 +163,7 @@ export function IssuesProvider({
   const { toggleSubtasks, toggleAllSubtasks } = useSubtaskExpansion({
     state,
     dispatch,
-    fetchSubtasksForParent,
+    cacheManager,
   });
 
   return (
@@ -162,10 +171,9 @@ export function IssuesProvider({
       value={{
         ...state,
         loadData,
-        fetchSubtasksForParent,
+        fetchSubtasksForParent: cacheManager.fetchSubtasksForParent,
         refreshSubtasksCache,
         setExpandedIssues,
-        setSubtasksCache,
         ...statusActions,
         ...issueActions,
         deleteIssue,
