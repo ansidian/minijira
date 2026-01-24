@@ -595,4 +595,23 @@ body {
   flex-shrink: 0;
 }
 
+/* Optimistic update pending state indicator */
+.issue-card[data-pending="true"],
+.subtask-row[data-pending="true"] {
+  opacity: 0.85;
+  animation: pending-pulse 0.4s ease-in-out;
+}
+
+@keyframes pending-pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 0.85; }
+  100% { opacity: 0.85; }
+}
+
+/* Issue key placeholder for optimistic creates */
+.issue-key-pending {
+  color: var(--muted-foreground, #888);
+  font-style: italic;
+}
+
 /* Hide hints on mobile */
