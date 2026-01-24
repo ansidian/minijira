@@ -161,7 +161,7 @@ export function formatChangeFields(changes) {
 
     // Prefix with subtask key for subtask field changes
     if (isSubtask && subtaskKey) {
-      fieldName = `${subtaskKey} ${fieldName}`;
+      fieldName = `${subtaskKey} (Subtask) ${fieldName}`;
     }
 
     // Format the change
