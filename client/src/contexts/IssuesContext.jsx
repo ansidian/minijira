@@ -1,7 +1,8 @@
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef, useCallback } from "react";
 import { api } from "../utils/api";
 import { useSubtasksCacheManager } from "../hooks/useSubtasksCacheManager";
 import { useIssueDelete } from "../hooks/useIssueDelete";
+import { useBackgroundRefresh } from "../hooks/useBackgroundRefresh";
 import { notifyError, notifyUndo } from "../utils/notify";
 import { IssuesContext } from "./IssuesContextBase";
 import { issuesReducer, initialState } from "./issues/issuesReducer";
@@ -53,8 +54,10 @@ export function IssuesProvider({
     stateRef.current = state;
   }, [state]);
 
-  const loadData = async () => {
-    dispatch({ type: "SET_LOADING", value: true });
+  const loadData = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) {
+      dispatch({ type: "SET_LOADING", value: true });
+    }
     const [issuesData, statsDataRaw, allIssuesData] = await Promise.all([
       api.get("/issues"),
       api.get("/stats"),
@@ -65,7 +68,10 @@ export function IssuesProvider({
     dispatch({ type: "SET_STATS", value: statsData });
     dispatch({ type: "SET_ALL_ISSUES", value: allIssuesData });
     dispatch({ type: "SET_LOADING", value: false });
-  };
+  }, []);
+
+  // Background refresh on tab visibility (silent, no loading indicators)
+  useBackgroundRefresh(loadData);
 
   const refreshSubtasksCache = async (issueIds) => {
     const results = await Promise.all(
