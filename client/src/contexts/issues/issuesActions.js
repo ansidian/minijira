@@ -3,7 +3,8 @@
 // Functional state updates used where feasible to mitigate stale closures.
 
 import { api } from "../../utils/api";
-import { notifyError, notifyUndo } from "../../utils/notify";
+import { notifyError, notifyUndo, notifyApiError } from "../../utils/notify";
+import { generateTempId } from "../../utils/tempId";
 
 export function createStatusChangeActions(dispatch, stateRef, deps) {
   const { currentUserId, selectedIssue, setSelectedIssue, refreshSubtasksCache, statusLabels } = deps;
@@ -85,10 +86,25 @@ export function createIssueActions(dispatch, stateRef, deps) {
   const { currentUserId, selectedIssue, setSelectedIssue, refreshSubtasksCache, statusLabels } = deps;
 
   const createIssue = async (data) => {
-    const newIssue = await api.post("/issues", data);
-    dispatch({ type: "ADD_ISSUE", value: newIssue });
-    dispatch({ type: "ADD_TO_ALL_ISSUES", value: newIssue });
+    const tempId = generateTempId();
 
+    // Create optimistic issue with temp ID
+    const optimisticIssue = {
+      ...data,
+      id: tempId,
+      key: null, // Server will assign, shows as placeholder
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      subtask_count: 0,
+      subtask_done_count: 0,
+      _isPending: true, // For visual indicator
+    };
+
+    // 1. Add optimistically - issue appears immediately
+    dispatch({ type: "ADD_ISSUE", value: optimisticIssue });
+    dispatch({ type: "ADD_TO_ALL_ISSUES", value: optimisticIssue });
+
+    // Update stats immediately for parent issues
     if (!data.parent_id) {
       const status = data.status || "todo";
       dispatch({
@@ -99,14 +115,60 @@ export function createIssueActions(dispatch, stateRef, deps) {
           [status]: stateRef.current.stats[status] + 1,
         },
       });
-    } else {
-      // If subtask, update parent's subtask_count
-      const parentIssue = await api.get(`/issues/${data.parent_id}`);
-      dispatch({ type: "UPDATE_ISSUE", value: parentIssue });
-      dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: parentIssue });
     }
 
-    return newIssue;
+    try {
+      // 2. Create on server
+      const created = await api.post("/issues", data);
+
+      // 3. Replace temp with real - gets server-assigned key and ID
+      dispatch({
+        type: "REPLACE_TEMP_ISSUE",
+        tempId,
+        value: created,
+      });
+
+      // 4. If subtask, update parent's subtask_count
+      if (created.parent_id) {
+        const parent = await api.get(`/issues/${created.parent_id}`);
+        dispatch({ type: "UPDATE_ISSUE", value: parent });
+        dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: parent });
+
+        // Add to parent's subtasks cache if expanded
+        const { expandedIssues } = stateRef.current;
+        if (expandedIssues.has(created.parent_id)) {
+          // Use cache manager to add subtask
+          deps.cacheManager?.addCachedSubtask(created.parent_id, created);
+        }
+      }
+
+      return created;
+    } catch (error) {
+      // 5. Remove optimistic issue on failure
+      dispatch({ type: "REMOVE_ISSUE", id: tempId });
+
+      // Revert stats
+      if (!data.parent_id) {
+        const status = data.status || "todo";
+        dispatch({
+          type: "SET_STATS",
+          value: {
+            ...stateRef.current.stats,
+            total: Math.max(0, (stateRef.current.stats.total || 0) - 1),
+            [status]: Math.max(0, stateRef.current.stats[status] - 1),
+          },
+        });
+      }
+
+      // 6. Show error with retry
+      notifyApiError({
+        error,
+        operation: "create issue",
+        onRetry: () => createIssue(data),
+      });
+
+      throw error;
+    }
   };
 
   const updateIssue = async (issueId, data) => {
