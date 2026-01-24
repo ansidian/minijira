@@ -2,18 +2,21 @@ import express from "express";
 import db from "../db/connection.js";
 import sseManager from "../sse-manager.js";
 import { logActivity } from "../utils/activity-logger.js";
-import { issueSelectWithCounts, subtaskSelect } from "../utils/queries.js";
+import { issueSelect, issueSelectWithCounts, subtaskSelect } from "../utils/queries.js";
 import { queueNotification } from '../utils/notification-queue.js';
 
 const router = express.Router();
 
 router.get("/", async (req, res) => {
   try {
-    const { status, assignee_id, priority, include_subtasks, parent_id } =
+    const { status, assignee_id, priority, include_subtasks, parent_id, with_counts } =
       req.query;
 
+    // Default to counts for backwards compatibility
+    const baseQuery = with_counts === 'false' ? issueSelect : issueSelectWithCounts;
+
     let sql = `
-      ${issueSelectWithCounts}
+      ${baseQuery}
       WHERE 1=1
     `;
     const args = [];
@@ -107,9 +110,12 @@ router.get("/:id/subtasks", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   try {
+    // Default to counts for backwards compatibility
+    const query = req.query.with_counts === 'false' ? issueSelect : issueSelectWithCounts;
+
     const { rows } = await db.execute({
       sql: `
-        ${issueSelectWithCounts}
+        ${query}
         WHERE issues.id = ?
       `,
       args: [req.params.id],
