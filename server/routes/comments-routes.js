@@ -2,6 +2,7 @@ import express from "express";
 import db from "../db/connection.js";
 import sseManager from "../sse-manager.js";
 import { logActivity } from "../utils/activity-logger.js";
+import { queueNotification } from '../utils/notification-queue.js';
 
 const router = express.Router();
 
@@ -80,6 +81,21 @@ router.post("/:id/comments", async (req, res) => {
     });
 
     res.status(201).json(rows[0]);
+
+    // Queue notification (don't await - don't block response)
+    queueNotification(
+      parseInt(issue_id),
+      user_id || 1,
+      'comment',
+      {
+        action_type: 'comment_added',
+        issue_key: issue.key,
+        issue_title: issue.title,
+        comment_body: body
+      }
+    ).catch(err => {
+      console.error('[Queue] Failed to queue comment notification:', err.message);
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
