@@ -73,20 +73,55 @@
     height: 18px;
   }
 
-  /* board - allow horizontal scroll with single column view */
+  /* Mobile board - horizontal scroll snap */
   .board {
-    padding: 12px;
-    gap: 12px;
+    padding: 12px 0; /* Remove horizontal padding, columns handle it */
+    gap: 0; /* No gap between columns */
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* Hide scrollbar */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
 
-  /* columns take full width on mobile */
+  .board::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Mobile columns - full width with peek */
   .column {
-    min-width: 280px;
-    max-width: 100%;
-    flex: 0 0 calc(100% - 24px);
+    flex: 0 0 calc(100vw - 48px); /* Full width minus peek space (24px each side) */
+    min-width: calc(100vw - 48px);
+    max-width: calc(100vw - 48px);
+    scroll-snap-align: center;
+    scroll-snap-stop: always; /* CRITICAL: Prevents flick-to-end on iOS Safari */
+    margin: 0;
+    border-radius: var(--radius-lg);
   }
 
+  /* First column has left margin for peek */
+  .column:first-child {
+    margin-left: 24px;
+  }
+
+  /* Last column has right margin for peek */
+  .column:last-child {
+    margin-right: 24px;
+  }
+
+  /* Gap between columns */
+  .column:not(:last-child) {
+    margin-right: 12px;
+  }
+
+  /* Sticky column header */
   .column-header {
+    position: sticky;
+    top: 0;
+    background: var(--bg-secondary);
+    z-index: 5;
     padding: 12px 16px;
   }
 
@@ -152,14 +187,28 @@
     -webkit-text-size-adjust: 100%;
   }
 
-  /* scrollbar for board on mobile */
-  .board {
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
+  /* Column indicators (dot pagination) */
+  .column-indicators {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 0;
+    background: var(--bg-primary);
   }
 
-  .column {
-    scroll-snap-align: start;
+  .column-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--border-secondary);
+    transition: all 0.2s ease;
+  }
+
+  .column-dot-active {
+    width: 8px;
+    height: 8px;
+    background: var(--accent);
   }
 }
 
@@ -203,6 +252,13 @@
 /* Hide hints on mobile */
 @media (max-width: 768px) {
   .hints-container {
+    display: none;
+  }
+}
+
+/* Hide column indicators on desktop */
+@media (min-width: 769px) {
+  .column-indicators {
     display: none;
   }
 }
