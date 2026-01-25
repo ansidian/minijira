@@ -11,6 +11,7 @@ import eventsRouter from "./routes/events-routes.js";
 import notificationsRouter from './routes/notifications-routes.js';
 import { startQueueProcessor, stopQueueProcessor, awaitInFlight } from "./utils/queue-processor.js";
 import { closeDb } from "./db/connection.js";
+import { cleanupActivityLog } from './jobs/cleanup.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -20,6 +21,7 @@ const PORT = process.env.PORT || 3001;
 
 // Shutdown state tracking
 let isShuttingDown = false;
+let cleanupIntervalId = null;
 
 app.use(cors());
 app.use(express.json());
@@ -45,6 +47,21 @@ if (process.env.NODE_ENV === "production") {
 const server = app.listen(PORT, async () => {
   console.log(`✓ MiniJira API running at http://localhost:${PORT}`);
   await startQueueProcessor();
+
+  // Run cleanup on startup
+  cleanupActivityLog().catch(err => {
+    console.error('[Startup] Activity log cleanup failed:', err);
+    // Don't crash server on cleanup failure
+  });
+
+  // Schedule daily cleanup (24 hours)
+  const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+  cleanupIntervalId = setInterval(() => {
+    cleanupActivityLog().catch(err => {
+      console.error('[Scheduled] Activity log cleanup failed:', err);
+      // Log but continue - will retry on next interval
+    });
+  }, CLEANUP_INTERVAL_MS);
 });
 
 // Graceful shutdown handler
@@ -69,7 +86,13 @@ async function gracefulShutdown(signal) {
   console.log('[SHUTDOWN] Stopping queue timer');
   stopQueueProcessor();
 
-  // 2. Wait for in-flight sends to complete
+  // 2. Clear cleanup interval
+  if (cleanupIntervalId) {
+    clearInterval(cleanupIntervalId);
+    cleanupIntervalId = null;
+  }
+
+  // 3. Wait for in-flight sends to complete
   console.log('[SHUTDOWN] Waiting for in-flight sends');
   const completed = await awaitInFlight(25000); // Leave 5s for HTTP/DB close
   if (completed) {
@@ -78,7 +101,7 @@ async function gracefulShutdown(signal) {
     console.log('[SHUTDOWN] In-flight sends did not complete within timeout');
   }
 
-  // 3. Stop HTTP server
+  // 4. Stop HTTP server
   console.log('[SHUTDOWN] Closing HTTP server');
   await new Promise((resolve) => {
     server.close(() => {
@@ -87,12 +110,12 @@ async function gracefulShutdown(signal) {
     });
   });
 
-  // 4. Close database connection
+  // 5. Close database connection
   console.log('[SHUTDOWN] Closing database connection');
   await closeDb();
   console.log('[SHUTDOWN] Database connection closed');
 
-  // 5. Clean exit
+  // 6. Clean exit
   console.log('[SHUTDOWN] Complete');
   process.exit(0);
 }
