@@ -87,6 +87,29 @@ router.get("/", async (req, res) => {
       args.push(...priorities);
     }
 
+    // Date range filters
+    const created_after = req.query.created_after;
+    const created_before = req.query.created_before;
+    const updated_after = req.query.updated_after;
+    const updated_before = req.query.updated_before;
+
+    if (created_after) {
+      sql += ` AND datetime(issues.created_at) >= datetime(?)`;
+      args.push(created_after);
+    }
+    if (created_before) {
+      sql += ` AND datetime(issues.created_at) <= datetime(?)`;
+      args.push(created_before);
+    }
+    if (updated_after) {
+      sql += ` AND datetime(issues.updated_at) >= datetime(?)`;
+      args.push(updated_after);
+    }
+    if (updated_before) {
+      sql += ` AND datetime(issues.updated_at) <= datetime(?)`;
+      args.push(updated_before);
+    }
+
     // Cursor-based pagination (keyset pagination)
     if (cursorData) {
       sql += " AND (issues.created_at < ? OR (issues.created_at = ? AND issues.id < ?))";

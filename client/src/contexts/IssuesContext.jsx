@@ -23,10 +23,28 @@ function buildFilterParams(filters) {
     params.append("assignee_id", a === "0" ? "0" : a)
   );
   filters.priority?.forEach((p) => params.append("priority", p));
+
+  // Date range filters
+  if (filters.createdRange?.[0] && filters.createdRange?.[1]) {
+    params.append('created_after', filters.createdRange[0].toISOString());
+    params.append('created_before', filters.createdRange[1].toISOString());
+  }
+  if (filters.updatedRange?.[0] && filters.updatedRange?.[1]) {
+    params.append('updated_after', filters.updatedRange[0].toISOString());
+    params.append('updated_before', filters.updatedRange[1].toISOString());
+  }
+
   return params.toString();
 }
 
-const EMPTY_FILTERS = { status: [], assignee: [], priority: [], myIssues: false };
+const EMPTY_FILTERS = {
+  status: [],
+  assignee: [],
+  priority: [],
+  myIssues: false,
+  createdRange: [null, null],
+  updatedRange: [null, null],
+};
 
 export function IssuesProvider({
   children,

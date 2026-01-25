@@ -10,10 +10,12 @@
 	},
 	"dependencies": {
 		"@mantine/core": "^8.3.9",
+		"@mantine/dates": "^8.3.9",
 		"@mantine/hooks": "^8.3.9",
 		"@mantine/notifications": "^8.3.9",
 		"@mantine/spotlight": "^8.3.9",
 		"@tabler/icons-react": "^3.35.0",
+		"dayjs": "^1.11.19",
 		"mantine-contextmenu": "^7.17.1",
 		"react": "^18.2.0",
 		"react-dom": "^18.2.0",

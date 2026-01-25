@@ -9,6 +9,8 @@ const INITIAL_FILTERS = {
   assignee: [],
   priority: [],
   myIssues: false,
+  createdRange: [null, null],
+  updatedRange: [null, null],
 };
 
 // Parse filters from URL on initial load
@@ -19,6 +21,8 @@ function getFiltersFromUrl() {
     assignee: params.getAll('assignee'),
     priority: params.getAll('priority'),
     myIssues: params.get('my') === 'true',
+    createdRange: [null, null], // Date ranges not persisted to URL (too complex)
+    updatedRange: [null, null],
   };
 }
 
@@ -58,7 +62,9 @@ export function BoardProvider({ children }) {
     activeFilters.status.length +
     activeFilters.assignee.length +
     activeFilters.priority.length +
-    (activeFilters.myIssues ? 1 : 0);
+    (activeFilters.myIssues ? 1 : 0) +
+    (activeFilters.createdRange?.[0] && activeFilters.createdRange?.[1] ? 1 : 0) +
+    (activeFilters.updatedRange?.[0] && activeFilters.updatedRange?.[1] ? 1 : 0);
 
   // Handle filter changes - trigger server-side fetch and sync URL
   const handleFiltersChange = useCallback(

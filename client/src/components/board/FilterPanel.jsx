@@ -9,6 +9,8 @@ import {
   Checkbox,
   Divider,
 } from "@mantine/core";
+import { DatePickerInput } from "@mantine/dates";
+import "@mantine/dates/styles.css";
 import { useUsers } from "../../contexts/UsersContext";
 
 const STATUS_OPTIONS = [
@@ -62,11 +64,19 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
   const { users } = useUsers();
 
   // Draft state for local edits - initialized from applied
-  const [draftFilters, setDraftFilters] = useState(appliedFilters);
+  const [draftFilters, setDraftFilters] = useState({
+    ...appliedFilters,
+    createdRange: appliedFilters.createdRange || [null, null],
+    updatedRange: appliedFilters.updatedRange || [null, null],
+  });
 
   // Sync draft to applied when panel first opens or applied changes externally
   useEffect(() => {
-    setDraftFilters(appliedFilters);
+    setDraftFilters({
+      ...appliedFilters,
+      createdRange: appliedFilters.createdRange || [null, null],
+      updatedRange: appliedFilters.updatedRange || [null, null],
+    });
   }, [appliedFilters]);
 
   // Assignee options: Unassigned first, then all users
@@ -78,13 +88,19 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
   }, [users]);
 
   // Check if draft differs from applied
-  const hasChanges = JSON.stringify(draftFilters) !== JSON.stringify(appliedFilters);
+  const hasChanges = JSON.stringify(draftFilters) !== JSON.stringify({
+    ...appliedFilters,
+    createdRange: appliedFilters.createdRange || [null, null],
+    updatedRange: appliedFilters.updatedRange || [null, null],
+  });
 
   const hasActiveFilters =
     draftFilters.status.length > 0 ||
     draftFilters.assignee.length > 0 ||
     draftFilters.priority.length > 0 ||
-    draftFilters.myIssues;
+    draftFilters.myIssues ||
+    (draftFilters.createdRange[0] && draftFilters.createdRange[1]) ||
+    (draftFilters.updatedRange[0] && draftFilters.updatedRange[1]);
 
   function handleApply() {
     onApply(draftFilters);
@@ -92,7 +108,11 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
   }
 
   function handleCancel() {
-    setDraftFilters(appliedFilters); // Revert to last applied
+    setDraftFilters({
+      ...appliedFilters,
+      createdRange: appliedFilters.createdRange || [null, null],
+      updatedRange: appliedFilters.updatedRange || [null, null],
+    });
     onClose();
   }
 
@@ -131,6 +151,8 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
       assignee: [],
       priority: [],
       myIssues: false,
+      createdRange: [null, null],
+      updatedRange: [null, null],
     });
   };
 
@@ -209,6 +231,38 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
             clearable
             size="sm"
             comboboxProps={{ withinPortal: false }}
+          />
+        </div>
+
+        {/* Created Date Range */}
+        <div>
+          <Text size="xs" c="var(--text-muted)" mb={8} tt="uppercase" fw={500}>
+            Created Date
+          </Text>
+          <DatePickerInput
+            type="range"
+            value={draftFilters.createdRange}
+            onChange={(range) => setDraftFilters(prev => ({ ...prev, createdRange: range }))}
+            placeholder="Select date range"
+            size="sm"
+            clearable
+            popoverProps={{ withinPortal: false }}
+          />
+        </div>
+
+        {/* Updated Date Range */}
+        <div>
+          <Text size="xs" c="var(--text-muted)" mb={8} tt="uppercase" fw={500}>
+            Updated Date
+          </Text>
+          <DatePickerInput
+            type="range"
+            value={draftFilters.updatedRange}
+            onChange={(range) => setDraftFilters(prev => ({ ...prev, updatedRange: range }))}
+            placeholder="Select date range"
+            size="sm"
+            clearable
+            popoverProps={{ withinPortal: false }}
           />
         </div>
 
