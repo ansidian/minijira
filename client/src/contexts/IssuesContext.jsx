@@ -24,12 +24,12 @@ function buildFilterParams(filters) {
   );
   filters.priority?.forEach((p) => params.append("priority", p));
 
-  // Date range filters
-  if (filters.createdRange?.[0] && filters.createdRange?.[1]) {
+  // Date range filters - defensive instanceof Date check
+  if (filters.createdRange?.[0] instanceof Date && filters.createdRange?.[1] instanceof Date) {
     params.append('created_after', filters.createdRange[0].toISOString());
     params.append('created_before', filters.createdRange[1].toISOString());
   }
-  if (filters.updatedRange?.[0] && filters.updatedRange?.[1]) {
+  if (filters.updatedRange?.[0] instanceof Date && filters.updatedRange?.[1] instanceof Date) {
     params.append('updated_after', filters.updatedRange[0].toISOString());
     params.append('updated_before', filters.updatedRange[1].toISOString());
   }

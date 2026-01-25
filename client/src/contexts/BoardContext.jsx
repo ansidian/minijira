@@ -16,13 +16,20 @@ const INITIAL_FILTERS = {
 // Parse filters from URL on initial load
 function getFiltersFromUrl() {
   const params = new URLSearchParams(window.location.search);
+
+  // Parse date ranges from URL
+  const createdFrom = params.get('created_from');
+  const createdTo = params.get('created_to');
+  const updatedFrom = params.get('updated_from');
+  const updatedTo = params.get('updated_to');
+
   return {
     status: params.getAll('status'),
     assignee: params.getAll('assignee'),
     priority: params.getAll('priority'),
     myIssues: params.get('my') === 'true',
-    createdRange: [null, null], // Date ranges not persisted to URL (too complex)
-    updatedRange: [null, null],
+    createdRange: (createdFrom && createdTo) ? [new Date(createdFrom), new Date(createdTo)] : [null, null],
+    updatedRange: (updatedFrom && updatedTo) ? [new Date(updatedFrom), new Date(updatedTo)] : [null, null],
   };
 }
 
@@ -54,7 +61,9 @@ export function BoardProvider({ children }) {
       urlFilters.status.length > 0 ||
       urlFilters.assignee.length > 0 ||
       urlFilters.priority.length > 0 ||
-      urlFilters.myIssues;
+      urlFilters.myIssues ||
+      (urlFilters.createdRange[0] && urlFilters.createdRange[1]) ||
+      (urlFilters.updatedRange[0] && urlFilters.updatedRange[1]);
     return hasUrlFilters ? urlFilters : INITIAL_FILTERS;
   });
 
@@ -78,11 +87,24 @@ export function BoardProvider({ children }) {
       params.delete('assignee');
       params.delete('priority');
       params.delete('my');
+      params.delete('created_from');
+      params.delete('created_to');
+      params.delete('updated_from');
+      params.delete('updated_to');
       // Add new values
       filters.status?.forEach(s => params.append('status', s));
       filters.assignee?.forEach(a => params.append('assignee', a));
       filters.priority?.forEach(p => params.append('priority', p));
       if (filters.myIssues) params.set('my', 'true');
+      // Add date ranges as ISO strings
+      if (filters.createdRange?.[0] && filters.createdRange?.[1]) {
+        params.set('created_from', filters.createdRange[0].toISOString());
+        params.set('created_to', filters.createdRange[1].toISOString());
+      }
+      if (filters.updatedRange?.[0] && filters.updatedRange?.[1]) {
+        params.set('updated_from', filters.updatedRange[0].toISOString());
+        params.set('updated_to', filters.updatedRange[1].toISOString());
+      }
 
       const newUrl = params.toString()
         ? `${window.location.pathname}?${params.toString()}`
@@ -104,7 +126,9 @@ export function BoardProvider({ children }) {
         activeFilters.status.length > 0 ||
         activeFilters.assignee.length > 0 ||
         activeFilters.priority.length > 0 ||
-        activeFilters.myIssues;
+        activeFilters.myIssues ||
+        (activeFilters.createdRange?.[0] && activeFilters.createdRange?.[1]) ||
+        (activeFilters.updatedRange?.[0] && activeFilters.updatedRange?.[1]);
       if (hasFilters) {
         loadWithFilters(activeFilters);
       }
