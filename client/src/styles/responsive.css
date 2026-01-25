@@ -205,10 +205,86 @@
     padding: 10px 16px;
   }
 
+  /* ========================================
+     TOUCH TARGET SIZING (44px minimum)
+     ======================================== */
+
+  /* All buttons and interactive elements */
+  button,
+  [role="button"],
+  .mantine-ActionIcon-root,
+  .mantine-Button-root {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Issue cards - full width with proper padding */
+  .issue-card {
+    min-height: 44px;
+    padding: 12px;
+    cursor: pointer;
+  }
+
+  /* Subtask expansion chevron - expand hit area */
+  .subtask-toggle-btn {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Priority badges - keep visual size, expand tap area */
+  .priority-badge,
+  .status-badge {
+    position: relative;
+    /* Visual size stays same, hit area expands via pseudo-element */
+  }
+
+  .priority-badge::before,
+  .status-badge::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 44px;
+    height: 44px;
+    /* Invisible but clickable */
+  }
+
+  /* Avatar buttons in cards */
+  .avatar-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   /* better touch targets */
   .add-issue-btn {
     min-height: 44px;
     font-size: 14px;
+  }
+
+  /* Select dropdowns */
+  .user-select,
+  .mantine-Select-input {
+    min-height: 44px;
+  }
+
+  /* Close buttons on modals */
+  .mantine-Modal-close,
+  .mantine-Drawer-close {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Filter panel checkboxes and labels */
+  .mantine-Checkbox-root {
+    min-height: 44px;
+  }
+
+  .mantine-Checkbox-label {
+    padding: 12px 0;
   }
 
   /* prevent text size adjustment on orientation change */
