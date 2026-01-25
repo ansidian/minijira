@@ -10,6 +10,10 @@ export { ApiError, NetworkError };
  */
 async function handleResponse(res, method, path) {
   if (res.ok) {
+    // Handle 204 No Content or empty responses
+    if (res.status === 204 || res.headers.get("Content-Length") === "0") {
+      return null;
+    }
     return res.json();
   }
 
