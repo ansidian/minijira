@@ -86,7 +86,7 @@ function AppContent() {
   // Theme toggle
   const { colorScheme, setColorScheme } = useMantineColorScheme();
 
-  // Hotkey for theme toggle (Cmd/Ctrl + J)
+  // Hotkeys for header controls
   useHotkeys(
     [
       [
@@ -103,8 +103,15 @@ function AppContent() {
           setShowActivityLog((prev) => !prev);
         },
       ],
+      [
+        "mod+X",
+        () => {
+          if (isUserLocked) return;
+          setFilterPanelExpanded((prev) => !prev);
+        },
+      ],
     ],
-    [colorScheme, isUserLocked, setColorScheme, setShowActivityLog],
+    [colorScheme, isUserLocked, setColorScheme, setShowActivityLog, setFilterPanelExpanded],
     true
   );
 

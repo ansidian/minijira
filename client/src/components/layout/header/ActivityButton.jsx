@@ -1,8 +1,9 @@
 import { ActionIcon, Tooltip } from "@mantine/core";
+import { isMac } from "../../../utils/platform";
 
 export function ActivityButton({ hasNewActivity, setShowActivityLog, isUserLocked }) {
   return (
-    <Tooltip label="Recent Activity">
+    <Tooltip label={`Recent Activity (${isMac ? "⌘" : "Ctrl"} + I)`}>
       <div style={{ position: "relative" }}>
         <ActionIcon
           variant="default"

@@ -1,9 +1,10 @@
 import { ActionIcon, Tooltip } from "@mantine/core";
+import { isMac } from "../../../utils/platform";
 
 export function ThemeToggle({ colorScheme, setColorScheme, isUserLocked }) {
   return (
     <Tooltip
-      label={`Switch to ${colorScheme === "dark" ? "light" : "dark"} mode`}
+      label={`${colorScheme === "dark" ? "Light" : "Dark"} mode (${isMac ? "⌘" : "Ctrl"} + J)`}
     >
       <ActionIcon
         variant="default"

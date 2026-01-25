@@ -1,4 +1,4 @@
-import { Button, ActionIcon, Indicator, Popover } from "@mantine/core";
+import { Button, ActionIcon, Indicator, Popover, Tooltip } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { StatsDisplay } from "./header/StatsDisplay";
 import { SearchButton } from "./header/SearchButton";
@@ -8,6 +8,7 @@ import { UserSelector } from "./header/UserSelector";
 import { FilterPanel } from "../board/FilterPanel";
 import { MobileDrawer } from "./MobileDrawer";
 import { useMobile } from "../../hooks/useMobile";
+import { isMac } from "../../utils/platform";
 
 function FilterIcon() {
   return (
@@ -26,7 +27,15 @@ function FilterIcon() {
 
 function HamburgerIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    >
       <line x1="3" y1="6" x2="21" y2="6" />
       <line x1="3" y1="12" x2="21" y2="12" />
       <line x1="3" y1="18" x2="21" y2="18" />
@@ -55,7 +64,8 @@ export function Header({
   onFiltersChange,
 }) {
   const isMobile = useMobile();
-  const [drawerOpened, { open: openDrawer, close: closeDrawer }] = useDisclosure(false);
+  const [drawerOpened, { open: openDrawer, close: closeDrawer }] =
+    useDisclosure(false);
 
   return (
     <header className={`header ${isUserLocked ? "user-locked" : ""}`}>
@@ -112,69 +122,76 @@ export function Header({
           </Button>
         )}
 
-        {!isMobile && <StatsDisplay stats={stats} statsBadgeAnimate={statsBadgeAnimate} />}
+        {!isMobile && (
+          <StatsDisplay stats={stats} statsBadgeAnimate={statsBadgeAnimate} />
+        )}
       </div>
 
       {/* Desktop header controls */}
       {!isMobile && (
         <div className="header-right">
-        <Popover
-          opened={filterPanelExpanded}
-          onChange={setFilterPanelExpanded}
-          position="bottom-end"
-          offset={8}
-          shadow="lg"
-          withArrow={false}
-        >
-          <Popover.Target>
-            <Indicator
-              label={activeFilterCount}
-              size={16}
-              disabled={activeFilterCount === 0 || filterPanelExpanded}
-              color="orange"
+          <Popover
+            opened={filterPanelExpanded}
+            onChange={setFilterPanelExpanded}
+            position="bottom-end"
+            offset={8}
+            shadow="lg"
+            withArrow={false}
+          >
+            <Popover.Target>
+              <Tooltip label={`Filter (${isMac ? "⌘" : "Ctrl"} + X)`}>
+                <Indicator
+                  label={activeFilterCount}
+                  size={16}
+                  disabled={activeFilterCount === 0 || filterPanelExpanded}
+                  color="orange"
+                >
+                  <ActionIcon
+                    variant={filterPanelExpanded ? "filled" : "light"}
+                    color={activeFilterCount > 0 ? "orange" : "gray"}
+                    size="lg"
+                    onClick={() => setFilterPanelExpanded(!filterPanelExpanded)}
+                    disabled={isUserLocked}
+                    aria-label="Toggle filters"
+                  >
+                    <FilterIcon />
+                  </ActionIcon>
+                </Indicator>
+              </Tooltip>
+            </Popover.Target>
+            <Popover.Dropdown
+              p={0}
+              style={{ border: "none", background: "transparent" }}
             >
-              <ActionIcon
-                variant={filterPanelExpanded ? "filled" : "light"}
-                color={activeFilterCount > 0 ? "orange" : "gray"}
-                size="lg"
-                onClick={() => setFilterPanelExpanded(!filterPanelExpanded)}
-                disabled={isUserLocked}
-                aria-label="Toggle filters"
-              >
-                <FilterIcon />
-              </ActionIcon>
-            </Indicator>
-          </Popover.Target>
-          <Popover.Dropdown p={0} style={{ border: "none", background: "transparent" }}>
-            <FilterPanel
-              currentUserId={currentUserId}
-              appliedFilters={activeFilters}
-              onApply={onFiltersChange}
-              onClose={() => setFilterPanelExpanded(false)}
-            />
-          </Popover.Dropdown>
-        </Popover>
-        <SearchButton isUserLocked={isUserLocked} />
-        <ActivityButton
-          hasNewActivity={hasNewActivity}
-          setShowActivityLog={setShowActivityLog}
-          isUserLocked={isUserLocked}
-        />
-        <ThemeToggle
-          colorScheme={colorScheme}
-          setColorScheme={setColorScheme}
-          isUserLocked={isUserLocked}
-        />
-        <UserSelector
-          users={users}
-          currentUser={currentUser}
-          currentUserId={currentUserId}
-          setCurrentUserId={setCurrentUserId}
-          allExpanded={allExpanded}
-          toggleAllSubtasks={toggleAllSubtasks}
-          isUserLocked={isUserLocked}
-        />
-      </div>
+              <FilterPanel
+                currentUserId={currentUserId}
+                appliedFilters={activeFilters}
+                onApply={onFiltersChange}
+                onClose={() => setFilterPanelExpanded(false)}
+              />
+            </Popover.Dropdown>
+          </Popover>
+          <SearchButton isUserLocked={isUserLocked} />
+          <ActivityButton
+            hasNewActivity={hasNewActivity}
+            setShowActivityLog={setShowActivityLog}
+            isUserLocked={isUserLocked}
+          />
+          <ThemeToggle
+            colorScheme={colorScheme}
+            setColorScheme={setColorScheme}
+            isUserLocked={isUserLocked}
+          />
+          <UserSelector
+            users={users}
+            currentUser={currentUser}
+            currentUserId={currentUserId}
+            setCurrentUserId={setCurrentUserId}
+            allExpanded={allExpanded}
+            toggleAllSubtasks={toggleAllSubtasks}
+            isUserLocked={isUserLocked}
+          />
+        </div>
       )}
 
       {/* Mobile: Search button only in header (other controls in drawer) */}
