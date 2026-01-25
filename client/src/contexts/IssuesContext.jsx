@@ -385,6 +385,14 @@ export function IssuesProvider({
     cacheManager,
   });
 
+  const setSubtasksCache = useCallback((value) => {
+    if (typeof value === 'function') {
+      dispatch({ type: 'SET_SUBTASKS_CACHE', value: value(stateRef.current.subtasksCache) });
+    } else {
+      dispatch({ type: 'SET_SUBTASKS_CACHE', value });
+    }
+  }, []);
+
   return (
     <IssuesContext.Provider
       value={{
@@ -396,6 +404,7 @@ export function IssuesProvider({
         fetchSubtasksForParent: cacheManager.fetchSubtasksForParent,
         refreshSubtasksCache,
         setExpandedIssues,
+        setSubtasksCache,
         ...statusActions,
         ...issueActions,
         deleteIssue,
