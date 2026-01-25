@@ -6,3 +6,5 @@ server/db/*.db
 .DS_Store
 *.log
 CLAUDE.md
+.planning/
+.interface-design/
