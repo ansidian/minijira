@@ -14,6 +14,7 @@ import { ActivityProvider } from "./contexts/ActivityContext";
 import { BoardProvider } from "./contexts/BoardContext";
 import { IssuesProvider } from "./contexts/IssuesContext";
 import { useActivity } from "./contexts/hooks/useActivity";
+import { useBoard } from "./contexts/hooks/useBoard";
 import { useIssues } from "./contexts/hooks/useIssues";
 import { useUI } from "./contexts/UIContext";
 import { useUsers } from "./contexts/UsersContext";
@@ -76,6 +77,11 @@ function AppContent() {
   const { showActivityLog, setShowActivityLog, hasNewActivity } = useActivity();
   const { users, currentUserId, setCurrentUserId } = useUsers();
   const { allExpanded, toggleAllSubtasks } = useSubtaskToggle();
+  const {
+    filterPanelExpanded,
+    setFilterPanelExpanded,
+    activeFilterCount,
+  } = useBoard();
   const isUserLocked = !currentUserId;
 
   // Theme toggle
@@ -172,6 +178,9 @@ function AppContent() {
           currentUser={currentUser}
           currentUserId={currentUserId}
           setCurrentUserId={setCurrentUserId}
+          filterPanelExpanded={filterPanelExpanded}
+          setFilterPanelExpanded={setFilterPanelExpanded}
+          activeFilterCount={activeFilterCount}
         />
 
         {/* Board */}
