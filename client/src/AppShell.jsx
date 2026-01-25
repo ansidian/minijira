@@ -70,8 +70,6 @@ function AppContent() {
     setAutoShowSubtaskForm,
     statsBadgeAnimate,
     setStatsBadgeAnimate,
-    previousStats,
-    setPreviousStats,
   } = useUI();
   const { showActivityLog, setShowActivityLog, hasNewActivity } = useActivity();
   const { users, currentUserId, setCurrentUserId } = useUsers();
@@ -115,8 +113,6 @@ function AppContent() {
 
   useStatsAnimation({
     stats,
-    previousStats,
-    setPreviousStats,
     setStatsBadgeAnimate,
   });
 
