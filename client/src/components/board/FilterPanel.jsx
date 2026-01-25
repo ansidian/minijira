@@ -103,6 +103,7 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
     draftFilters.assignee.length > 0 ||
     draftFilters.priority.length > 0 ||
     draftFilters.myIssues ||
+    draftFilters.showArchived ||
     (draftFilters.createdRange[0] && draftFilters.createdRange[1]) ||
     (draftFilters.updatedRange[0] && draftFilters.updatedRange[1]);
 
@@ -155,6 +156,7 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
       assignee: [],
       priority: [],
       myIssues: false,
+      showArchived: false,
       createdRange: [null, null],
       updatedRange: [null, null],
     };
@@ -346,6 +348,14 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
           checked={draftFilters.myIssues}
           onChange={toggleMyIssues}
           disabled={!currentUserId}
+          size="sm"
+        />
+
+        {/* Show Archived toggle */}
+        <Checkbox
+          label="Show Archived"
+          checked={draftFilters.showArchived}
+          onChange={() => setDraftFilters((prev) => ({ ...prev, showArchived: !prev.showArchived }))}
           size="sm"
         />
 

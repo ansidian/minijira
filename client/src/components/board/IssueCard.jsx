@@ -65,6 +65,7 @@ export function IssueCard({
         className={dragging ? "dragging" : "issue-card"}
         data-pending={issue._isPending ? "true" : undefined}
         data-failing={issue._isFailing ? "true" : undefined}
+        data-archived={issue.archived_at ? "true" : undefined}
         onClick={() => onClick(issue)}
         onContextMenu={handleContextMenu}
         draggable

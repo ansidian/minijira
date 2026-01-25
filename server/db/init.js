@@ -101,6 +101,17 @@ async function init() {
     // Column already exists, ignore
   }
 
+  // Migration: Add archived_at column for auto-archiving done issues
+  try {
+    await db.execute(`ALTER TABLE issues ADD COLUMN archived_at DATETIME`);
+  } catch (err) {
+    // Column already exists, ignore
+  }
+
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_issues_archived_at ON issues(archived_at)
+  `);
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS counters (
       name TEXT PRIMARY KEY,

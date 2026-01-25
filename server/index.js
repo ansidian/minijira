@@ -12,6 +12,7 @@ import notificationsRouter from './routes/notifications-routes.js';
 import { startQueueProcessor, stopQueueProcessor, awaitInFlight } from "./utils/queue-processor.js";
 import { closeDb } from "./db/connection.js";
 import { cleanupActivityLog } from './jobs/cleanup.js';
+import { archiveDoneIssues } from './jobs/archive.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -54,12 +55,19 @@ const server = app.listen(PORT, async () => {
     // Don't crash server on cleanup failure
   });
 
-  // Schedule daily cleanup (24 hours)
+  // Run archive on startup
+  archiveDoneIssues().catch(err => {
+    console.error('[Startup] Archive job failed:', err);
+  });
+
+  // Schedule daily maintenance jobs (24 hours)
   const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
   cleanupIntervalId = setInterval(() => {
     cleanupActivityLog().catch(err => {
       console.error('[Scheduled] Activity log cleanup failed:', err);
-      // Log but continue - will retry on next interval
+    });
+    archiveDoneIssues().catch(err => {
+      console.error('[Scheduled] Archive job failed:', err);
     });
   }, CLEANUP_INTERVAL_MS);
 });

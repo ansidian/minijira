@@ -9,6 +9,7 @@ const INITIAL_FILTERS = {
   assignee: [],
   priority: [],
   myIssues: false,
+  showArchived: false,
   createdRange: [null, null],
   updatedRange: [null, null],
 };
@@ -38,6 +39,7 @@ function getFiltersFromUrl() {
     assignee: params.getAll('assignee'),
     priority: params.getAll('priority'),
     myIssues: params.get('my') === 'true',
+    showArchived: params.get('archived') === 'true',
     createdRange: (createdFrom && createdTo) ? [new Date(createdFrom), new Date(createdTo)] : [null, null],
     updatedRange: (updatedFrom && updatedTo) ? [new Date(updatedFrom), new Date(updatedTo)] : [null, null],
   };
@@ -72,6 +74,7 @@ export function BoardProvider({ children }) {
       urlFilters.assignee.length > 0 ||
       urlFilters.priority.length > 0 ||
       urlFilters.myIssues ||
+      urlFilters.showArchived ||
       (urlFilters.createdRange[0] && urlFilters.createdRange[1]) ||
       (urlFilters.updatedRange[0] && urlFilters.updatedRange[1]);
     return hasUrlFilters ? urlFilters : INITIAL_FILTERS;
@@ -82,6 +85,7 @@ export function BoardProvider({ children }) {
     activeFilters.assignee.length +
     activeFilters.priority.length +
     (activeFilters.myIssues ? 1 : 0) +
+    (activeFilters.showArchived ? 1 : 0) +
     (activeFilters.createdRange?.[0] && activeFilters.createdRange?.[1] ? 1 : 0) +
     (activeFilters.updatedRange?.[0] && activeFilters.updatedRange?.[1] ? 1 : 0);
 
@@ -97,6 +101,7 @@ export function BoardProvider({ children }) {
       params.delete('assignee');
       params.delete('priority');
       params.delete('my');
+      params.delete('archived');
       params.delete('created_from');
       params.delete('created_to');
       params.delete('updated_from');
@@ -106,6 +111,7 @@ export function BoardProvider({ children }) {
       filters.assignee?.forEach(a => params.append('assignee', a));
       filters.priority?.forEach(p => params.append('priority', p));
       if (filters.myIssues) params.set('my', 'true');
+      if (filters.showArchived) params.set('archived', 'true');
       // Add date ranges as ISO strings (ensureDate handles dayjs objects from DatePickerInput)
       if (filters.createdRange?.[0] && filters.createdRange?.[1]) {
         params.set('created_from', ensureDate(filters.createdRange[0]).toISOString());

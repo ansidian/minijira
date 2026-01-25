@@ -650,3 +650,16 @@ body {
 }
 
 /* Hide hints on mobile */
+
+/* Archived issue styling - muted/faded appearance */
+.issue-card[data-archived="true"],
+.subtask-card[data-archived="true"] {
+	opacity: 0.55;
+	filter: grayscale(30%);
+}
+
+.issue-card[data-archived="true"]:hover,
+.subtask-card[data-archived="true"]:hover {
+	opacity: 0.75;
+	filter: grayscale(15%);
+}

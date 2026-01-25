@@ -47,6 +47,11 @@ function buildFilterParams(filters) {
     params.append('updated_before', updatedEnd.toISOString());
   }
 
+  // Archive filter
+  if (filters.showArchived) {
+    params.append('show_archived', 'true');
+  }
+
   return params.toString();
 }
 
@@ -55,6 +60,7 @@ const EMPTY_FILTERS = {
   assignee: [],
   priority: [],
   myIssues: false,
+  showArchived: false,
   createdRange: [null, null],
   updatedRange: [null, null],
 };

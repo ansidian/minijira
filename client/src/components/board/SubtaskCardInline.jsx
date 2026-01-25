@@ -44,6 +44,7 @@ export function SubtaskCardInline({
         p="sm"
         withBorder
         className="subtask-card"
+        data-archived={subtask.archived_at ? "true" : undefined}
         style={{
           cursor: "pointer",
           backgroundColor: "var(--bg-tertiary)",

@@ -110,6 +110,12 @@ router.get("/", async (req, res) => {
       args.push(updated_before);
     }
 
+    // Archive filter - hide archived by default unless show_archived=true
+    const showArchived = req.query.show_archived === 'true';
+    if (!showArchived) {
+      sql += " AND issues.archived_at IS NULL";
+    }
+
     // Cursor-based pagination (keyset pagination)
     if (cursorData) {
       sql += " AND (issues.created_at < ? OR (issues.created_at = ? AND issues.id < ?))";
@@ -151,7 +157,7 @@ router.get("/", async (req, res) => {
 // Must be defined BEFORE /:id routes to avoid :id capturing "subtasks"
 router.get("/subtasks/batch", async (req, res) => {
   try {
-    const { parent_ids } = req.query;
+    const { parent_ids, show_archived } = req.query;
 
     if (!parent_ids) {
       return res.status(400).json({ error: "parent_ids required" });
@@ -165,10 +171,11 @@ router.get("/subtasks/batch", async (req, res) => {
 
     // SQLite IN clause efficient for <1000 items
     const placeholders = ids.map(() => '?').join(',');
+    const archiveFilter = show_archived === 'true' ? '' : ' AND issues.archived_at IS NULL';
     const { rows } = await db.execute({
       sql: `
         ${subtaskSelect}
-        WHERE issues.parent_id IN (${placeholders})
+        WHERE issues.parent_id IN (${placeholders})${archiveFilter}
         ORDER BY issues.parent_id, issues.created_at ASC
       `,
       args: ids,
@@ -191,10 +198,12 @@ router.get("/subtasks/batch", async (req, res) => {
 
 router.get("/:id/subtasks", async (req, res) => {
   try {
+    const showArchived = req.query.show_archived === 'true';
+    const archiveFilter = showArchived ? '' : ' AND issues.archived_at IS NULL';
     const { rows } = await db.execute({
       sql: `
         ${subtaskSelect}
-        WHERE issues.parent_id = ?
+        WHERE issues.parent_id = ?${archiveFilter}
         ORDER BY issues.created_at ASC
       `,
       args: [req.params.id],
@@ -365,6 +374,9 @@ router.patch("/:id", async (req, res) => {
       if (status !== "done" && existing[0].status === "done") {
         updates.push("previous_status = ?");
         args.push(null);
+        // Clear archive when moving out of done
+        updates.push("archived_at = ?");
+        args.push(null);
       }
       updates.push("status = ?");
       args.push(status);
@@ -452,6 +464,14 @@ router.patch("/:id", async (req, res) => {
       }
       if (description !== undefined && oldIssue.description !== description) {
         notificationChanges.push({ action_type: 'description_changed', old_value: oldIssue.description, new_value: description });
+      }
+
+      // If parent was unarchived (moved out of done), unarchive its subtasks too
+      if (status !== undefined && status !== "done" && oldIssue.status === "done" && oldIssue.parent_id === null) {
+        await db.execute({
+          sql: `UPDATE issues SET archived_at = NULL WHERE parent_id = ?`,
+          args: [id]
+        });
       }
     }
 
