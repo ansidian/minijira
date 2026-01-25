@@ -83,6 +83,10 @@ export function IssueDetailModal({
         />
       }
       withCloseButton={true}
+      fullScreen={isMobile}
+      radius={isMobile ? 0 : undefined}
+      transitionProps={{ transition: isMobile ? 'fade' : 'pop', duration: 200 }}
+      overlayProps={{ backgroundOpacity: 0.55, blur: isMobile ? 0 : 3 }}
       classNames={{
         content: shake ? "shake" : "",
         body: "modal-body-reset",
