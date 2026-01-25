@@ -249,24 +249,15 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
             type="range"
             presets={[
               {
-                value: [
-                  today.subtract(2, "day").toDate(),
-                  today.toDate(),
-                ],
+                value: [today.subtract(2, "day").toDate(), today.toDate()],
                 label: "Last two days",
               },
               {
-                value: [
-                  today.subtract(7, "day").toDate(),
-                  today.toDate(),
-                ],
+                value: [today.subtract(7, "day").toDate(), today.toDate()],
                 label: "Last 7 days",
               },
               {
-                value: [
-                  today.startOf("month").toDate(),
-                  today.toDate(),
-                ],
+                value: [today.startOf("month").toDate(), today.toDate()],
                 label: "This month",
               },
               {
@@ -288,6 +279,7 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
             onChange={(range) =>
               setDraftFilters((prev) => ({ ...prev, createdRange: range }))
             }
+            allowSingleDateInRange
             placeholder="Select date range"
             firstDayOfWeek={0}
             size="sm"
@@ -306,24 +298,15 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
             type="range"
             presets={[
               {
-                value: [
-                  today.subtract(2, "day").toDate(),
-                  today.toDate(),
-                ],
+                value: [today.subtract(2, "day").toDate(), today.toDate()],
                 label: "Last two days",
               },
               {
-                value: [
-                  today.subtract(7, "day").toDate(),
-                  today.toDate(),
-                ],
+                value: [today.subtract(7, "day").toDate(), today.toDate()],
                 label: "Last 7 days",
               },
               {
-                value: [
-                  today.startOf("month").toDate(),
-                  today.toDate(),
-                ],
+                value: [today.startOf("month").toDate(), today.toDate()],
                 label: "This month",
               },
               {
@@ -346,6 +329,7 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
               setDraftFilters((prev) => ({ ...prev, updatedRange: range }))
             }
             placeholder="Select date range"
+            allowSingleDateInRange
             firstDayOfWeek={0}
             size="sm"
             clearable
