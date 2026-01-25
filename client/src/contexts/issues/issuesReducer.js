@@ -1,3 +1,11 @@
+// Initial pagination state for each column
+const createInitialPaginationState = () => ({
+  todo: { cursor: null, hasMore: true, loading: false, total: 0 },
+  in_progress: { cursor: null, hasMore: true, loading: false, total: 0 },
+  review: { cursor: null, hasMore: true, loading: false, total: 0 },
+  done: { cursor: null, hasMore: true, loading: false, total: 0 },
+});
+
 export const initialState = {
   issues: [],
   allIssues: [],
@@ -11,6 +19,7 @@ export const initialState = {
   loading: true,
   expandedIssues: new Set(),
   subtasksCache: {},
+  paginationState: createInitialPaginationState(),
 };
 
 export function issuesReducer(state, action) {
@@ -96,6 +105,61 @@ export function issuesReducer(state, action) {
         allIssues: state.allIssues.map((issue) =>
           issue.id === action.id ? { ...issue, _isPending: action.pending } : issue,
         ),
+      };
+    case "SET_PAGINATION_STATE":
+      // Update specific column's pagination state
+      // action: { status: string, updates: Partial<PaginationState> }
+      return {
+        ...state,
+        paginationState: {
+          ...state.paginationState,
+          [action.status]: {
+            ...state.paginationState[action.status],
+            ...action.updates,
+          },
+        },
+      };
+    case "RESET_PAGINATION":
+      // Reset all columns to initial state (on filter change)
+      return {
+        ...state,
+        issues: [],
+        paginationState: createInitialPaginationState(),
+      };
+    case "SET_COLUMN_ISSUES":
+      // Set issues for a specific column (initial load)
+      // action: { status: string, issues: Issue[], cursor: string|null, hasMore: boolean, total: number }
+      return {
+        ...state,
+        issues: [
+          ...state.issues.filter((i) => i.status !== action.status),
+          ...action.issues,
+        ],
+        paginationState: {
+          ...state.paginationState,
+          [action.status]: {
+            cursor: action.cursor,
+            hasMore: action.hasMore,
+            loading: false,
+            total: action.total,
+          },
+        },
+      };
+    case "APPEND_ISSUES":
+      // Append new issues to existing list (for Load More)
+      // action: { status: string, issues: Issue[], cursor: string|null, hasMore: boolean }
+      return {
+        ...state,
+        issues: [...state.issues, ...action.issues],
+        paginationState: {
+          ...state.paginationState,
+          [action.status]: {
+            ...state.paginationState[action.status],
+            cursor: action.cursor,
+            hasMore: action.hasMore,
+            loading: false,
+          },
+        },
       };
     default:
       return state;
