@@ -9,8 +9,6 @@ import {
   Checkbox,
   Divider,
 } from "@mantine/core";
-import { useDebouncedValue } from "@mantine/hooks";
-import { useQueryParams } from "../../hooks/useQueryParams";
 import { useUsers } from "../../contexts/UsersContext";
 
 const STATUS_OPTIONS = [
@@ -60,9 +58,16 @@ function FilterChip({ label, color, selected, onClick }) {
   );
 }
 
-export function FilterPanel({ currentUserId, onFiltersChange, onClose }) {
-  const [params, setParams] = useQueryParams();
+export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose }) {
   const { users } = useUsers();
+
+  // Draft state for local edits - initialized from applied
+  const [draftFilters, setDraftFilters] = useState(appliedFilters);
+
+  // Sync draft to applied when panel first opens or applied changes externally
+  useEffect(() => {
+    setDraftFilters(appliedFilters);
+  }, [appliedFilters]);
 
   // Assignee options: Unassigned first, then all users
   const assigneeOptions = useMemo(() => {
@@ -72,51 +77,27 @@ export function FilterPanel({ currentUserId, onFiltersChange, onClose }) {
     ];
   }, [users]);
 
-  // Initialize from URL
-  const [filters, setFilters] = useState(() => ({
-    status: params.getAll("status"),
-    assignee: params.getAll("assignee"),
-    priority: params.getAll("priority"),
-    myIssues: params.get("my") === "true",
-  }));
+  // Check if draft differs from applied
+  const hasChanges = JSON.stringify(draftFilters) !== JSON.stringify(appliedFilters);
 
-  const [debouncedFilters] = useDebouncedValue(filters, 300);
+  const hasActiveFilters =
+    draftFilters.status.length > 0 ||
+    draftFilters.assignee.length > 0 ||
+    draftFilters.priority.length > 0 ||
+    draftFilters.myIssues;
 
-  // Sync debounced filters to URL and notify parent
-  useEffect(() => {
-    setParams({
-      status: debouncedFilters.status.length ? debouncedFilters.status : null,
-      assignee: debouncedFilters.assignee.length
-        ? debouncedFilters.assignee
-        : null,
-      priority: debouncedFilters.priority.length
-        ? debouncedFilters.priority
-        : null,
-      my: debouncedFilters.myIssues ? "true" : null,
-    });
-    onFiltersChange(debouncedFilters);
-  }, [debouncedFilters, setParams, onFiltersChange]);
+  function handleApply() {
+    onApply(draftFilters);
+    onClose();
+  }
 
-  // Listen for URL changes (browser back/forward) and sync to local state
-  useEffect(() => {
-    const newFilters = {
-      status: params.getAll("status"),
-      assignee: params.getAll("assignee"),
-      priority: params.getAll("priority"),
-      myIssues: params.get("my") === "true",
-    };
-
-    // Only update if actually different to avoid loops
-    const isDifferent =
-      JSON.stringify(newFilters) !== JSON.stringify(filters);
-
-    if (isDifferent) {
-      setFilters(newFilters);
-    }
-  }, [params]);
+  function handleCancel() {
+    setDraftFilters(appliedFilters); // Revert to last applied
+    onClose();
+  }
 
   const toggleStatus = (value) => {
-    setFilters((prev) => ({
+    setDraftFilters((prev) => ({
       ...prev,
       status: prev.status.includes(value)
         ? prev.status.filter((s) => s !== value)
@@ -125,7 +106,7 @@ export function FilterPanel({ currentUserId, onFiltersChange, onClose }) {
   };
 
   const togglePriority = (value) => {
-    setFilters((prev) => ({
+    setDraftFilters((prev) => ({
       ...prev,
       priority: prev.priority.includes(value)
         ? prev.priority.filter((p) => p !== value)
@@ -134,30 +115,24 @@ export function FilterPanel({ currentUserId, onFiltersChange, onClose }) {
   };
 
   const setAssignee = (value) => {
-    setFilters((prev) => ({
+    setDraftFilters((prev) => ({
       ...prev,
       assignee: value ? [value] : [],
     }));
   };
 
   const toggleMyIssues = () => {
-    setFilters((prev) => ({ ...prev, myIssues: !prev.myIssues }));
+    setDraftFilters((prev) => ({ ...prev, myIssues: !prev.myIssues }));
   };
 
   const clearAllFilters = () => {
-    setFilters({
+    setDraftFilters({
       status: [],
       assignee: [],
       priority: [],
       myIssues: false,
     });
   };
-
-  const hasActiveFilters =
-    filters.status.length > 0 ||
-    filters.assignee.length > 0 ||
-    filters.priority.length > 0 ||
-    filters.myIssues;
 
   return (
     <div
@@ -180,7 +155,7 @@ export function FilterPanel({ currentUserId, onFiltersChange, onClose }) {
         <Text size="sm" fw={600} c="var(--text-primary)">
           Filters
         </Text>
-        <CloseButton size="sm" onClick={onClose} />
+        <CloseButton size="sm" onClick={handleCancel} />
       </Group>
 
       <Stack gap="md" p="sm">
@@ -195,7 +170,7 @@ export function FilterPanel({ currentUserId, onFiltersChange, onClose }) {
                 key={opt.value}
                 label={opt.label}
                 color={opt.color}
-                selected={filters.status.includes(opt.value)}
+                selected={draftFilters.status.includes(opt.value)}
                 onClick={() => toggleStatus(opt.value)}
               />
             ))}
@@ -213,7 +188,7 @@ export function FilterPanel({ currentUserId, onFiltersChange, onClose }) {
                 key={opt.value}
                 label={opt.label}
                 color={opt.color}
-                selected={filters.priority.includes(opt.value)}
+                selected={draftFilters.priority.includes(opt.value)}
                 onClick={() => togglePriority(opt.value)}
               />
             ))}
@@ -227,7 +202,7 @@ export function FilterPanel({ currentUserId, onFiltersChange, onClose }) {
           </Text>
           <Select
             data={assigneeOptions}
-            value={filters.assignee[0] || null}
+            value={draftFilters.assignee[0] || null}
             onChange={setAssignee}
             placeholder="Anyone"
             searchable
@@ -242,24 +217,28 @@ export function FilterPanel({ currentUserId, onFiltersChange, onClose }) {
         {/* My Issues toggle */}
         <Checkbox
           label="My Issues Only"
-          checked={filters.myIssues}
+          checked={draftFilters.myIssues}
           onChange={toggleMyIssues}
           disabled={!currentUserId}
           size="sm"
         />
 
-        {/* Clear All */}
-        {hasActiveFilters && (
-          <Button
-            variant="subtle"
-            color="violet"
-            size="xs"
-            fullWidth
-            onClick={clearAllFilters}
-          >
-            Clear All Filters
+        {/* Apply/Cancel buttons */}
+        <Group justify="space-between" mt="xs">
+          <Button variant="subtle" color="gray" size="xs" onClick={handleCancel}>
+            Cancel
           </Button>
-        )}
+          <Group gap="xs">
+            {hasActiveFilters && (
+              <Button variant="subtle" color="red" size="xs" onClick={clearAllFilters}>
+                Clear
+              </Button>
+            )}
+            <Button color="violet" size="xs" onClick={handleApply} disabled={!hasChanges}>
+              Apply
+            </Button>
+          </Group>
+        </Group>
       </Stack>
     </div>
   );

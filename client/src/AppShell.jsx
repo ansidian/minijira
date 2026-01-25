@@ -79,7 +79,9 @@ function AppContent() {
   const {
     filterPanelExpanded,
     setFilterPanelExpanded,
+    activeFilters,
     activeFilterCount,
+    handleFiltersChange,
   } = useBoard();
   const isUserLocked = !currentUserId;
 
@@ -177,6 +179,8 @@ function AppContent() {
           filterPanelExpanded={filterPanelExpanded}
           setFilterPanelExpanded={setFilterPanelExpanded}
           activeFilterCount={activeFilterCount}
+          activeFilters={activeFilters}
+          onFiltersChange={handleFiltersChange}
         />
 
         {/* Board */}

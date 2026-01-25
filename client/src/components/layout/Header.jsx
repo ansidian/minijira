@@ -1,9 +1,10 @@
-import { Button, ActionIcon, Indicator } from "@mantine/core";
+import { Button, ActionIcon, Indicator, Popover } from "@mantine/core";
 import { StatsDisplay } from "./header/StatsDisplay";
 import { SearchButton } from "./header/SearchButton";
 import { ActivityButton } from "./header/ActivityButton";
 import { ThemeToggle } from "./header/ThemeToggle";
 import { UserSelector } from "./header/UserSelector";
+import { FilterPanel } from "../board/FilterPanel";
 
 function FilterIcon() {
   return (
@@ -37,6 +38,8 @@ export function Header({
   filterPanelExpanded,
   setFilterPanelExpanded,
   activeFilterCount,
+  activeFilters,
+  onFiltersChange,
 }) {
   return (
     <header className={`header ${isUserLocked ? "user-locked" : ""}`}>
@@ -77,23 +80,42 @@ export function Header({
         <StatsDisplay stats={stats} statsBadgeAnimate={statsBadgeAnimate} />
       </div>
       <div className="header-right">
-        <Indicator
-          label={activeFilterCount}
-          size={16}
-          disabled={activeFilterCount === 0 || filterPanelExpanded}
-          color="blue"
+        <Popover
+          opened={filterPanelExpanded}
+          onChange={setFilterPanelExpanded}
+          position="bottom-end"
+          offset={8}
+          shadow="lg"
+          withArrow={false}
         >
-          <ActionIcon
-            variant={filterPanelExpanded ? "filled" : "light"}
-            color={activeFilterCount > 0 ? "blue" : "gray"}
-            size="lg"
-            onClick={() => setFilterPanelExpanded(!filterPanelExpanded)}
-            disabled={isUserLocked}
-            aria-label="Toggle filters"
-          >
-            <FilterIcon />
-          </ActionIcon>
-        </Indicator>
+          <Popover.Target>
+            <Indicator
+              label={activeFilterCount}
+              size={16}
+              disabled={activeFilterCount === 0 || filterPanelExpanded}
+              color="violet"
+            >
+              <ActionIcon
+                variant={filterPanelExpanded ? "filled" : "light"}
+                color={activeFilterCount > 0 ? "violet" : "gray"}
+                size="lg"
+                onClick={() => setFilterPanelExpanded(!filterPanelExpanded)}
+                disabled={isUserLocked}
+                aria-label="Toggle filters"
+              >
+                <FilterIcon />
+              </ActionIcon>
+            </Indicator>
+          </Popover.Target>
+          <Popover.Dropdown p={0} style={{ border: "none", background: "transparent" }}>
+            <FilterPanel
+              currentUserId={currentUserId}
+              appliedFilters={activeFilters}
+              onApply={onFiltersChange}
+              onClose={() => setFilterPanelExpanded(false)}
+            />
+          </Popover.Dropdown>
+        </Popover>
         <SearchButton isUserLocked={isUserLocked} />
         <ActivityButton
           hasNewActivity={hasNewActivity}
