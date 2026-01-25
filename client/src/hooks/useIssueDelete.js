@@ -1,5 +1,5 @@
-import { useRef } from "react";
-import { api } from "../utils/api";
+import { useRef, useEffect } from "react";
+import { api, API_BASE } from "../utils/api";
 
 export function useIssueDelete({
   dispatch,
@@ -14,6 +14,26 @@ export function useIssueDelete({
   const pendingDeletesRef = useRef(new Map());
   // Track issues with in-progress API calls to prevent concurrent deletes
   const deletingNowRef = useRef(new Set());
+
+  // Ensure pending deletes fire when user leaves the page
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      for (const [issueId, pending] of pendingDeletesRef.current) {
+        clearTimeout(pending.timeoutId);
+        // Use keepalive to ensure request completes even as page unloads
+        fetch(`${API_BASE}/issues/${issueId}`, {
+          method: "DELETE",
+          keepalive: true,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: getCurrentUserId() }),
+        });
+      }
+      pendingDeletesRef.current.clear();
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [getCurrentUserId]);
 
   const deleteIssue = async (issueId) => {
     const userId = getCurrentUserId();
