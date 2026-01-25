@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+// Note: useEffect removed - initial data load handled by IssuesContext
 import { useMantineColorScheme } from "@mantine/core";
 import { useHotkeys } from "@mantine/hooks";
 import { ContextMenuProvider } from "mantine-contextmenu";
@@ -54,7 +54,6 @@ function AppContent() {
   const {
     allIssues,
     stats,
-    loadData,
     createIssue,
     deleteIssue,
     updateIssue,
@@ -119,10 +118,7 @@ function AppContent() {
     setStatsBadgeAnimate,
   });
 
-  // Load data
-  useEffect(() => {
-    loadData();
-  }, []);
+  // Note: Initial data load is handled by IssuesContext on mount
 
   // Handle viewing a different issue (for subtask navigation)
   async function handleViewIssue(issueId) {

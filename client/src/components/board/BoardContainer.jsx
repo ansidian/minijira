@@ -10,11 +10,13 @@ export function BoardContainer({ isTouchDevice }) {
     users,
     expandedIssues,
     subtasksCache,
+    paginationState,
     handleStatusChange,
     updateIssue,
     deleteIssue,
     handleSubtaskChange,
     toggleSubtasks,
+    loadMoreIssues,
     requestAddSubtask,
     filterPanelExpanded,
     handleFiltersChange,
@@ -47,6 +49,8 @@ export function BoardContainer({ isTouchDevice }) {
         onToggleSubtasks={toggleSubtasks}
         onRequestAddSubtask={requestAddSubtask}
         isTouchDevice={isTouchDevice}
+        paginationState={paginationState}
+        onLoadMore={loadMoreIssues}
       />
     </>
   );

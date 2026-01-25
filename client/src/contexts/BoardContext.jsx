@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { useIssues } from "./hooks/useIssues";
 import { useUsers } from "./UsersContext";
 import { useUI } from "./UIContext";
@@ -16,15 +16,19 @@ export function BoardProvider({ children }) {
     issues,
     expandedIssues,
     subtasksCache,
+    paginationState,
     handleStatusChange,
     updateIssue,
     updateIssueWithUndo,
     deleteIssue,
     handleSubtaskChange,
     toggleSubtasks,
+    loadMoreIssues,
+    loadWithFilters,
   } = useIssues();
   const { users, currentUserId } = useUsers();
   const { setAutoShowSubtaskForm, setSelectedIssue } = useUI();
+  const isInitialMount = useRef(true);
 
   // Filter panel state
   const [filterPanelExpanded, setFilterPanelExpanded] = useState(false);
@@ -36,73 +40,56 @@ export function BoardProvider({ children }) {
     activeFilters.priority.length +
     (activeFilters.myIssues ? 1 : 0);
 
-  // Memoized callback for filter changes from FilterPanel
-  const handleFiltersChange = useCallback((filters) => {
-    setActiveFilters(filters);
-  }, []);
+  // Handle filter changes - trigger server-side fetch
+  const handleFiltersChange = useCallback(
+    (filters) => {
+      setActiveFilters(filters);
+      // Server-side filtering - fetch with new filters
+      loadWithFilters(filters);
+    },
+    [loadWithFilters]
+  );
 
-  // Apply client-side filtering (temporary until Plan 04 server-side)
-  const filteredIssues = useMemo(() => {
-    return issues.filter((issue) => {
-      // Only filter parent issues (subtasks handled separately)
-      if (issue.parent_id) return true;
+  // Reload with filters when currentUserId changes (for myIssues filter)
+  useEffect(() => {
+    // Skip initial mount - IssuesContext handles that
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    // If myIssues is active, we need to reload when user changes
+    if (activeFilters.myIssues) {
+      loadWithFilters(activeFilters);
+    }
+  }, [currentUserId, activeFilters, loadWithFilters]);
 
-      // Status filter (OR within)
-      if (
-        activeFilters.status.length > 0 &&
-        !activeFilters.status.includes(issue.status)
-      ) {
-        return false;
-      }
-
-      // Priority filter (OR within)
-      if (
-        activeFilters.priority.length > 0 &&
-        !activeFilters.priority.includes(issue.priority)
-      ) {
-        return false;
-      }
-
-      // Assignee filter (OR within)
-      if (activeFilters.assignee.length > 0) {
-        const assigneeStr = issue.assignee_id ? String(issue.assignee_id) : "0";
-        if (!activeFilters.assignee.includes(assigneeStr)) {
-          return false;
-        }
-      }
-
-      // My Issues filter
-      if (activeFilters.myIssues && issue.assignee_id !== currentUserId) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [issues, activeFilters, currentUserId]);
-
+  // Group issues by status - server handles filtering via API
   const issuesByStatus = useMemo(() => {
-    return filteredIssues.reduce(
+    return issues.reduce(
       (acc, issue) => {
+        // Only include parent issues (not subtasks)
         if (!issue.parent_id) {
           acc[issue.status] = acc[issue.status] || [];
           acc[issue.status].push(issue);
         }
         return acc;
       },
-      { todo: [], in_progress: [], review: [], done: [] },
+      { todo: [], in_progress: [], review: [], done: [] }
     );
-  }, [filteredIssues]);
+  }, [issues]);
 
   const value = {
     issuesByStatus,
     users,
     expandedIssues,
     subtasksCache,
+    paginationState,
     handleStatusChange,
     updateIssue: updateIssueWithUndo,
     deleteIssue,
     handleSubtaskChange,
     toggleSubtasks,
+    loadMoreIssues,
     requestAddSubtask: (issue) => {
       setAutoShowSubtaskForm(true);
       setSelectedIssue(issue);

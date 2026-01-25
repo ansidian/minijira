@@ -22,6 +22,8 @@ export function Board({
   onToggleSubtasks,
   onRequestAddSubtask,
   isTouchDevice,
+  paginationState,
+  onLoadMore,
 }) {
   return (
     <div className="board">
@@ -43,6 +45,8 @@ export function Board({
           onToggleSubtasks={onToggleSubtasks}
           onRequestAddSubtask={onRequestAddSubtask}
           isTouchDevice={isTouchDevice}
+          paginationState={paginationState?.[column.status]}
+          onLoadMore={() => onLoadMore?.(column.status)}
         />
       ))}
     </div>
