@@ -77,9 +77,15 @@ export function IssuesProvider({
 
   /**
    * Fetch a single column's issues with pagination and filters.
+   * Returns empty result if status filter is active and this column isn't selected.
    */
   const fetchColumnData = useCallback(
     async (status, filters, cursor = null) => {
+      // If status filter is active and this column isn't selected, skip fetch
+      if (filters.status?.length > 0 && !filters.status.includes(status)) {
+        return { issues: [], nextCursor: null, hasMore: false };
+      }
+
       const filterParams = buildFilterParams(filters);
       // Add myIssues filter if active
       const myIssuesParam =
@@ -136,13 +142,15 @@ export function IssuesProvider({
 
         // Update each column's issues and pagination state
         for (const { status, response } of columnResults) {
+          // If status filter is active and this column was skipped, show 0 total
+          const isFiltered = filters.status?.length > 0 && !filters.status.includes(status);
           dispatch({
             type: "SET_COLUMN_ISSUES",
             status,
             issues: response.issues,
             cursor: response.nextCursor,
             hasMore: response.hasMore,
-            total: statsData[status] || response.issues.length,
+            total: isFiltered ? 0 : (statsData[status] || response.issues.length),
           });
         }
 
