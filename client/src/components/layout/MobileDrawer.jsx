@@ -279,6 +279,7 @@ export function MobileDrawer({
               appliedFilters={activeFilters}
               onApply={handleFiltersChange}
               onClose={() => {}}
+              showHeader={false}
             />
           </div>
         </Stack>

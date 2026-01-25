@@ -156,7 +156,13 @@ function FilterChip({ label, color, selected, onClick }) {
   );
 }
 
-export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose }) {
+export function FilterPanel({
+  currentUserId,
+  appliedFilters,
+  onApply,
+  onClose,
+  showHeader = true,
+}) {
   const { users } = useUsers();
   const isMobile = useMobile();
   const today = dayjs();
@@ -187,11 +193,13 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
   }, [users]);
 
   // Check if draft differs from applied
-  const hasChanges = JSON.stringify(draftFilters) !== JSON.stringify({
-    ...appliedFilters,
-    createdRange: appliedFilters.createdRange || [null, null],
-    updatedRange: appliedFilters.updatedRange || [null, null],
-  });
+  const hasChanges =
+    JSON.stringify(draftFilters) !==
+    JSON.stringify({
+      ...appliedFilters,
+      createdRange: appliedFilters.createdRange || [null, null],
+      updatedRange: appliedFilters.updatedRange || [null, null],
+    });
 
   const hasActiveFilters =
     draftFilters.status.length > 0 ||
@@ -269,18 +277,20 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
       }}
     >
       {/* Header */}
-      <Group
-        justify="space-between"
-        p="sm"
-        style={{
-          borderBottom: "1px solid var(--border-primary)",
-        }}
-      >
-        <Text size="sm" fw={600} c="var(--text-primary)">
-          Filters
-        </Text>
-        <CloseButton size="sm" onClick={handleCancel} />
-      </Group>
+      {showHeader && (
+        <Group
+          justify="space-between"
+          p="sm"
+          style={{
+            borderBottom: "1px solid var(--border-primary)",
+          }}
+        >
+          <Text size="sm" fw={600} c="var(--text-primary)">
+            Filters
+          </Text>
+          <CloseButton size="sm" onClick={handleCancel} />
+        </Group>
+      )}
 
       <Stack gap="md" p="sm">
         {/* Status chips */}
@@ -415,7 +425,12 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
         <Checkbox
           label="Show Archived"
           checked={draftFilters.showArchived}
-          onChange={() => setDraftFilters((prev) => ({ ...prev, showArchived: !prev.showArchived }))}
+          onChange={() =>
+            setDraftFilters((prev) => ({
+              ...prev,
+              showArchived: !prev.showArchived,
+            }))
+          }
           size="sm"
         />
 
