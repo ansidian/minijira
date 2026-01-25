@@ -1,4 +1,10 @@
-import { createContext, useContext, useReducer } from "react";
+import {
+  createContext,
+  useContext,
+  useReducer,
+  useCallback,
+  useMemo,
+} from "react";
 
 const UIContext = createContext(null);
 
@@ -8,7 +14,6 @@ const initialState = {
   createStatus: "todo",
   autoShowSubtaskForm: false,
   statsBadgeAnimate: false,
-  previousStats: null,
 };
 
 function uiReducer(state, action) {
@@ -23,8 +28,6 @@ function uiReducer(state, action) {
       return { ...state, autoShowSubtaskForm: action.value };
     case "SET_STATS_BADGE_ANIMATE":
       return { ...state, statsBadgeAnimate: action.value };
-    case "SET_PREVIOUS_STATS":
-      return { ...state, previousStats: action.value };
     default:
       return state;
   }
@@ -33,20 +36,46 @@ function uiReducer(state, action) {
 export function UIProvider({ children }) {
   const [state, dispatch] = useReducer(uiReducer, initialState);
 
-  const value = {
-    ...state,
-    setSelectedIssue: (value) =>
-      dispatch({ type: "SET_SELECTED_ISSUE", value }),
-    setShowCreateModal: (value) =>
-      dispatch({ type: "SET_SHOW_CREATE_MODAL", value }),
-    setCreateStatus: (value) => dispatch({ type: "SET_CREATE_STATUS", value }),
-    setAutoShowSubtaskForm: (value) =>
-      dispatch({ type: "SET_AUTO_SHOW_SUBTASK_FORM", value }),
-    setStatsBadgeAnimate: (value) =>
-      dispatch({ type: "SET_STATS_BADGE_ANIMATE", value }),
-    setPreviousStats: (value) =>
-      dispatch({ type: "SET_PREVIOUS_STATS", value }),
-  };
+  // Stable function references (dispatch is stable from useReducer)
+  const setSelectedIssue = useCallback(
+    (value) => dispatch({ type: "SET_SELECTED_ISSUE", value }),
+    [],
+  );
+  const setShowCreateModal = useCallback(
+    (value) => dispatch({ type: "SET_SHOW_CREATE_MODAL", value }),
+    [],
+  );
+  const setCreateStatus = useCallback(
+    (value) => dispatch({ type: "SET_CREATE_STATUS", value }),
+    [],
+  );
+  const setAutoShowSubtaskForm = useCallback(
+    (value) => dispatch({ type: "SET_AUTO_SHOW_SUBTASK_FORM", value }),
+    [],
+  );
+  const setStatsBadgeAnimate = useCallback(
+    (value) => dispatch({ type: "SET_STATS_BADGE_ANIMATE", value }),
+    [],
+  );
+
+  const value = useMemo(
+    () => ({
+      ...state,
+      setSelectedIssue,
+      setShowCreateModal,
+      setCreateStatus,
+      setAutoShowSubtaskForm,
+      setStatsBadgeAnimate,
+    }),
+    [
+      state,
+      setSelectedIssue,
+      setShowCreateModal,
+      setCreateStatus,
+      setAutoShowSubtaskForm,
+      setStatsBadgeAnimate,
+    ],
+  );
 
   return <UIContext.Provider value={value}>{children}</UIContext.Provider>;
 }

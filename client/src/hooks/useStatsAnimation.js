@@ -1,14 +1,15 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
-export function useStatsAnimation({
-  stats,
-  previousStats,
-  setPreviousStats,
-  setStatsBadgeAnimate,
-}) {
+export function useStatsAnimation({ stats, setStatsBadgeAnimate }) {
+  const previousStatsRef = useRef(null);
+
   useEffect(() => {
+    if (!stats) return;
+
+    const previousStats = previousStatsRef.current;
+
     if (!previousStats) {
-      setPreviousStats(stats);
+      previousStatsRef.current = { ...stats };
       return;
     }
 
@@ -19,17 +20,14 @@ export function useStatsAnimation({
       previousStats.done !== stats.done;
 
     if (hasChanged) {
-      setPreviousStats(stats);
+      previousStatsRef.current = { ...stats };
+
+      // trigger animation
       setStatsBadgeAnimate(true);
       const timer = setTimeout(() => setStatsBadgeAnimate(false), 300);
       return () => clearTimeout(timer);
     }
 
     return undefined;
-  }, [
-    previousStats,
-    setPreviousStats,
-    setStatsBadgeAnimate,
-    stats,
-  ]);
+  }, [stats, setStatsBadgeAnimate]);
 }
