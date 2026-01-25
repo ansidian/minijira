@@ -7,10 +7,37 @@ import { queueNotification } from '../utils/notification-queue.js';
 
 const router = express.Router();
 
+// Cursor pagination helpers
+function encodeCursor(row) {
+  if (!row) return null;
+  return `${row.created_at}|${row.id}`;
+}
+
+function decodeCursor(cursor) {
+  if (!cursor) return null;
+  const [created_at, id] = cursor.split('|');
+  return { created_at, id: parseInt(id, 10) };
+}
+
+// Normalize query param to array (Express parses repeated params as array)
+function toArray(param) {
+  if (!param) return null;
+  return Array.isArray(param) ? param : [param];
+}
+
 router.get("/", async (req, res) => {
   try {
-    const { status, assignee_id, priority, include_subtasks, parent_id, with_counts } =
-      req.query;
+    const { include_subtasks, parent_id, with_counts, cursor, limit: limitParam } = req.query;
+
+    // Multi-value filters (can be string or array)
+    const statuses = toArray(req.query.status);
+    const assigneeIds = toArray(req.query.assignee_id);
+    const priorities = toArray(req.query.priority);
+
+    // Pagination - only enabled when limit is explicitly provided
+    const usePagination = limitParam !== undefined;
+    const limit = usePagination ? Math.min(Math.max(parseInt(limitParam) || 20, 1), 100) : null;
+    const cursorData = usePagination ? decodeCursor(cursor) : null;
 
     // Default to counts for backwards compatibility
     const baseQuery = with_counts === 'false' ? issueSelect : issueSelectWithCounts;
@@ -28,23 +55,70 @@ router.get("/", async (req, res) => {
       sql += " AND issues.parent_id IS NULL";
     }
 
-    if (status) {
-      sql += " AND issues.status = ?";
-      args.push(status);
-    }
-    if (assignee_id) {
-      sql += " AND issues.assignee_id = ?";
-      args.push(assignee_id);
-    }
-    if (priority) {
-      sql += " AND issues.priority = ?";
-      args.push(priority);
+    // Multi-value status filter (OR logic within)
+    if (statuses && statuses.length > 0) {
+      const placeholders = statuses.map(() => '?').join(', ');
+      sql += ` AND issues.status IN (${placeholders})`;
+      args.push(...statuses);
     }
 
-    sql += " ORDER BY issues.created_at DESC";
+    // Multi-value assignee filter (OR logic, with special handling for '0' = unassigned)
+    if (assigneeIds && assigneeIds.length > 0) {
+      const hasUnassigned = assigneeIds.includes('0') || assigneeIds.includes(0);
+      const numericIds = assigneeIds.filter(id => id !== '0' && id !== 0);
+
+      if (hasUnassigned && numericIds.length > 0) {
+        const placeholders = numericIds.map(() => '?').join(', ');
+        sql += ` AND (issues.assignee_id IS NULL OR issues.assignee_id IN (${placeholders}))`;
+        args.push(...numericIds);
+      } else if (hasUnassigned) {
+        sql += " AND issues.assignee_id IS NULL";
+      } else {
+        const placeholders = numericIds.map(() => '?').join(', ');
+        sql += ` AND issues.assignee_id IN (${placeholders})`;
+        args.push(...numericIds);
+      }
+    }
+
+    // Multi-value priority filter (OR logic within)
+    if (priorities && priorities.length > 0) {
+      const placeholders = priorities.map(() => '?').join(', ');
+      sql += ` AND issues.priority IN (${placeholders})`;
+      args.push(...priorities);
+    }
+
+    // Cursor-based pagination (keyset pagination)
+    if (cursorData) {
+      sql += " AND (issues.created_at < ? OR (issues.created_at = ? AND issues.id < ?))";
+      args.push(cursorData.created_at, cursorData.created_at, cursorData.id);
+    }
+
+    sql += " ORDER BY issues.created_at DESC, issues.id DESC";
+
+    // Fetch limit + 1 to determine hasMore
+    if (usePagination) {
+      sql += ` LIMIT ?`;
+      args.push(limit + 1);
+    }
 
     const { rows } = await db.execute({ sql, args });
-    res.json(rows);
+
+    // Backwards compatibility: return array when no limit param
+    if (!usePagination) {
+      return res.json(rows);
+    }
+
+    // Paginated response
+    const hasMore = rows.length > limit;
+    const issues = hasMore ? rows.slice(0, limit) : rows;
+    const lastRow = issues[issues.length - 1];
+    const nextCursor = hasMore ? encodeCursor(lastRow) : null;
+
+    res.json({
+      issues,
+      nextCursor,
+      hasMore
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
