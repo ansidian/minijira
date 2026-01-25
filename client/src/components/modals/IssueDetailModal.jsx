@@ -7,6 +7,7 @@ import { IssueMetaPanel } from "./issue-detail/IssueMetaPanel";
 import { IssueComments } from "./issue-detail/IssueComments";
 import { IssueDeleteSection } from "./issue-detail/IssueDeleteSection";
 import { useIssueDetailState } from "../../hooks/useIssueDetailState";
+import { useMobile } from "../../hooks/useMobile";
 
 export function IssueDetailModal({
   issue,
@@ -50,6 +51,8 @@ export function IssueDetailModal({
     onUpdate,
   });
 
+  const isMobile = useMobile();
+
   // Hotkey for save/send (Cmd/Ctrl + Enter)
   useHotkeys(
     [
@@ -87,8 +90,9 @@ export function IssueDetailModal({
       styles={{
         header: {
           padding: "16px 20px",
-          background:
-            "linear-gradient(to right, transparent calc(100% - 281px), var(--border-primary) calc(100% - 281px), var(--border-primary) calc(100% - 280px), var(--bg-secondary) calc(100% - 280px))",
+          background: isMobile
+            ? "var(--bg-secondary)"
+            : "linear-gradient(to right, transparent calc(100% - 281px), var(--border-primary) calc(100% - 281px), var(--border-primary) calc(100% - 280px), var(--bg-secondary) calc(100% - 280px))",
         },
         close: {
           marginRight: "4px",
