@@ -1,5 +1,6 @@
 import { Avatar, Button, Stack, Textarea } from "@mantine/core";
 import { formatDate, linkifyText } from "../../../utils/formatters.jsx";
+import { useMobile } from "../../../hooks/useMobile";
 
 export function IssueComments({
   comments,
@@ -7,6 +8,7 @@ export function IssueComments({
   setNewComment,
   onAddComment,
 }) {
+  const isMobile = useMobile();
   return (
     <div className="comments-section">
       <div className="comments-header">
@@ -65,6 +67,7 @@ export function IssueComments({
               onAddComment();
             }
           }}
+          inputMode="text"
           autosize
           minRows={1}
           style={{ flex: 1 }}

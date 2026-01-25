@@ -170,7 +170,8 @@ export function CreateIssueModal({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="What needs to be done?"
-                data-autofocus
+                data-autofocus={!isMobile}
+                inputMode="text"
                 autosize
                 minRows={1}
                 styles={{
@@ -189,6 +190,7 @@ export function CreateIssueModal({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Add a description..."
+                inputMode="text"
                 autosize
                 minRows={3}
                 styles={{

@@ -1,5 +1,6 @@
 import { Button, Group, Textarea } from "@mantine/core";
 import { linkifyText } from "../../../utils/formatters.jsx";
+import { useMobile } from "../../../hooks/useMobile";
 
 export function IssueDetailFields({
   editing,
@@ -15,6 +16,7 @@ export function IssueDetailFields({
   onStartEditTitle,
   onStartEditDescription,
 }) {
+  const isMobile = useMobile();
   if (editing) {
     return (
       <div className="modal-section">
@@ -22,9 +24,10 @@ export function IssueDetailFields({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Issue title"
+          inputMode="text"
           autosize
           minRows={1}
-          autoFocus
+          data-autofocus={!isMobile}
           styles={{
             input: {
               fontSize: "var(--text-lg)",
@@ -41,6 +44,7 @@ export function IssueDetailFields({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Add a description..."
+          inputMode="text"
           autosize
           minRows={3}
           styles={{
