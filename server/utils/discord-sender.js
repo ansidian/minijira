@@ -159,6 +159,14 @@ export function extractChangesFromPayload(eventPayload, eventType) {
       isSubtask: actionType === 'subtask_created' || eventPayload.is_subtask || false,
       title: eventPayload.issue_title || null
     });
+    // Add assignee change if assigned at creation
+    if (eventPayload.assignee_name) {
+      changes.push({
+        type: 'assignee',
+        old: null,
+        new: eventPayload.assignee_name
+      });
+    }
   } else if (actionType === 'issue_deleted' || actionType === 'subtask_deleted') {
     changes.push({
       type: 'deleted',

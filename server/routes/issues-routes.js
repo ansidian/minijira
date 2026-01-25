@@ -319,7 +319,9 @@ router.post("/", async (req, res) => {
         issue_key: key,
         issue_title: title,
         description: description || null,
-        is_subtask: !!parent_id
+        is_subtask: !!parent_id,
+        assignee_id: assignee_id || null,
+        assignee_name: rows[0].assignee_name || null
       }
     ).catch(err => {
       console.error('[Queue] Failed to queue issue creation:', err.message);

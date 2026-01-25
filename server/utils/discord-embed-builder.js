@@ -110,11 +110,13 @@ export function formatChangeFields(changes) {
     return [];
   }
 
-  // Define field order: assignee, status, priority, then others
+  // Define field order: created/deleted first, then assignee, status, priority, then others
   const orderPriority = {
-    assignee: 1,
-    status: 2,
-    priority: 3
+    created: 1,
+    deleted: 1,
+    assignee: 2,
+    status: 3,
+    priority: 4
   };
 
   // Sort changes by priority
