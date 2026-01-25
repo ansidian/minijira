@@ -103,7 +103,6 @@ function AppContent() {
       [
         "mod+J",
         () => {
-          if (isUserLocked || shouldIgnoreHotkey()) return;
           setColorScheme(colorScheme === "dark" ? "light" : "dark");
         },
       ],
