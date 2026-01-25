@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-24)
 
 **Core value:** Team visibility into MiniJira activity via Discord without notification spam
-**Current focus:** Phase 10 - Pagination & Filtering (execution in progress)
+**Current focus:** Phase 10.2 - Filter Polish (urgent insertion)
 
 ## Current Position
 
-Phase: 10 of 12 (Pagination & Filtering)
-Plan: 5 of 5 complete
+Phase: 10.2 of 12 (Filter Polish)
+Plan: 1 of 1 complete
 Status: Phase complete
-Last activity: 2026-01-24 — Completed 10-04-PLAN.md (Paginated Board)
+Last activity: 2026-01-25 — Completed 10.2-01-PLAN.md (Filter Polish)
 
-Progress: [██████████] 83% (10/12 phases complete)
+Progress: [███████████] 90% (10.83/12 phases complete)
 
 ## Completed Milestones
 
@@ -47,6 +47,11 @@ Recent decisions affecting current work:
 - [v1.2]: My Issues toggle coexists with assignee filter (additive, not replacement)
 - [v1.2]: Load More button for board columns (explicit user control, not infinite scroll)
 - [v1.2]: Server-side filtering replaces client-side for efficiency with large datasets
+- [v1.2]: Close-to-apply filter pattern (draft state until Apply clicked)
+- [v1.2]: Date range filters for created_at/updated_at with ISO string params
+- [v1.2]: ISO 8601 strings in URL params for date filters (human-readable, debuggable)
+- [v1.2]: Scroll-triggered Load More at 75% threshold using IntersectionObserver
+- [v1.2]: Defensive instanceof Date checks prevent crashes from serialized dates
 
 ### Pending Todos
 
@@ -55,6 +60,11 @@ None.
 ### Blockers/Concerns
 
 None.
+
+### Roadmap Evolution
+
+- Phase 10.1 inserted after Phase 10: Filter UX Overhaul (URGENT) - fixes broken status filtering, clipped Load More button, adds close-to-apply pattern and date filtering
+- Phase 10.2 inserted after Phase 10.1: Filter Polish - fixes date filter hang, adds URL sync for dates, current date indicator, scroll-triggered Load More
 
 ### Quick Tasks Completed
 
@@ -65,8 +75,8 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-24
-Stopped at: Completed 10-04-PLAN.md (Phase 10 complete)
+Last session: 2026-01-25
+Stopped at: Completed 10.2-01-PLAN.md (Filter Polish)
 Resume file: None
 
-**Next step:** Phase 11 or review Phase 10 completion
+**Next step:** Continue with Phase 11 (Notification Queuing)
