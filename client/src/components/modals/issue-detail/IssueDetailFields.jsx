@@ -1,5 +1,6 @@
 import { Button, Group, Textarea } from "@mantine/core";
 import { MarkdownRenderer } from "../../shared/MarkdownRenderer";
+import { TitleWithLinks } from "../../shared/TitleWithLinks";
 import { useMobile } from "../../../hooks/useMobile";
 import { useMarkdownTextarea } from "../../../hooks/useMarkdownTextarea";
 
@@ -125,7 +126,9 @@ export function IssueDetailFields({
     <div className="modal-section">
       {/* Title - editable block */}
       <div className="editable-block" onClick={onStartEditTitle}>
-        <div className="editable-block-title">{title}</div>
+        <div className="editable-block-title">
+          <TitleWithLinks>{title}</TitleWithLinks>
+        </div>
       </div>
 
       {/* Description - editable block */}
