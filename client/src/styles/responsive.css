@@ -421,3 +421,48 @@
     display: none;
   }
 }
+
+/* Modal Responsiveness - Mobile optimizations */
+@media (max-width: 768px) {
+  /* Modal action buttons - thumb zone with safe area */
+  .create-modal-actions {
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Ensure action buttons meet touch target size */
+  .create-modal-actions button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Modal scroll isolation - prevent scroll chaining to background */
+  .mantine-Modal-body {
+    overscroll-behavior: contain;
+  }
+
+  /* Modal content height for fullscreen */
+  .mantine-Modal-content[data-full-screen] {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mantine-Modal-content[data-full-screen] .mantine-Modal-body {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Ensure form inside modal flexes to push actions to bottom */
+  .mantine-Modal-content[data-full-screen] form {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mantine-Modal-content[data-full-screen] .modal-two-column,
+  .mantine-Modal-content[data-full-screen] .modal-two-column--narrow {
+    flex: 1;
+    overflow-y: auto;
+  }
+}

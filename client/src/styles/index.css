@@ -1041,6 +1041,8 @@ body {
 }
 
 .create-modal-actions {
+	position: sticky;
+	bottom: 0;
 	display: flex;
 	justify-content: flex-end;
 	padding: 16px 20px;
