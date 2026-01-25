@@ -86,33 +86,51 @@ function AppContent() {
   // Theme toggle
   const { colorScheme, setColorScheme } = useMantineColorScheme();
 
+  // Check if any modal is open or user is in a text input (hotkeys should be ignored)
+  const anyModalOpen = selectedIssue || showCreateModal || showActivityLog;
+  const shouldIgnoreHotkey = () => {
+    const el = document.activeElement;
+    const inTextInput =
+      (el instanceof HTMLInputElement &&
+        ["text", "search", "url", "email", "password"].includes(el.type)) ||
+      el instanceof HTMLTextAreaElement;
+    return inTextInput || anyModalOpen;
+  };
+
   // Hotkeys for header controls
   useHotkeys(
     [
       [
         "mod+J",
         () => {
-          if (isUserLocked) return;
+          if (isUserLocked || shouldIgnoreHotkey()) return;
           setColorScheme(colorScheme === "dark" ? "light" : "dark");
         },
       ],
       [
         "mod+I",
         () => {
-          if (isUserLocked) return;
+          if (isUserLocked || shouldIgnoreHotkey()) return;
           setShowActivityLog((prev) => !prev);
         },
       ],
       [
         "mod+X",
         () => {
-          if (isUserLocked) return;
+          if (isUserLocked || shouldIgnoreHotkey()) return;
           setFilterPanelExpanded((prev) => !prev);
         },
       ],
     ],
-    [colorScheme, isUserLocked, setColorScheme, setShowActivityLog, setFilterPanelExpanded],
-    true
+    [
+      colorScheme,
+      isUserLocked,
+      setColorScheme,
+      setShowActivityLog,
+      setFilterPanelExpanded,
+      anyModalOpen,
+    ],
+    true,
   );
 
   // Detect if this is a touch device
@@ -139,7 +157,6 @@ function AppContent() {
   async function handleUpdateIssue(issueId, data) {
     await updateIssue(issueId, data);
   }
-
 
   async function handleDeleteIssue(issueId) {
     await deleteIssue(issueId);

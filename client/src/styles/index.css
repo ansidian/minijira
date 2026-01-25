@@ -729,6 +729,8 @@ body {
 	gap: 20px;
 	border-right: 1px solid var(--border-primary);
 	background: var(--bg-tertiary);
+	overflow-x: hidden;
+		min-width: 0;
 }
 
 .modal-sidebar {
