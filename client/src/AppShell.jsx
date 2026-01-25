@@ -6,7 +6,6 @@ import "mantine-contextmenu/styles.css";
 import { BoardContainer } from "./components/board/BoardContainer";
 import { Footer } from "./components/layout/Footer";
 import { Header } from "./components/layout/Header";
-import { FloatingActionButton } from "./components/layout/FloatingActionButton";
 import { ActivityLogModal } from "./components/modals/ActivityLogModal";
 import { CreateIssueModal } from "./components/modals/CreateIssueModal";
 import { IssueDetailModal } from "./components/modals/IssueDetailModal";
@@ -187,12 +186,6 @@ function AppContent() {
 
         {/* Footer */}
         <Footer />
-
-        {/* Floating Action Button (mobile only) */}
-        <FloatingActionButton
-          onClick={() => setShowCreateModal(true)}
-          disabled={isUserLocked}
-        />
 
         {/* Create Issue Modal */}
         {showCreateModal && (
