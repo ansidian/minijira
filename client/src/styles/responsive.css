@@ -292,6 +292,46 @@
     -webkit-text-size-adjust: 100%;
   }
 
+  /* ========================================
+     TAP FEEDBACK (iOS-style scale effect)
+     ======================================== */
+
+  /* Issue card tap feedback */
+  .issue-card {
+    transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
+    -webkit-tap-highlight-color: transparent; /* Remove default tap highlight */
+  }
+
+  .issue-card:active {
+    transform: scale(0.98);
+  }
+
+  /* Subtask card tap feedback */
+  .subtask-card {
+    transition: transform 0.1s ease-out;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .subtask-card:active {
+    transform: scale(0.98);
+  }
+
+  /* Button tap feedback */
+  .add-issue-btn {
+    transition: transform 0.1s ease-out;
+  }
+
+  .add-issue-btn:active {
+    transform: scale(0.98);
+  }
+
+  /* Prevent text selection on tap */
+  .issue-card,
+  .subtask-card {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
   /* Column indicators (dot pagination) */
   .column-indicators {
     display: flex;
