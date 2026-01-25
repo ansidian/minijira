@@ -9,7 +9,8 @@ export function useActivityPolling({
   useEffect(() => {
     async function checkNewActivity() {
       try {
-        const [latest] = await api.get("/activity?limit=1");
+        const { activities } = await api.get("/activity?limit=1");
+        const latest = activities?.[0];
         if (latest) {
           if (
             currentUserId &&
@@ -34,7 +35,8 @@ export function useActivityPolling({
   useEffect(() => {
     if (showActivityLog) {
       setHasNewActivity(false);
-      api.get("/activity?limit=1").then(([latest]) => {
+      api.get("/activity?limit=1").then(({ activities }) => {
+        const latest = activities?.[0];
         if (latest) {
           localStorage.setItem("minijira_activity_viewed", latest.created_at);
         }

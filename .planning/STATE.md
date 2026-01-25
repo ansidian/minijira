@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-01-24)
 
 **Core value:** Team visibility into MiniJira activity via Discord without notification spam
-**Current focus:** Phase 10.2 - Filter Polish (urgent insertion)
+**Current focus:** Phase 11 - Cache Management
 
 ## Current Position
 

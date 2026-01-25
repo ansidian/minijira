@@ -11,6 +11,7 @@ import {
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import "@mantine/dates/styles.css";
+import dayjs from "dayjs";
 import { useUsers } from "../../contexts/UsersContext";
 
 const STATUS_OPTIONS = [
@@ -45,7 +46,9 @@ function FilterChip({ label, color, selected, onClick }) {
       style={{
         padding: "6px 12px",
         borderRadius: "var(--radius-md)",
-        border: selected ? `1.5px solid ${color}` : "1.5px solid var(--border-primary)",
+        border: selected
+          ? `1.5px solid ${color}`
+          : "1.5px solid var(--border-primary)",
         backgroundColor: selected ? `${color}20` : "transparent",
         color: selected ? color : "var(--text-secondary)",
         fontSize: "var(--text-sm)",
@@ -62,6 +65,7 @@ function FilterChip({ label, color, selected, onClick }) {
 
 export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose }) {
   const { users } = useUsers();
+  const today = dayjs();
 
   // Draft state for local edits - initialized from applied
   const [draftFilters, setDraftFilters] = useState({
@@ -146,14 +150,16 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
   };
 
   const clearAllFilters = () => {
-    setDraftFilters({
+    const clearedFilters = {
       status: [],
       assignee: [],
       priority: [],
       myIssues: false,
       createdRange: [null, null],
       updatedRange: [null, null],
-    });
+    };
+    onApply(clearedFilters);
+    onClose();
   };
 
   return (
@@ -241,6 +247,43 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
           </Text>
           <DatePickerInput
             type="range"
+            presets={[
+              {
+                value: [
+                  today.subtract(2, "day").toDate(),
+                  today.toDate(),
+                ],
+                label: "Last two days",
+              },
+              {
+                value: [
+                  today.subtract(7, "day").toDate(),
+                  today.toDate(),
+                ],
+                label: "Last 7 days",
+              },
+              {
+                value: [
+                  today.startOf("month").toDate(),
+                  today.toDate(),
+                ],
+                label: "This month",
+              },
+              {
+                value: [
+                  today.subtract(1, "month").startOf("month").toDate(),
+                  today.subtract(1, "month").endOf("month").toDate(),
+                ],
+                label: "Last month",
+              },
+              {
+                value: [
+                  today.subtract(1, "year").startOf("year").toDate(),
+                  today.subtract(1, "year").endOf("year").toDate(),
+                ],
+                label: "Last year",
+              },
+            ]}
             value={draftFilters.createdRange}
             onChange={(range) =>
               setDraftFilters((prev) => ({ ...prev, createdRange: range }))
@@ -261,6 +304,43 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
           </Text>
           <DatePickerInput
             type="range"
+            presets={[
+              {
+                value: [
+                  today.subtract(2, "day").toDate(),
+                  today.toDate(),
+                ],
+                label: "Last two days",
+              },
+              {
+                value: [
+                  today.subtract(7, "day").toDate(),
+                  today.toDate(),
+                ],
+                label: "Last 7 days",
+              },
+              {
+                value: [
+                  today.startOf("month").toDate(),
+                  today.toDate(),
+                ],
+                label: "This month",
+              },
+              {
+                value: [
+                  today.subtract(1, "month").startOf("month").toDate(),
+                  today.subtract(1, "month").endOf("month").toDate(),
+                ],
+                label: "Last month",
+              },
+              {
+                value: [
+                  today.subtract(1, "year").startOf("year").toDate(),
+                  today.subtract(1, "year").endOf("year").toDate(),
+                ],
+                label: "Last year",
+              },
+            ]}
             value={draftFilters.updatedRange}
             onChange={(range) =>
               setDraftFilters((prev) => ({ ...prev, updatedRange: range }))
