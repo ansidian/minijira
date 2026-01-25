@@ -71,6 +71,17 @@
   border-bottom-color: var(--accent-hover);
 }
 
+/* Title links - lighter style that doesn't distract from title content */
+.title-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: inherit;
+}
+
+.title-link:hover {
+  text-decoration: underline;
+}
+
 .markdown-code-inline {
   background: var(--bg-card);
   padding: 2px 6px;

@@ -11,6 +11,7 @@ import {
 import { useIssueContextMenu } from "../../hooks/useIssueContextMenu";
 import { getPriorityColor } from "../../utils/colors";
 import { UnassignedAvatar } from "../shared/UnassignedAvatar";
+import { TitleWithLinks } from "../shared/TitleWithLinks";
 import { SubtaskCardInline } from "./SubtaskCardInline";
 
 export function IssueCard({
@@ -103,7 +104,7 @@ export function IssueCard({
               overflowWrap: "break-word",
             }}
           >
-            {issue.title}
+            <TitleWithLinks>{issue.title}</TitleWithLinks>
           </div>
           {issue.description && (
             <div

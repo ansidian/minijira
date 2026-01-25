@@ -2,6 +2,7 @@ import { Avatar, Badge, Checkbox, Group, Paper, Stack } from "@mantine/core";
 import { useIssueContextMenu } from "../../hooks/useIssueContextMenu";
 import { getPriorityColor, getStatusColor } from "../../utils/colors";
 import { UnassignedAvatar } from "../shared/UnassignedAvatar";
+import { TitleWithLinks } from "../shared/TitleWithLinks";
 
 export function SubtaskCardInline({
   subtask,
@@ -102,7 +103,7 @@ export function SubtaskCardInline({
               opacity: subtask.status === "done" ? 0.7 : 1,
             }}
           >
-            {subtask.title}
+            <TitleWithLinks>{subtask.title}</TitleWithLinks>
           </div>
           {subtask.description && (
             <div

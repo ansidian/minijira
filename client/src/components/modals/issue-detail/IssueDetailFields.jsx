@@ -50,6 +50,7 @@ export function IssueDetailFields({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Add a description..."
+          data-markdown="full"
           inputMode="text"
           autosize
           minRows={3}

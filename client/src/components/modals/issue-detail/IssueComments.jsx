@@ -55,6 +55,7 @@ export function IssueComments({
           placeholder="Add a comment..."
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
+          data-markdown="full"
           {...commentProps}
           onKeyDown={(e) => {
             // Handle formatting hotkeys (B/I/K)
