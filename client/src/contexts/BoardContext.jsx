@@ -13,6 +13,16 @@ const INITIAL_FILTERS = {
   updatedRange: [null, null],
 };
 
+// Ensure value is a Date object (handles dayjs objects, strings, etc.)
+function ensureDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  // Handle dayjs objects (have toDate method)
+  if (typeof value.toDate === 'function') return value.toDate();
+  // Handle ISO strings
+  return new Date(value);
+}
+
 // Parse filters from URL on initial load
 function getFiltersFromUrl() {
   const params = new URLSearchParams(window.location.search);
@@ -96,14 +106,14 @@ export function BoardProvider({ children }) {
       filters.assignee?.forEach(a => params.append('assignee', a));
       filters.priority?.forEach(p => params.append('priority', p));
       if (filters.myIssues) params.set('my', 'true');
-      // Add date ranges as ISO strings
+      // Add date ranges as ISO strings (ensureDate handles dayjs objects from DatePickerInput)
       if (filters.createdRange?.[0] && filters.createdRange?.[1]) {
-        params.set('created_from', filters.createdRange[0].toISOString());
-        params.set('created_to', filters.createdRange[1].toISOString());
+        params.set('created_from', ensureDate(filters.createdRange[0]).toISOString());
+        params.set('created_to', ensureDate(filters.createdRange[1]).toISOString());
       }
       if (filters.updatedRange?.[0] && filters.updatedRange?.[1]) {
-        params.set('updated_from', filters.updatedRange[0].toISOString());
-        params.set('updated_to', filters.updatedRange[1].toISOString());
+        params.set('updated_from', ensureDate(filters.updatedRange[0]).toISOString());
+        params.set('updated_to', ensureDate(filters.updatedRange[1]).toISOString());
       }
 
       const newUrl = params.toString()
@@ -117,21 +127,12 @@ export function BoardProvider({ children }) {
     [loadWithFilters]
   );
 
-  // Load with URL filters on initial mount (if any)
+  // Load on initial mount with URL filters (or empty filters if none)
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
-      // If URL has filters, fetch with those filters
-      const hasFilters =
-        activeFilters.status.length > 0 ||
-        activeFilters.assignee.length > 0 ||
-        activeFilters.priority.length > 0 ||
-        activeFilters.myIssues ||
-        (activeFilters.createdRange?.[0] && activeFilters.createdRange?.[1]) ||
-        (activeFilters.updatedRange?.[0] && activeFilters.updatedRange?.[1]);
-      if (hasFilters) {
-        loadWithFilters(activeFilters);
-      }
+      // Always trigger initial load - BoardContext owns this
+      loadWithFilters(activeFilters);
     }
   }, [activeFilters, loadWithFilters]);
 

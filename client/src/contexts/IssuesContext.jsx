@@ -12,6 +12,14 @@ import { useSubtaskExpansion } from "./issues/useSubtaskExpansion";
 const STATUSES = ["todo", "in_progress", "review", "done"];
 const PAGE_SIZE = 20;
 
+// Normalize date-like values to Date objects (handles dayjs, strings, Date)
+function toDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value.toDate === 'function') return value.toDate(); // dayjs
+  return new Date(value);
+}
+
 /**
  * Build URL search params for filter values.
  * Does NOT include status since we fetch per-column.
@@ -24,14 +32,19 @@ function buildFilterParams(filters) {
   );
   filters.priority?.forEach((p) => params.append("priority", p));
 
-  // Date range filters - defensive instanceof Date check
-  if (filters.createdRange?.[0] instanceof Date && filters.createdRange?.[1] instanceof Date) {
-    params.append('created_after', filters.createdRange[0].toISOString());
-    params.append('created_before', filters.createdRange[1].toISOString());
+  // Date range filters - normalize to Date objects first
+  const createdStart = toDate(filters.createdRange?.[0]);
+  const createdEnd = toDate(filters.createdRange?.[1]);
+  const updatedStart = toDate(filters.updatedRange?.[0]);
+  const updatedEnd = toDate(filters.updatedRange?.[1]);
+
+  if (createdStart && createdEnd) {
+    params.append('created_after', createdStart.toISOString());
+    params.append('created_before', createdEnd.toISOString());
   }
-  if (filters.updatedRange?.[0] instanceof Date && filters.updatedRange?.[1] instanceof Date) {
-    params.append('updated_after', filters.updatedRange[0].toISOString());
-    params.append('updated_before', filters.updatedRange[1].toISOString());
+  if (updatedStart && updatedEnd) {
+    params.append('updated_after', updatedStart.toISOString());
+    params.append('updated_before', updatedEnd.toISOString());
   }
 
   return params.toString();
@@ -252,11 +265,8 @@ export function IssuesProvider({
     [loadPaginatedData]
   );
 
-  // Load initial data on mount (no filters)
-  useEffect(() => {
-    loadPaginatedData(EMPTY_FILTERS);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // NOTE: Initial load is triggered by BoardContext via loadWithFilters()
+  // This ensures URL filters are respected on page refresh
 
   /**
    * Load data with filters - called by BoardContext when filters change.
