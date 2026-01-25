@@ -5,19 +5,14 @@ const DEBOUNCE_WINDOW = '+60 seconds';  // Sliding window - each new event reset
 const MAX_WAIT = '+3 minutes';          // Maximum wait from first event in batch
 
 /**
- * Merge a new event into an existing payload's changes array.
+ * Merge a single change into a changes array.
  * Deduplicates by action_type (later change of same type wins).
  * Preserves the first old_value for net-zero change detection.
- * @param {object} existingPayload - Existing event_payload from queue
- * @param {object} newPayload - New event to merge
- * @returns {object} Merged payload with changes array
+ * @param {Array} changes - Existing changes array
+ * @param {object} newChange - New change to merge
  */
-function mergePayloads(existingPayload, newPayload) {
-  // Get existing changes array, or convert single event to array
-  let changes = existingPayload.changes || [existingPayload];
-
-  // Check if we already have a change of this type
-  const existingIndex = changes.findIndex(c => c.action_type === newPayload.action_type);
+function mergeChange(changes, newChange) {
+  const existingIndex = changes.findIndex(c => c.action_type === newChange.action_type);
 
   if (existingIndex >= 0) {
     // Replace existing change of same type, but preserve the original old_value
@@ -28,12 +23,37 @@ function mergePayloads(existingPayload, newPayload) {
       : existingChange.old_value;
 
     changes[existingIndex] = {
-      ...newPayload,
+      ...newChange,
       first_old_value: firstOldValue
     };
   } else {
     // Add new change type
-    changes.push(newPayload);
+    changes.push(newChange);
+  }
+}
+
+/**
+ * Merge a new event into an existing payload's changes array.
+ * Handles both flat events and nested events (issue_updated with inner changes array).
+ * Deduplicates by action_type (later change of same type wins).
+ * Preserves the first old_value for net-zero change detection.
+ * @param {object} existingPayload - Existing event_payload from queue
+ * @param {object} newPayload - New event to merge
+ * @returns {object} Merged payload with changes array
+ */
+function mergePayloads(existingPayload, newPayload) {
+  // Get existing changes array, or convert single event to array
+  let changes = existingPayload.changes || [existingPayload];
+
+  // If newPayload has its own changes array (e.g., issue_updated events),
+  // merge each inner change individually instead of the wrapper object
+  if (Array.isArray(newPayload.changes)) {
+    for (const innerChange of newPayload.changes) {
+      mergeChange(changes, innerChange);
+    }
+  } else {
+    // Simple event without nested changes
+    mergeChange(changes, newPayload);
   }
 
   return { changes };

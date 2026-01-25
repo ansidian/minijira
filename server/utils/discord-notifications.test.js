@@ -404,15 +404,34 @@ describe('Integration: Full embed generation', () => {
 // ============================================================================
 
 describe('Payload merging logic', () => {
-  // Replicate mergePayloads function for testing
-  function mergePayloads(existingPayload, newPayload) {
-    let changes = existingPayload.changes || [existingPayload];
-    const existingIndex = changes.findIndex(c => c.action_type === newPayload.action_type);
+  // Replicate mergePayloads function for testing (must match notification-queue.js)
+  function mergeChange(changes, newChange) {
+    const existingIndex = changes.findIndex(c => c.action_type === newChange.action_type);
 
     if (existingIndex >= 0) {
-      changes[existingIndex] = newPayload;
+      const existingChange = changes[existingIndex];
+      const firstOldValue = existingChange.first_old_value !== undefined
+        ? existingChange.first_old_value
+        : existingChange.old_value;
+
+      changes[existingIndex] = {
+        ...newChange,
+        first_old_value: firstOldValue
+      };
     } else {
-      changes.push(newPayload);
+      changes.push(newChange);
+    }
+  }
+
+  function mergePayloads(existingPayload, newPayload) {
+    let changes = existingPayload.changes || [existingPayload];
+
+    if (Array.isArray(newPayload.changes)) {
+      for (const innerChange of newPayload.changes) {
+        mergeChange(changes, innerChange);
+      }
+    } else {
+      mergeChange(changes, newPayload);
     }
 
     return { changes };
@@ -461,6 +480,76 @@ describe('Payload merging logic', () => {
     assert.strictEqual(payload.changes.length, 2);
     assert.strictEqual(payload.changes[0].action_type, 'status_changed');
     assert.strictEqual(payload.changes[1].action_type, 'subtask_created');
+  });
+
+  it('preserves first_old_value for net-zero detection', () => {
+    const event1 = { action_type: 'status_changed', old_value: 'todo', new_value: 'in_progress' };
+    const event2 = { action_type: 'status_changed', old_value: 'in_progress', new_value: 'todo' };
+
+    const merged = mergePayloads(event1, event2);
+
+    assert.strictEqual(merged.changes.length, 1);
+    assert.strictEqual(merged.changes[0].first_old_value, 'todo');
+    assert.strictEqual(merged.changes[0].new_value, 'todo');
+  });
+
+  it('merges nested changes arrays from issue_updated events', () => {
+    const event1 = {
+      action_type: 'issue_updated',
+      changes: [{ action_type: 'status_changed', old_value: 'todo', new_value: 'in_progress' }]
+    };
+    const event2 = {
+      action_type: 'issue_updated',
+      changes: [{ action_type: 'status_changed', old_value: 'in_progress', new_value: 'todo' }]
+    };
+
+    const merged = mergePayloads(event1, event2);
+
+    // Should have merged the inner changes, not pushed the wrapper
+    assert.strictEqual(merged.changes.length, 1);
+    assert.strictEqual(merged.changes[0].action_type, 'status_changed');
+    assert.strictEqual(merged.changes[0].first_old_value, 'todo');
+    assert.strictEqual(merged.changes[0].new_value, 'todo');
+  });
+
+  it('filters net-zero changes when extracting from merged payload', () => {
+    const event1 = {
+      action_type: 'issue_updated',
+      changes: [{ action_type: 'status_changed', old_value: 'todo', new_value: 'in_progress' }]
+    };
+    const event2 = {
+      action_type: 'issue_updated',
+      changes: [{ action_type: 'status_changed', old_value: 'in_progress', new_value: 'todo' }]
+    };
+
+    const merged = mergePayloads(event1, event2);
+    const changes = extractChangesFromPayload(merged, 'update');
+
+    // Net-zero change should be filtered out
+    assert.strictEqual(changes.length, 0);
+  });
+
+  it('keeps non-net-zero changes while filtering net-zero ones', () => {
+    const event1 = {
+      action_type: 'issue_updated',
+      changes: [
+        { action_type: 'status_changed', old_value: 'todo', new_value: 'in_progress' },
+        { action_type: 'priority_changed', old_value: 'low', new_value: 'high' }
+      ]
+    };
+    const event2 = {
+      action_type: 'issue_updated',
+      changes: [{ action_type: 'status_changed', old_value: 'in_progress', new_value: 'todo' }]
+    };
+
+    const merged = mergePayloads(event1, event2);
+    const changes = extractChangesFromPayload(merged, 'update');
+
+    // Status is net-zero (filtered), priority is not (kept)
+    assert.strictEqual(changes.length, 1);
+    assert.strictEqual(changes[0].type, 'priority');
+    assert.strictEqual(changes[0].old, 'low');
+    assert.strictEqual(changes[0].new, 'high');
   });
 });
 
