@@ -53,7 +53,7 @@ export function IssueDetailModal({
 
   const isMobile = useMobile();
 
-  // Hotkey for save/send (Cmd/Ctrl + Enter)
+  // Hotkey for save (Cmd/Ctrl + Enter) when editing title/description
   useHotkeys(
     [
       [
@@ -61,14 +61,12 @@ export function IssueDetailModal({
         () => {
           if (editing) {
             handleSave();
-          } else if (newComment.trim()) {
-            handleAddComment();
           }
         },
       ],
     ],
     [],
-    true
+    true,
   );
 
   return (
@@ -85,7 +83,7 @@ export function IssueDetailModal({
       withCloseButton={true}
       fullScreen={isMobile}
       radius={isMobile ? 0 : undefined}
-      transitionProps={{ transition: isMobile ? 'fade' : 'pop', duration: 200 }}
+      transitionProps={{ transition: isMobile ? "fade" : "pop", duration: 200 }}
       overlayProps={{ backgroundOpacity: 0.55, blur: isMobile ? 0 : 3 }}
       classNames={{
         content: shake ? "shake" : "",
