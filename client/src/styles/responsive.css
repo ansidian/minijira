@@ -9,11 +9,18 @@
     flex-wrap: wrap;
     height: auto;
     min-height: var(--header-height);
+    justify-content: space-between;
   }
 
   .logo {
     font-size: 16px;
     gap: 8px;
+    display: flex;
+    align-items: center;
+  }
+
+  .logo-text {
+    font-size: 16px;
   }
 
   .logo-icon {
@@ -22,12 +29,20 @@
     font-size: 12px;
   }
 
+  .hamburger-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Hide desktop header-right on mobile */
   .header-right {
-    gap: 12px;
-    width: 100%;
-    justify-content: flex-start;
-    margin-top: 8px;
-    padding-bottom: 12px;
+    display: none;
+  }
+
+  .header-right-mobile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
   /* hide stats on very small screens, show on slightly larger */
@@ -259,6 +274,11 @@
 /* Hide column indicators on desktop */
 @media (min-width: 769px) {
   .column-indicators {
+    display: none;
+  }
+
+  /* Ensure header-right-mobile hidden on desktop */
+  .header-right-mobile {
     display: none;
   }
 }
