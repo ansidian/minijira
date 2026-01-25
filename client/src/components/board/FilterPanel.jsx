@@ -242,10 +242,14 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
           <DatePickerInput
             type="range"
             value={draftFilters.createdRange}
-            onChange={(range) => setDraftFilters(prev => ({ ...prev, createdRange: range }))}
+            onChange={(range) =>
+              setDraftFilters((prev) => ({ ...prev, createdRange: range }))
+            }
             placeholder="Select date range"
+            firstDayOfWeek={0}
             size="sm"
             clearable
+            highlightToday
             popoverProps={{ withinPortal: false }}
           />
         </div>
@@ -258,10 +262,14 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
           <DatePickerInput
             type="range"
             value={draftFilters.updatedRange}
-            onChange={(range) => setDraftFilters(prev => ({ ...prev, updatedRange: range }))}
+            onChange={(range) =>
+              setDraftFilters((prev) => ({ ...prev, updatedRange: range }))
+            }
             placeholder="Select date range"
+            firstDayOfWeek={0}
             size="sm"
             clearable
+            highlightToday
             popoverProps={{ withinPortal: false }}
           />
         </div>
@@ -279,16 +287,31 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
 
         {/* Apply/Cancel buttons */}
         <Group justify="space-between" mt="xs">
-          <Button variant="subtle" color="gray" size="xs" onClick={handleCancel}>
+          <Button
+            variant="subtle"
+            color="gray"
+            size="xs"
+            onClick={handleCancel}
+          >
             Cancel
           </Button>
           <Group gap="xs">
             {hasActiveFilters && (
-              <Button variant="subtle" color="red" size="xs" onClick={clearAllFilters}>
+              <Button
+                variant="subtle"
+                color="red"
+                size="xs"
+                onClick={clearAllFilters}
+              >
                 Clear
               </Button>
             )}
-            <Button color="violet" size="xs" onClick={handleApply} disabled={!hasChanges}>
+            <Button
+              color="violet"
+              size="xs"
+              onClick={handleApply}
+              disabled={!hasChanges}
+            >
               Apply
             </Button>
           </Group>

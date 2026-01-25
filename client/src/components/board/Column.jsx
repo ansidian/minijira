@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@mantine/core";
 import { IssueCard } from "./IssueCard";
 import { IssueCardSkeletons } from "../shared/IssueCardSkeleton";
@@ -23,6 +23,8 @@ export function Column({
   onLoadMore,
 }) {
   const [dragOver, setDragOver] = useState(false);
+  const [showLoadMore, setShowLoadMore] = useState(false);
+  const columnContentRef = useRef(null);
 
   function handleDragOver(e) {
     e.preventDefault();
@@ -41,6 +43,40 @@ export function Column({
       onDrop(parseInt(issueId), column.status);
     }
   }
+
+  // Scroll-triggered Load More visibility
+  useEffect(() => {
+    if (!paginationState?.hasMore || issues.length === 0) {
+      setShowLoadMore(false);
+      return;
+    }
+
+    const scrollContainer = columnContentRef.current;
+    if (!scrollContainer) return;
+
+    // Create sentinel element at bottom of content
+    const sentinel = document.createElement('div');
+    sentinel.className = 'load-more-sentinel';
+    scrollContainer.appendChild(sentinel);
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowLoadMore(entry.isIntersecting);
+      },
+      {
+        root: scrollContainer,
+        rootMargin: '200px 0px', // Trigger 200px before sentinel visible (~75% scroll)
+        threshold: 0,
+      }
+    );
+
+    observer.observe(sentinel);
+
+    return () => {
+      observer.disconnect();
+      sentinel.remove();
+    };
+  }, [paginationState?.hasMore, issues.length]);
 
   return (
     <div
@@ -72,7 +108,7 @@ export function Column({
           {paginationState?.total ?? issues.length}
         </span>
       </div>
-      <div className="column-content">
+      <div className="column-content" ref={columnContentRef}>
         {/* Show skeletons during initial load */}
         {paginationState?.loading && issues.length === 0 && (
           <IssueCardSkeletons count={3} />
@@ -103,8 +139,8 @@ export function Column({
         ))}
 
         {/* Load More button */}
-        {paginationState?.hasMore && issues.length > 0 && (
-          <div className="load-more-container">
+        {showLoadMore && paginationState?.hasMore && issues.length > 0 && (
+          <div className="load-more-container load-more-visible">
             <Button
               variant="subtle"
               size="sm"
