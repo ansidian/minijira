@@ -47,7 +47,7 @@ function ThemedToaster() {
   const { colorScheme } = useMantineColorScheme();
   return (
     <Toaster
-      position="top-center"
+      position="bottom-right"
       theme={colorScheme}
       richColors
       visibleToasts={5}
