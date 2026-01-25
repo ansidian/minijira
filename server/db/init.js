@@ -165,6 +165,17 @@ async function init() {
     // Column already exists, ignore
   }
 
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS attachments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      data TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      filename TEXT,
+      size INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   const seedUsers = [
     { name: "Andy Su", email: "alex@team.edu", avatar_color: "#ef4444" },
     {

@@ -3,6 +3,7 @@ import { Avatar, Badge, Button, Group, Modal, Select, Textarea } from "@mantine/
 import { useHotkeys } from "@mantine/hooks";
 import { IconArrowLeft } from "@tabler/icons-react";
 import { useMobile } from "../../hooks/useMobile";
+import { useMarkdownTextarea } from "../../hooks/useMarkdownTextarea";
 
 const STATUS_OPTIONS = [
   { value: "todo", label: "To Do", color: "var(--status-todo)" },
@@ -56,6 +57,10 @@ export function CreateIssueModal({
   const [confirmingCancel, setConfirmingCancel] = useState(false);
 
   const isMobile = useMobile();
+  const { textareaProps: descriptionProps } = useMarkdownTextarea({
+    value: description,
+    onChange: setDescription,
+  });
   const isDirty = title.trim() || description.trim();
   const isSubtask = !!parentIssue;
 
@@ -193,6 +198,7 @@ export function CreateIssueModal({
                 inputMode="text"
                 autosize
                 minRows={3}
+                {...descriptionProps}
                 styles={{
                   input: {
                     fontSize: "var(--text-base)",

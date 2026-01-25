@@ -8,3 +8,4 @@ server/db/*.db
 CLAUDE.md
 .planning/
 .interface-design/
+test-results

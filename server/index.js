@@ -9,6 +9,7 @@ import activityRouter from "./routes/activity-routes.js";
 import statsRouter from "./routes/stats-routes.js";
 import eventsRouter from "./routes/events-routes.js";
 import notificationsRouter from './routes/notifications-routes.js';
+import attachmentsRouter from './routes/attachments-routes.js';
 import { startQueueProcessor, stopQueueProcessor, awaitInFlight } from "./utils/queue-processor.js";
 import { closeDb } from "./db/connection.js";
 import { cleanupActivityLog } from './jobs/cleanup.js';
@@ -38,6 +39,7 @@ app.use("/api/activity", activityRouter);
 app.use("/api/stats", statsRouter);
 app.use("/api/events", eventsRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/attachments', attachmentsRouter);
 
 if (process.env.NODE_ENV === "production") {
   app.get("*", (req, res) => {

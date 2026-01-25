@@ -1,6 +1,8 @@
 import { Avatar, Button, Stack, Textarea } from "@mantine/core";
-import { formatDate, linkifyText } from "../../../utils/formatters.jsx";
+import { formatDate } from "../../../utils/formatters.jsx";
+import { MarkdownRenderer } from "../../shared/MarkdownRenderer";
 import { useMobile } from "../../../hooks/useMobile";
+import { useMarkdownTextarea } from "../../../hooks/useMarkdownTextarea";
 
 export function IssueComments({
   comments,
@@ -9,6 +11,11 @@ export function IssueComments({
   onAddComment,
 }) {
   const isMobile = useMobile();
+  const { textareaProps: commentProps } = useMarkdownTextarea({
+    value: newComment,
+    onChange: setNewComment,
+  });
+
   return (
     <div className="comments-section">
       <div className="comments-header">
@@ -33,22 +40,8 @@ export function IssueComments({
                   {formatDate(comment.created_at)}
                 </span>
               </div>
-              <div className="comment-body">
-                {linkifyText(comment.body).map((part, index) =>
-                  part.type === "link" ? (
-                    <a
-                      key={index}
-                      href={part.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="comment-link"
-                    >
-                      {part.content}
-                    </a>
-                  ) : (
-                    <span key={index}>{part.content}</span>
-                  )
-                )}
+              <div className="comment-body markdown-content">
+                <MarkdownRenderer content={comment.body} />
               </div>
             </div>
           ))}
@@ -62,7 +55,11 @@ export function IssueComments({
           placeholder="Add a comment..."
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
+          {...commentProps}
           onKeyDown={(e) => {
+            // Handle formatting hotkeys (B/I/K)
+            commentProps.onKeyDown(e);
+            // Handle submit on Cmd/Ctrl+Enter
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
               onAddComment();
             }

@@ -1,6 +1,7 @@
 import { Button, Group, Textarea } from "@mantine/core";
-import { linkifyText } from "../../../utils/formatters.jsx";
+import { MarkdownRenderer } from "../../shared/MarkdownRenderer";
 import { useMobile } from "../../../hooks/useMobile";
+import { useMarkdownTextarea } from "../../../hooks/useMarkdownTextarea";
 
 export function IssueDetailFields({
   editing,
@@ -17,6 +18,11 @@ export function IssueDetailFields({
   onStartEditDescription,
 }) {
   const isMobile = useMobile();
+  const { textareaProps: descriptionProps } = useMarkdownTextarea({
+    value: description,
+    onChange: setDescription,
+  });
+
   if (editing) {
     return (
       <div className="modal-section">
@@ -47,6 +53,7 @@ export function IssueDetailFields({
           inputMode="text"
           autosize
           minRows={3}
+          {...descriptionProps}
           styles={{
             input: {
               fontSize: "var(--text-base)",
@@ -124,29 +131,23 @@ export function IssueDetailFields({
       <div
         className="editable-block"
         onClick={(e) => {
-          if (e.target.tagName !== "A") {
-            onStartEditDescription();
+          // Don't trigger edit when clicking links or images
+          // Check both target and closest ancestor in case of event retargeting
+          const clickedElement = e.target;
+          if (
+            clickedElement.tagName === "A" ||
+            clickedElement.tagName === "IMG" ||
+            clickedElement.closest("a") ||
+            clickedElement.closest("img")
+          ) {
+            return;
           }
+          onStartEditDescription();
         }}
       >
         {description ? (
-          <div className="editable-block-description">
-            {linkifyText(description).map((part, index) =>
-              part.type === "link" ? (
-                <a
-                  key={index}
-                  href={part.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="comment-link"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {part.content}
-                </a>
-              ) : (
-                <span key={index}>{part.content}</span>
-              )
-            )}
+          <div className="editable-block-description markdown-content">
+            <MarkdownRenderer content={description} />
           </div>
         ) : (
           <div className="editable-block-description editable-block-placeholder">
