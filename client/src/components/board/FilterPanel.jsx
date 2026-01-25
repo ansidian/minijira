@@ -13,6 +13,99 @@ import { DatePickerInput } from "@mantine/dates";
 import "@mantine/dates/styles.css";
 import dayjs from "dayjs";
 import { useUsers } from "../../contexts/UsersContext";
+import { useMobile } from "../../hooks/useMobile";
+
+// Shared date presets used by both DatePickerInput and mobile preset buttons
+function getDatePresets(today) {
+  return [
+    {
+      key: "last-2-days",
+      label: "Last 2 days",
+      value: [today.subtract(2, "day").startOf("day").toDate(), today.endOf("day").toDate()],
+    },
+    {
+      key: "last-7-days",
+      label: "Last 7 days",
+      value: [today.subtract(7, "day").startOf("day").toDate(), today.endOf("day").toDate()],
+    },
+    {
+      key: "this-month",
+      label: "This month",
+      value: [today.startOf("month").toDate(), today.endOf("day").toDate()],
+    },
+    {
+      key: "last-month",
+      label: "Last month",
+      value: [
+        today.subtract(1, "month").startOf("month").toDate(),
+        today.subtract(1, "month").endOf("month").toDate(),
+      ],
+    },
+    {
+      key: "last-year",
+      label: "Last year",
+      value: [
+        today.subtract(1, "year").startOf("year").toDate(),
+        today.subtract(1, "year").endOf("year").toDate(),
+      ],
+    },
+  ];
+}
+
+// Mobile-only preset button selector
+function DatePresetButtons({ presets, value, onChange }) {
+  // Check if current value matches a preset
+  const selectedPresetKey = useMemo(() => {
+    if (!value || !value[0] || !value[1]) return null;
+    const preset = presets.find(
+      (p) =>
+        p.value[0].getTime() === value[0].getTime() &&
+        p.value[1].getTime() === value[1].getTime()
+    );
+    return preset?.key || null;
+  }, [presets, value]);
+
+  return (
+    <Group gap={6} wrap="wrap">
+      {presets.map((preset) => (
+        <button
+          key={preset.key}
+          onClick={() => {
+            // Toggle off if already selected
+            if (selectedPresetKey === preset.key) {
+              onChange([null, null]);
+            } else {
+              onChange(preset.value);
+            }
+          }}
+          style={{
+            padding: "6px 10px",
+            borderRadius: "var(--radius-md)",
+            border:
+              selectedPresetKey === preset.key
+                ? "1.5px solid var(--accent)"
+                : "1.5px solid var(--border-primary)",
+            backgroundColor:
+              selectedPresetKey === preset.key
+                ? "var(--accent-light)"
+                : "transparent",
+            color:
+              selectedPresetKey === preset.key
+                ? "var(--accent)"
+                : "var(--text-secondary)",
+            fontSize: "var(--text-xs)",
+            fontFamily: "var(--font-sans)",
+            fontWeight: 500,
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+          }}
+        >
+          {preset.label}
+        </button>
+      ))}
+    </Group>
+  );
+}
 
 const STATUS_OPTIONS = [
   { value: "todo", label: "To Do", color: "var(--status-todo)" },
@@ -65,7 +158,9 @@ function FilterChip({ label, color, selected, onClick }) {
 
 export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose }) {
   const { users } = useUsers();
+  const isMobile = useMobile();
   const today = dayjs();
+  const datePresets = useMemo(() => getDatePresets(today), [today]);
 
   // Draft state for local edits - initialized from applied
   const [draftFilters, setDraftFilters] = useState({
@@ -247,48 +342,31 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
           <Text size="xs" c="var(--text-muted)" mb={8} tt="uppercase" fw={500}>
             Created Date
           </Text>
-          <DatePickerInput
-            type="range"
-            presets={[
-              {
-                value: [today.subtract(2, "day").toDate(), today.toDate()],
-                label: "Last two days",
-              },
-              {
-                value: [today.subtract(7, "day").toDate(), today.toDate()],
-                label: "Last 7 days",
-              },
-              {
-                value: [today.startOf("month").toDate(), today.toDate()],
-                label: "This month",
-              },
-              {
-                value: [
-                  today.subtract(1, "month").startOf("month").toDate(),
-                  today.subtract(1, "month").endOf("month").toDate(),
-                ],
-                label: "Last month",
-              },
-              {
-                value: [
-                  today.subtract(1, "year").startOf("year").toDate(),
-                  today.subtract(1, "year").endOf("year").toDate(),
-                ],
-                label: "Last year",
-              },
-            ]}
-            value={draftFilters.createdRange}
-            onChange={(range) =>
-              setDraftFilters((prev) => ({ ...prev, createdRange: range }))
-            }
-            allowSingleDateInRange
-            placeholder="Select date range"
-            firstDayOfWeek={0}
-            size="sm"
-            clearable
-            highlightToday
-            popoverProps={{ withinPortal: false }}
-          />
+          {isMobile ? (
+            <DatePresetButtons
+              presets={datePresets}
+              value={draftFilters.createdRange}
+              onChange={(range) =>
+                setDraftFilters((prev) => ({ ...prev, createdRange: range }))
+              }
+            />
+          ) : (
+            <DatePickerInput
+              type="range"
+              presets={datePresets}
+              value={draftFilters.createdRange}
+              onChange={(range) =>
+                setDraftFilters((prev) => ({ ...prev, createdRange: range }))
+              }
+              allowSingleDateInRange
+              placeholder="Select date range"
+              firstDayOfWeek={0}
+              size="sm"
+              clearable
+              highlightToday
+              popoverProps={{ withinPortal: false }}
+            />
+          )}
         </div>
 
         {/* Updated Date Range */}
@@ -296,48 +374,31 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
           <Text size="xs" c="var(--text-muted)" mb={8} tt="uppercase" fw={500}>
             Updated Date
           </Text>
-          <DatePickerInput
-            type="range"
-            presets={[
-              {
-                value: [today.subtract(2, "day").toDate(), today.toDate()],
-                label: "Last two days",
-              },
-              {
-                value: [today.subtract(7, "day").toDate(), today.toDate()],
-                label: "Last 7 days",
-              },
-              {
-                value: [today.startOf("month").toDate(), today.toDate()],
-                label: "This month",
-              },
-              {
-                value: [
-                  today.subtract(1, "month").startOf("month").toDate(),
-                  today.subtract(1, "month").endOf("month").toDate(),
-                ],
-                label: "Last month",
-              },
-              {
-                value: [
-                  today.subtract(1, "year").startOf("year").toDate(),
-                  today.subtract(1, "year").endOf("year").toDate(),
-                ],
-                label: "Last year",
-              },
-            ]}
-            value={draftFilters.updatedRange}
-            onChange={(range) =>
-              setDraftFilters((prev) => ({ ...prev, updatedRange: range }))
-            }
-            placeholder="Select date range"
-            allowSingleDateInRange
-            firstDayOfWeek={0}
-            size="sm"
-            clearable
-            highlightToday
-            popoverProps={{ withinPortal: false }}
-          />
+          {isMobile ? (
+            <DatePresetButtons
+              presets={datePresets}
+              value={draftFilters.updatedRange}
+              onChange={(range) =>
+                setDraftFilters((prev) => ({ ...prev, updatedRange: range }))
+              }
+            />
+          ) : (
+            <DatePickerInput
+              type="range"
+              presets={datePresets}
+              value={draftFilters.updatedRange}
+              onChange={(range) =>
+                setDraftFilters((prev) => ({ ...prev, updatedRange: range }))
+              }
+              placeholder="Select date range"
+              allowSingleDateInRange
+              firstDayOfWeek={0}
+              size="sm"
+              clearable
+              highlightToday
+              popoverProps={{ withinPortal: false }}
+            />
+          )}
         </div>
 
         <Divider color="var(--border-primary)" />
