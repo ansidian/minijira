@@ -58,12 +58,12 @@ export function Column({
               borderRadius: "50%",
               backgroundColor:
                 column.status === "todo"
-                  ? "#71717a"
+                  ? "var(--status-todo)"
                   : column.status === "in_progress"
-                  ? "#3b82f6"
+                  ? "var(--status-progress)"
                   : column.status === "review"
-                  ? "#a855f7"
-                  : "#22c55e",
+                  ? "var(--status-review)"
+                  : "var(--status-done)",
             }}
           />
           {column.title}
@@ -104,17 +104,18 @@ export function Column({
 
         {/* Load More button */}
         {paginationState?.hasMore && issues.length > 0 && (
-          <Button
-            variant="subtle"
-            size="sm"
-            fullWidth
-            onClick={onLoadMore}
-            loading={paginationState.loading}
-            disabled={paginationState.loading}
-            style={{ marginTop: "8px" }}
-          >
-            Load More
-          </Button>
+          <div className="load-more-container">
+            <Button
+              variant="subtle"
+              size="sm"
+              fullWidth
+              onClick={onLoadMore}
+              loading={paginationState.loading}
+              disabled={paginationState.loading}
+            >
+              Load More
+            </Button>
+          </div>
         )}
       </div>
       <button className="add-issue-btn" onClick={onAddClick}>
