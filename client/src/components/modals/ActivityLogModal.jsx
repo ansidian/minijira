@@ -1,11 +1,26 @@
 import { useEffect, useState } from "react";
-import { Avatar, Badge, Button, Modal, Stack } from "@mantine/core";
+import { Avatar, Badge, Button, Modal, Skeleton, Stack } from "@mantine/core";
 import { api } from "../../utils/api";
 import { notifyApiError } from "../../utils/notify";
 import {
   formatActivityDescription,
   relativeTime,
 } from "../../utils/formatters.jsx";
+
+function ActivityEntrySkeleton() {
+  return (
+    <div className="activity-entry">
+      <div className="activity-header">
+        <Skeleton height={28} width={28} circle />
+        <Skeleton height={14} width={100} radius="sm" />
+        <Skeleton height={12} width={60} radius="sm" ml="auto" />
+      </div>
+      <div className="activity-body" style={{ marginTop: "8px" }}>
+        <Skeleton height={14} width="80%" radius="sm" />
+      </div>
+    </div>
+  );
+}
 
 export function ActivityLogModal({ opened, onClose, onViewIssue }) {
   const [activities, setActivities] = useState([]);
@@ -68,15 +83,11 @@ export function ActivityLogModal({ opened, onClose, onViewIssue }) {
   return (
     <Modal opened={opened} onClose={onClose} size="lg" title="Recent Activity">
       {loading ? (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "2rem",
-            color: "var(--text-secondary)",
-          }}
-        >
-          Loading...
-        </div>
+        <Stack gap="sm">
+          <ActivityEntrySkeleton />
+          <ActivityEntrySkeleton />
+          <ActivityEntrySkeleton />
+        </Stack>
       ) : activities.length === 0 ? (
         <div
           style={{
