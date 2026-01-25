@@ -4,7 +4,10 @@ import {
   useReducer,
   useCallback,
   useMemo,
+  useEffect,
 } from "react";
+import { useDeepLink } from "../hooks/useDeepLink.js";
+import { api } from "../utils/api.js";
 
 const UIContext = createContext(null);
 
@@ -57,6 +60,48 @@ export function UIProvider({ children }) {
     (value) => dispatch({ type: "SET_STATS_BADGE_ANIMATE", value }),
     [],
   );
+
+  // Handle deep links on initial load
+  useDeepLink(setSelectedIssue);
+
+  // Sync URL with selectedIssue state
+  useEffect(() => {
+    if (state.selectedIssue) {
+      // Issue opened - update URL
+      window.history.pushState({}, '', `/issues/${state.selectedIssue.id}`);
+    } else {
+      // Issue closed - return to root
+      window.history.pushState({}, '', '/');
+    }
+  }, [state.selectedIssue]);
+
+  // Handle browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const pathname = window.location.pathname;
+      const match = pathname.match(/^\/issues\/(\d+)$/);
+
+      if (match) {
+        // Navigate to an issue
+        const issueId = match[1];
+        api.get(`/issues/${issueId}`)
+          .then((issue) => {
+            setSelectedIssue(issue);
+          })
+          .catch((error) => {
+            console.warn(`Failed to load issue ${issueId}:`, error);
+            setSelectedIssue(null);
+            window.history.replaceState({}, '', '/');
+          });
+      } else if (pathname === '/') {
+        // Navigate to root - close any open modal
+        setSelectedIssue(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [setSelectedIssue]);
 
   const value = useMemo(
     () => ({
