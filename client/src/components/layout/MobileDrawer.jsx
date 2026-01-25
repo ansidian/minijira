@@ -53,10 +53,10 @@ export function MobileDrawer({
       styles={{
         title: {
           fontWeight: 600,
-          fontSize: 'var(--text-lg)',
+          fontSize: "var(--text-lg)",
         },
         body: {
-          padding: '0 16px 16px',
+          padding: "0 16px 16px",
         },
       }}
     >
@@ -102,29 +102,36 @@ export function MobileDrawer({
             fullWidth
             justify="flex-start"
             leftSection={
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-              </svg>
+              <span style={{ position: "relative", display: "flex" }}>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                </svg>
+                {hasNewActivity && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: "-2px",
+                      right: "-2px",
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "50%",
+                      background: "red",
+                    }}
+                  />
+                )}
+              </span>
             }
             onClick={handleActivityClick}
             disabled={isUserLocked}
-            styles={{ label: { position: 'relative' } }}
           >
             Activity Log
-            {hasNewActivity && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: '50%',
-                  right: '12px',
-                  transform: 'translateY(-50%)',
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  background: 'var(--status-progress)',
-                }}
-              />
-            )}
           </Button>
 
           <Button
@@ -133,8 +140,23 @@ export function MobileDrawer({
             fullWidth
             justify="flex-start"
             leftSection={
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="6 9 12 15 18 9" style={{ transform: allExpanded ? 'rotate(180deg)' : 'none', transformOrigin: 'center' }} />
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline
+                  points="6 9 12 15 18 9"
+                  style={{
+                    transform: allExpanded ? "rotate(180deg)" : "none",
+                    transformOrigin: "center",
+                  }}
+                />
               </svg>
             }
             onClick={() => {
@@ -142,7 +164,7 @@ export function MobileDrawer({
             }}
             disabled={isUserLocked}
           >
-            {allExpanded ? 'Hide All Subtasks' : 'Show All Subtasks'}
+            {allExpanded ? "Hide All Subtasks" : "Show All Subtasks"}
           </Button>
         </Stack>
 
