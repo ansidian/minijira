@@ -66,7 +66,6 @@ export function Header({
             variant="subtle"
             size="lg"
             onClick={openDrawer}
-            disabled={isUserLocked}
             aria-label="Open navigation menu"
             aria-expanded={drawerOpened}
             className="hamburger-button"
