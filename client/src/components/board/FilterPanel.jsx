@@ -1,23 +1,66 @@
 import { useState, useEffect, useMemo } from "react";
-import { MultiSelect, Button, Group, Collapse, Box } from "@mantine/core";
+import {
+  Select,
+  Button,
+  Group,
+  Stack,
+  Text,
+  CloseButton,
+  Checkbox,
+  Divider,
+} from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useQueryParams } from "../../hooks/useQueryParams";
 import { useUsers } from "../../contexts/UsersContext";
 
 const STATUS_OPTIONS = [
-  { value: "todo", label: "To Do" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "review", label: "Review" },
-  { value: "done", label: "Done" },
+  { value: "todo", label: "To Do", color: "var(--status-todo)" },
+  { value: "in_progress", label: "In Progress", color: "var(--status-progress)" },
+  { value: "review", label: "Review", color: "var(--status-review)" },
+  { value: "done", label: "Done", color: "var(--status-done)" },
 ];
 
 const PRIORITY_OPTIONS = [
-  { value: "high", label: "High" },
-  { value: "medium", label: "Medium" },
-  { value: "low", label: "Low" },
+  { value: "high", label: "High", color: "var(--priority-high)" },
+  { value: "medium", label: "Medium", color: "var(--priority-medium)" },
+  { value: "low", label: "Low", color: "var(--priority-low)" },
 ];
 
-export function FilterPanel({ expanded, currentUserId, onFiltersChange }) {
+function FilterChip({ label, color, selected, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={(e) => {
+        if (!selected) {
+          e.currentTarget.style.borderColor = "var(--border-secondary)";
+          e.currentTarget.style.backgroundColor = "var(--bg-tertiary)";
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!selected) {
+          e.currentTarget.style.borderColor = "var(--border-primary)";
+          e.currentTarget.style.backgroundColor = "transparent";
+        }
+      }}
+      style={{
+        padding: "6px 12px",
+        borderRadius: "var(--radius-md)",
+        border: selected ? `1.5px solid ${color}` : "1.5px solid var(--border-primary)",
+        backgroundColor: selected ? `${color}20` : "transparent",
+        color: selected ? color : "var(--text-secondary)",
+        fontSize: "var(--text-sm)",
+        fontFamily: "var(--font-sans)",
+        fontWeight: 500,
+        cursor: "pointer",
+        transition: "all 0.15s ease",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+export function FilterPanel({ currentUserId, onFiltersChange, onClose }) {
   const [params, setParams] = useQueryParams();
   const { users } = useUsers();
 
@@ -72,8 +115,29 @@ export function FilterPanel({ expanded, currentUserId, onFiltersChange }) {
     }
   }, [params]);
 
-  const updateFilter = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
+  const toggleStatus = (value) => {
+    setFilters((prev) => ({
+      ...prev,
+      status: prev.status.includes(value)
+        ? prev.status.filter((s) => s !== value)
+        : [...prev.status, value],
+    }));
+  };
+
+  const togglePriority = (value) => {
+    setFilters((prev) => ({
+      ...prev,
+      priority: prev.priority.includes(value)
+        ? prev.priority.filter((p) => p !== value)
+        : [...prev.priority, value],
+    }));
+  };
+
+  const setAssignee = (value) => {
+    setFilters((prev) => ({
+      ...prev,
+      assignee: value ? [value] : [],
+    }));
   };
 
   const toggleMyIssues = () => {
@@ -96,71 +160,107 @@ export function FilterPanel({ expanded, currentUserId, onFiltersChange }) {
     filters.myIssues;
 
   return (
-    <Collapse in={expanded}>
-      <Box
+    <div
+      style={{
+        width: 280,
+        backgroundColor: "var(--bg-secondary)",
+        border: "1px solid var(--border-primary)",
+        borderRadius: "var(--radius-lg)",
+        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+      }}
+    >
+      {/* Header */}
+      <Group
+        justify="space-between"
         p="sm"
-        mb="sm"
         style={{
-          backgroundColor: "var(--mantine-color-body)",
-          borderBottom: "1px solid var(--mantine-color-default-border)",
+          borderBottom: "1px solid var(--border-primary)",
         }}
       >
-        <Group gap="sm" wrap="wrap">
-          <MultiSelect
-            data={STATUS_OPTIONS}
-            value={filters.status}
-            onChange={(value) => updateFilter("status", value)}
-            placeholder="Status"
-            searchable
-            clearable
-            size="sm"
-            style={{ minWidth: 150 }}
-          />
+        <Text size="sm" fw={600} c="var(--text-primary)">
+          Filters
+        </Text>
+        <CloseButton size="sm" onClick={onClose} />
+      </Group>
 
-          <MultiSelect
+      <Stack gap="md" p="sm">
+        {/* Status chips */}
+        <div>
+          <Text size="xs" c="var(--text-muted)" mb={8} tt="uppercase" fw={500}>
+            Status
+          </Text>
+          <Group gap={6}>
+            {STATUS_OPTIONS.map((opt) => (
+              <FilterChip
+                key={opt.value}
+                label={opt.label}
+                color={opt.color}
+                selected={filters.status.includes(opt.value)}
+                onClick={() => toggleStatus(opt.value)}
+              />
+            ))}
+          </Group>
+        </div>
+
+        {/* Priority chips */}
+        <div>
+          <Text size="xs" c="var(--text-muted)" mb={8} tt="uppercase" fw={500}>
+            Priority
+          </Text>
+          <Group gap={6}>
+            {PRIORITY_OPTIONS.map((opt) => (
+              <FilterChip
+                key={opt.value}
+                label={opt.label}
+                color={opt.color}
+                selected={filters.priority.includes(opt.value)}
+                onClick={() => togglePriority(opt.value)}
+              />
+            ))}
+          </Group>
+        </div>
+
+        {/* Assignee dropdown */}
+        <div>
+          <Text size="xs" c="var(--text-muted)" mb={8} tt="uppercase" fw={500}>
+            Assignee
+          </Text>
+          <Select
             data={assigneeOptions}
-            value={filters.assignee}
-            onChange={(value) => updateFilter("assignee", value)}
-            placeholder="Assignee"
+            value={filters.assignee[0] || null}
+            onChange={setAssignee}
+            placeholder="Anyone"
             searchable
             clearable
             size="sm"
-            style={{ minWidth: 150 }}
+            comboboxProps={{ withinPortal: false }}
           />
+        </div>
 
-          <MultiSelect
-            data={PRIORITY_OPTIONS}
-            value={filters.priority}
-            onChange={(value) => updateFilter("priority", value)}
-            placeholder="Priority"
-            searchable
-            clearable
-            size="sm"
-            style={{ minWidth: 150 }}
-          />
+        <Divider color="var(--border-primary)" />
 
+        {/* My Issues toggle */}
+        <Checkbox
+          label="My Issues Only"
+          checked={filters.myIssues}
+          onChange={toggleMyIssues}
+          disabled={!currentUserId}
+          size="sm"
+        />
+
+        {/* Clear All */}
+        {hasActiveFilters && (
           <Button
-            variant={filters.myIssues ? "filled" : "light"}
-            color={filters.myIssues ? "blue" : "gray"}
-            size="sm"
-            onClick={toggleMyIssues}
-            disabled={!currentUserId}
+            variant="subtle"
+            color="violet"
+            size="xs"
+            fullWidth
+            onClick={clearAllFilters}
           >
-            My Issues
+            Clear All Filters
           </Button>
-
-          {hasActiveFilters && (
-            <Button
-              variant="subtle"
-              color="red"
-              size="sm"
-              onClick={clearAllFilters}
-            >
-              Clear All
-            </Button>
-          )}
-        </Group>
-      </Box>
-    </Collapse>
+        )}
+      </Stack>
+    </div>
   );
 }
