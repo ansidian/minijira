@@ -62,6 +62,7 @@ export function useIssueDelete({
       issues: [...stateRef.current.issues],
       allIssues: [...stateRef.current.allIssues],
       stats: { ...stateRef.current.stats },
+      paginationState: { ...stateRef.current.paginationState },
       expandedIssues: new Set(stateRef.current.expandedIssues),
       subtasksCache: { ...stateRef.current.subtasksCache },
       selectedIssue,
@@ -89,6 +90,11 @@ export function useIssueDelete({
           total: Math.max(0, (stateRef.current.stats.total || 0) - 1),
           [deletedStatus]: Math.max(0, stateRef.current.stats[deletedStatus] - 1),
         },
+      });
+      dispatch({
+        type: "SET_PAGINATION_STATE",
+        status: deletedStatus,
+        updates: { total: Math.max(0, (stateRef.current.paginationState[deletedStatus]?.total || 0) - 1) },
       });
     }
 
@@ -122,6 +128,14 @@ export function useIssueDelete({
         dispatch({ type: "SET_ISSUES", value: issuesData });
         dispatch({ type: "SET_ALL_ISSUES", value: allIssuesData });
         dispatch({ type: "SET_STATS", value: statsData });
+        // Update pagination totals from fresh stats
+        for (const status of ["todo", "in_progress", "review", "done"]) {
+          dispatch({
+            type: "SET_PAGINATION_STATE",
+            status,
+            updates: { total: statsData[status] || 0 },
+          });
+        }
         setSelectedIssue?.(null);
 
         const expandedIssues = new Set(stateRef.current.expandedIssues);
@@ -157,6 +171,14 @@ export function useIssueDelete({
         dispatch({ type: "SET_ISSUES", value: snapshot.issues });
         dispatch({ type: "SET_ALL_ISSUES", value: snapshot.allIssues });
         dispatch({ type: "SET_STATS", value: snapshot.stats });
+        // Restore pagination totals from snapshot
+        for (const status of ["todo", "in_progress", "review", "done"]) {
+          dispatch({
+            type: "SET_PAGINATION_STATE",
+            status,
+            updates: { total: snapshot.paginationState[status]?.total || 0 },
+          });
+        }
         dispatch({
           type: "SET_EXPANDED_ISSUES",
           value: new Set(snapshot.expandedIssues),
@@ -188,6 +210,14 @@ export function useIssueDelete({
         dispatch({ type: "SET_ISSUES", value: pending.snapshot.issues });
         dispatch({ type: "SET_ALL_ISSUES", value: pending.snapshot.allIssues });
         dispatch({ type: "SET_STATS", value: pending.snapshot.stats });
+        // Restore pagination totals from snapshot
+        for (const status of ["todo", "in_progress", "review", "done"]) {
+          dispatch({
+            type: "SET_PAGINATION_STATE",
+            status,
+            updates: { total: pending.snapshot.paginationState[status]?.total || 0 },
+          });
+        }
         dispatch({
           type: "SET_EXPANDED_ISSUES",
           value: new Set(pending.snapshot.expandedIssues),

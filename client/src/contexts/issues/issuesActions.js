@@ -27,7 +27,7 @@ export function createStatusChangeActions(dispatch, stateRef, deps) {
     dispatch({ type: "UPDATE_ISSUE", value: optimisticIssue });
     dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: optimisticIssue });
 
-    // Update stats immediately for parent issues
+    // Update stats and pagination totals immediately for parent issues
     if (isParentIssue) {
       dispatch({
         type: "SET_STATS",
@@ -36,6 +36,16 @@ export function createStatusChangeActions(dispatch, stateRef, deps) {
           [oldStatus]: Math.max(0, stateRef.current.stats[oldStatus] - 1),
           [newStatus]: stateRef.current.stats[newStatus] + 1,
         },
+      });
+      dispatch({
+        type: "SET_PAGINATION_STATE",
+        status: oldStatus,
+        updates: { total: Math.max(0, (stateRef.current.paginationState[oldStatus]?.total || 0) - 1) },
+      });
+      dispatch({
+        type: "SET_PAGINATION_STATE",
+        status: newStatus,
+        updates: { total: (stateRef.current.paginationState[newStatus]?.total || 0) + 1 },
       });
     }
 
@@ -88,7 +98,7 @@ export function createStatusChangeActions(dispatch, stateRef, deps) {
       dispatch({ type: "UPDATE_ISSUE", value: { ...snapshot, _isPending: false } });
       dispatch({ type: "UPDATE_IN_ALL_ISSUES", value: snapshot });
 
-      // Revert stats
+      // Revert stats and pagination totals
       if (isParentIssue) {
         dispatch({
           type: "SET_STATS",
@@ -97,6 +107,16 @@ export function createStatusChangeActions(dispatch, stateRef, deps) {
             [oldStatus]: stateRef.current.stats[oldStatus] + 1,
             [newStatus]: Math.max(0, stateRef.current.stats[newStatus] - 1),
           },
+        });
+        dispatch({
+          type: "SET_PAGINATION_STATE",
+          status: oldStatus,
+          updates: { total: (stateRef.current.paginationState[oldStatus]?.total || 0) + 1 },
+        });
+        dispatch({
+          type: "SET_PAGINATION_STATE",
+          status: newStatus,
+          updates: { total: Math.max(0, (stateRef.current.paginationState[newStatus]?.total || 0) - 1) },
         });
       }
 
@@ -143,7 +163,7 @@ export function createIssueActions(dispatch, stateRef, deps) {
     dispatch({ type: "ADD_ISSUE", value: optimisticIssue });
     dispatch({ type: "ADD_TO_ALL_ISSUES", value: optimisticIssue });
 
-    // Update stats immediately for parent issues
+    // Update stats and pagination total immediately for parent issues
     if (!data.parent_id) {
       const status = data.status || "todo";
       dispatch({
@@ -153,6 +173,11 @@ export function createIssueActions(dispatch, stateRef, deps) {
           total: (stateRef.current.stats.total || 0) + 1,
           [status]: stateRef.current.stats[status] + 1,
         },
+      });
+      dispatch({
+        type: "SET_PAGINATION_STATE",
+        status,
+        updates: { total: (stateRef.current.paginationState[status]?.total || 0) + 1 },
       });
     }
 
@@ -186,7 +211,7 @@ export function createIssueActions(dispatch, stateRef, deps) {
       // 5. Remove optimistic issue on failure
       dispatch({ type: "REMOVE_ISSUE", id: tempId });
 
-      // Revert stats
+      // Revert stats and pagination total
       if (!data.parent_id) {
         const status = data.status || "todo";
         dispatch({
@@ -196,6 +221,11 @@ export function createIssueActions(dispatch, stateRef, deps) {
             total: Math.max(0, (stateRef.current.stats.total || 0) - 1),
             [status]: Math.max(0, stateRef.current.stats[status] - 1),
           },
+        });
+        dispatch({
+          type: "SET_PAGINATION_STATE",
+          status,
+          updates: { total: Math.max(0, (stateRef.current.paginationState[status]?.total || 0) - 1) },
         });
       }
 
