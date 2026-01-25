@@ -82,7 +82,7 @@ export function Header({
           <Button
             variant="light"
             size="sm"
-            color="blue"
+            color="orange"
             onClick={toggleAllSubtasks}
             disabled={isUserLocked}
             className="subtask-toggle-desktop"
@@ -131,11 +131,11 @@ export function Header({
               label={activeFilterCount}
               size={16}
               disabled={activeFilterCount === 0 || filterPanelExpanded}
-              color="violet"
+              color="orange"
             >
               <ActionIcon
                 variant={filterPanelExpanded ? "filled" : "light"}
-                color={activeFilterCount > 0 ? "violet" : "gray"}
+                color={activeFilterCount > 0 ? "orange" : "gray"}
                 size="lg"
                 onClick={() => setFilterPanelExpanded(!filterPanelExpanded)}
                 disabled={isUserLocked}

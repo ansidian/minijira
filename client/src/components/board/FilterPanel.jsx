@@ -264,9 +264,8 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
       style={{
         width: 280,
         backgroundColor: "var(--bg-secondary)",
-        border: "1px solid var(--border-primary)",
         borderRadius: "var(--radius-lg)",
-        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+        boxShadow: "var(--shadow-lg)",
       }}
     >
       {/* Header */}
@@ -442,7 +441,7 @@ export function FilterPanel({ currentUserId, appliedFilters, onApply, onClose })
               </Button>
             )}
             <Button
-              color="violet"
+              color="orange"
               size="xs"
               onClick={handleApply}
               disabled={!hasChanges}

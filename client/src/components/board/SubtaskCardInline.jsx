@@ -42,20 +42,20 @@ export function SubtaskCardInline({
       <div className="subtask-connector" />
       <Paper
         p="sm"
-        withBorder
         className="subtask-card"
         data-archived={subtask.archived_at ? "true" : undefined}
         style={{
           cursor: "pointer",
           backgroundColor: "var(--bg-tertiary)",
+          boxShadow: "var(--shadow-sm)",
           borderLeft:
             subtask.status === "done"
-              ? "4px solid var(--status-done)"
+              ? "3px solid var(--status-done)"
               : subtask.status === "in_progress"
-              ? "4px solid var(--status-progress)"
+              ? "3px solid var(--status-progress)"
               : subtask.status === "review"
-              ? "4px solid var(--status-review)"
-              : "4px solid var(--status-todo)",
+              ? "3px solid var(--status-review)"
+              : "3px solid var(--status-todo)",
         }}
         onClick={(e) => {
           e.stopPropagation();

@@ -18,23 +18,26 @@ import "./styles/responsive.css";
 
 const theme = createTheme({
   colors: {
-    // Dark mode colors (used when --mantine-color-dark-X is referenced)
+    // Warm dark mode colors
     dark: [
-      "#fafafa", // 0 - text-primary (dark mode)
-      "#a1a1aa", // 1 - text-secondary
-      "#71717a", // 2 - text-muted
-      "#3a3a3f", // 3 - border-secondary
-      "#2a2a2e", // 4 - border-primary
-      "#232326", // 5 - bg-hover
-      "#1c1c1f", // 6 - bg-card
-      "#18181b", // 7 - bg-tertiary
-      "#111113", // 8 - bg-secondary
-      "#0a0a0b", // 9 - bg-primary
+      "#faf9f7", // 0 - text-primary (dark mode)
+      "#a8a5a0", // 1 - text-secondary
+      "#78746e", // 2 - text-muted
+      "#3d3935", // 3 - border-secondary
+      "#2e2b28", // 4 - border-primary
+      "#2a2725", // 5 - bg-hover
+      "#211f1d", // 6 - bg-card
+      "#1c1a19", // 7 - bg-tertiary
+      "#141312", // 8 - bg-secondary
+      "#0c0b0a", // 9 - bg-primary
     ],
   },
-  // Use 'dark' as the default color for backgrounds/components
-  // This way --mantine-color-dark-6 will automatically switch between dark[6] and light theme equivalent
-  primaryColor: "blue",
+  primaryColor: "orange",
+  components: {
+    Checkbox: {
+      defaultProps: { color: "orange" },
+    },
+  },
 });
 
 // Get initial color scheme from localStorage, default to dark

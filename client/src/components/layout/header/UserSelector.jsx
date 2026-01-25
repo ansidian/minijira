@@ -35,7 +35,7 @@ export function UserSelector({
       <Button
         variant="light"
         size="sm"
-        color="blue"
+        color="orange"
         onClick={toggleAllSubtasks}
         disabled={isUserLocked}
         className="subtask-toggle-mobile"

@@ -61,7 +61,7 @@ export function SubtaskListHeader({ doneCount, totalCount, showAddButton, onAddC
         </Badge>
       </h3>
       {showAddButton && (
-        <Button size="xs" variant="subtle" onClick={onAddClick}>
+        <Button size="xs" variant="subtle" color="orange" onClick={onAddClick}>
           + Add Subtask
         </Button>
       )}

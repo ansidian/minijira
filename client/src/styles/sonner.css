@@ -1,35 +1,17 @@
 /* === Sonner + custom toast styling === */
 
-/* Dark theme variables */
+/* Dark theme variables - warm palette with amber accent */
 [data-mantine-color-scheme="dark"] {
-  --bg-primary: #0a0a0b;
-  --bg-secondary: #111113;
-  --bg-tertiary: #18181b;
-  --bg-card: #1c1c1f;
-  --bg-hover: #232326;
-
-  --border-primary: #2a2a2e;
-  --border-secondary: #3a3a3f;
-  --border-accent: #4a4a50;
-
-  --text-primary: #fafafa;
-  --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
-
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
-  --accent-light: rgba(59, 130, 246, 0.1);
-
   --sonner-bg: var(--bg-card);
   --sonner-border: var(--border-primary);
   --sonner-text: var(--text-primary);
   --sonner-description: var(--text-secondary);
-  --sonner-action: var(--accent-light);
+  --sonner-action: var(--accent-subtle);
   --sonner-action-text: var(--accent);
   --sonner-success: #22c55e;
   --sonner-error: #ef4444;
   --sonner-warning: #f59e0b;
-  --sonner-info: #3b82f6;
+  --sonner-info: #f59e0b;
   --sonner-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
 }
 
@@ -42,8 +24,8 @@
   --success-bg: #13261c;
   --success-border: #1e3b2a;
   --success-text: var(--sonner-success);
-  --info-bg: rgba(59, 130, 246, 0.12);
-  --info-border: rgba(59, 130, 246, 0.35);
+  --info-bg: rgba(245, 158, 11, 0.12);
+  --info-border: rgba(245, 158, 11, 0.35);
   --info-text: var(--sonner-info);
   --warning-bg: rgba(245, 158, 11, 0.12);
   --warning-border: rgba(245, 158, 11, 0.35);
@@ -53,36 +35,18 @@
   --error-text: var(--sonner-error);
 }
 
-/* Light theme variables */
+/* Light theme variables - warm palette with amber accent */
 [data-mantine-color-scheme="light"] {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f9fafb;
-  --bg-tertiary: #f3f4f6;
-  --bg-card: #ffffff;
-  --bg-hover: #f3f4f6;
-
-  --border-primary: #e5e7eb;
-  --border-secondary: #d1d5db;
-  --border-accent: #9ca3af;
-
-  --text-primary: #111827;
-  --text-secondary: #4b5563;
-  --text-muted: #6b7280;
-
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
-  --accent-light: rgba(59, 130, 246, 0.1);
-
   --sonner-bg: var(--bg-card);
   --sonner-border: var(--border-primary);
   --sonner-text: var(--text-primary);
   --sonner-description: var(--text-secondary);
-  --sonner-action: var(--accent-light);
+  --sonner-action: var(--accent-subtle);
   --sonner-action-text: var(--accent);
   --sonner-success: #16a34a;
   --sonner-error: #dc2626;
   --sonner-warning: #d97706;
-  --sonner-info: #2563eb;
+  --sonner-info: #d97706;
   --sonner-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
 }
 
@@ -95,8 +59,8 @@
   --success-bg: #e7f7ee;
   --success-border: #b7e6c9;
   --success-text: var(--sonner-success);
-  --info-bg: rgba(37, 99, 235, 0.12);
-  --info-border: rgba(37, 99, 235, 0.28);
+  --info-bg: rgba(217, 119, 6, 0.12);
+  --info-border: rgba(217, 119, 6, 0.28);
   --info-text: var(--sonner-info);
   --warning-bg: rgba(217, 119, 6, 0.12);
   --warning-border: rgba(217, 119, 6, 0.28);
@@ -237,7 +201,7 @@
   background: var(--accent-hover);
   border-color: var(--accent-hover);
   transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(59, 130, 246, 0.35);
+  box-shadow: 0 6px 14px rgba(245, 158, 11, 0.35);
 }
 
 .sonner-custom-toast__button:disabled {

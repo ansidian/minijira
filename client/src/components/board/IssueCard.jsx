@@ -74,13 +74,12 @@ export function IssueCard({
         onMouseEnter={() => setHovering(true)}
         onMouseLeave={() => setHovering(false)}
         p="md"
-        withBorder
         style={{
           cursor: "pointer",
-          transition: "all 0.2s ease",
-          backgroundColor: hovering ? "var(--bg-hover)" : undefined,
-          transform: hovering ? "translateY(-2px)" : undefined,
-          boxShadow: hovering ? "0 4px 8px rgba(0, 0, 0, 0.3)" : undefined,
+          transition: "all 0.15s ease",
+          backgroundColor: hovering ? "var(--bg-hover)" : "var(--bg-card)",
+          transform: hovering ? "translateY(-1px)" : undefined,
+          boxShadow: hovering ? "var(--shadow-md)" : "var(--shadow-sm)",
         }}
       >
         <Stack gap="xs">
@@ -148,7 +147,7 @@ export function IssueCard({
                     color={
                       issue.subtask_done_count === issue.subtask_count
                         ? "green"
-                        : "blue"
+                        : "gray"
                     }
                     style={{ cursor: "pointer" }}
                     onClick={handleSubtaskBadgeClick}

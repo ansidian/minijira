@@ -109,7 +109,7 @@ export function CreateIssueModal({
         <Badge
           size="xs"
           variant="light"
-          color="violet"
+          color="gray"
           style={{
             textTransform: "uppercase",
             letterSpacing: "0.03em",
