@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Avatar, Badge, Button, Group, Modal, Select, Textarea } from "@mantine/core";
 import { useHotkeys } from "@mantine/hooks";
 import { IconArrowLeft } from "@tabler/icons-react";
+import { useMobile } from "../../hooks/useMobile";
 
 const STATUS_OPTIONS = [
   { value: "todo", label: "To Do", color: "var(--status-todo)" },
@@ -54,6 +55,7 @@ export function CreateIssueModal({
   const [shake, setShake] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
 
+  const isMobile = useMobile();
   const isDirty = title.trim() || description.trim();
   const isSubtask = !!parentIssue;
 
@@ -137,6 +139,10 @@ export function CreateIssueModal({
       }}
       withCloseButton={true}
       title={modalTitle}
+      fullScreen={isMobile}
+      radius={isMobile ? 0 : undefined}
+      transitionProps={{ transition: isMobile ? 'fade' : 'pop', duration: 200 }}
+      overlayProps={{ backgroundOpacity: 0.55, blur: isMobile ? 0 : 3 }}
       classNames={{
         content: shake ? "shake" : "",
         body: "modal-body-reset",
@@ -144,8 +150,9 @@ export function CreateIssueModal({
       styles={{
         header: {
           padding: "16px 20px",
-          background:
-            "linear-gradient(to right, transparent calc(100% - 241px), var(--border-primary) calc(100% - 241px), var(--border-primary) calc(100% - 240px), var(--bg-secondary) calc(100% - 240px))",
+          background: isMobile
+            ? "var(--bg-secondary)"
+            : "linear-gradient(to right, transparent calc(100% - 241px), var(--border-primary) calc(100% - 241px), var(--border-primary) calc(100% - 240px), var(--bg-secondary) calc(100% - 240px))",
         },
         close: {
           marginRight: "4px",
