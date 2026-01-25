@@ -71,6 +71,17 @@ async function init() {
       ON activity_log(created_at DESC)
   `);
 
+  // Composite indexes for efficient cursor-based pagination
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_issues_cursor
+      ON issues(created_at DESC, id DESC)
+  `);
+
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_activity_cursor
+      ON activity_log(created_at DESC, id DESC)
+  `);
+
   // Migration: Add issue_key and issue_title columns if they don't exist
   try {
     await db.execute(`ALTER TABLE activity_log ADD COLUMN issue_key TEXT`);
