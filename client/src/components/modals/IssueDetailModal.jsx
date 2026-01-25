@@ -72,69 +72,88 @@ export function IssueDetailModal({
     <Modal
       opened={true}
       onClose={() => handleCloseAttempt(onClose)}
-      title={<IssueDetailHeader issue={issue} isSubtask={isSubtask} onViewIssue={onViewIssue} />}
+      title={
+        <IssueDetailHeader
+          issue={issue}
+          isSubtask={isSubtask}
+          onViewIssue={onViewIssue}
+        />
+      }
       withCloseButton={true}
-      classNames={{ content: shake ? "shake" : "" }}
-      size="lg"
+      classNames={{
+        content: shake ? "shake" : "",
+        body: "modal-body-reset",
+      }}
+      styles={{
+        header: {
+          padding: "16px 20px",
+          background:
+            "linear-gradient(to right, transparent calc(100% - 281px), var(--border-primary) calc(100% - 281px), var(--border-primary) calc(100% - 280px), var(--bg-secondary) calc(100% - 280px))",
+        },
+        close: {
+          marginRight: "4px",
+        },
+      }}
+      size="xl"
+      padding={0}
     >
-      <IssueDetailFields
-        editing={editing}
-        title={title}
-        setTitle={setTitle}
-        description={description}
-        setDescription={setDescription}
-        isEditDirty={isEditDirty}
-        confirmingCancel={confirmingCancel}
-        setConfirmingCancel={setConfirmingCancel}
-        onSave={handleSave}
-        onCancelEdit={handleCancelEdit}
-        onStartEditTitle={() => startEditing("title")}
-        onStartEditDescription={() => startEditing("description")}
-      />
+      <div className="modal-two-column">
+        {/* Main content area - left side */}
+        <div className="modal-main-content">
+          <IssueDetailFields
+            editing={editing}
+            title={title}
+            setTitle={setTitle}
+            description={description}
+            setDescription={setDescription}
+            isEditDirty={isEditDirty}
+            confirmingCancel={confirmingCancel}
+            setConfirmingCancel={setConfirmingCancel}
+            onSave={handleSave}
+            onCancelEdit={handleCancelEdit}
+            onStartEditTitle={() => startEditing("title")}
+            onStartEditDescription={() => startEditing("description")}
+          />
 
-      <IssueMetaPanel
-        issue={issue}
-        users={users}
-        onStatusChange={onStatusChange}
-        onUpdate={onMetaUpdate}
-      />
+          {/* Subtasks Section - only show for parent issues */}
+          {!isSubtask && (
+            <SubtasksSection
+              parentIssue={issue}
+              users={users}
+              currentUserId={currentUserId}
+              onViewIssue={onViewIssue}
+              onSubtaskChange={onSubtaskChange}
+              autoShowSubtaskForm={autoShowSubtaskForm}
+              onSubtaskFormShown={onSubtaskFormShown}
+              isTouchDevice={isTouchDevice}
+            />
+          )}
 
-      {/* Subtasks Section - only show for parent issues */}
-      {!isSubtask && (
-        <div
-          style={{
-            marginTop: "1.5rem",
-            marginBottom: "1.5rem",
-            paddingTop: "1rem",
-            borderTop: "1px solid var(--border-primary)",
-          }}
-        >
-          <SubtasksSection
-            parentIssue={issue}
-            users={users}
-            currentUserId={currentUserId}
-            onViewIssue={onViewIssue}
-            onSubtaskChange={onSubtaskChange}
-            autoShowSubtaskForm={autoShowSubtaskForm}
-            onSubtaskFormShown={onSubtaskFormShown}
-            isTouchDevice={isTouchDevice}
+          <IssueComments
+            comments={comments}
+            newComment={newComment}
+            setNewComment={setNewComment}
+            onAddComment={handleAddComment}
           />
         </div>
-      )}
 
-      <IssueComments
-        comments={comments}
-        newComment={newComment}
-        setNewComment={setNewComment}
-        onAddComment={handleAddComment}
-      />
+        {/* Sidebar - right side */}
+        <div className="modal-sidebar">
+          <IssueMetaPanel
+            issue={issue}
+            users={users}
+            onStatusChange={onStatusChange}
+            onUpdate={onMetaUpdate}
+          />
 
-      <IssueDeleteSection
-        isSubtask={isSubtask}
-        confirmingDelete={confirmingDelete}
-        setConfirmingDelete={setConfirmingDelete}
-        onDelete={() => onDelete(issue.id)}
-      />
+          <IssueDeleteSection
+            isSubtask={isSubtask}
+            confirmingDelete={confirmingDelete}
+            setConfirmingDelete={setConfirmingDelete}
+            onDelete={() => onDelete(issue.id)}
+          />
+        </div>
+      </div>
     </Modal>
   );
 }

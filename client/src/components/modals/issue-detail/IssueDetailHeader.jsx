@@ -1,29 +1,37 @@
-import { Badge, Button, Group } from "@mantine/core";
+import { Badge } from "@mantine/core";
+import { IconArrowLeft } from "@tabler/icons-react";
 
 export function IssueDetailHeader({ issue, isSubtask, onViewIssue }) {
   return (
-    <>
-      {/* Parent issue link for subtasks */}
+    <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+      {/* Parent issue breadcrumb for subtasks */}
       {isSubtask && issue.parent_key && (
-        <Button
-          variant="subtle"
-          size="xs"
-          mb="md"
+        <button
+          className="modal-header-parent"
           onClick={() => onViewIssue(issue.parent_id)}
-          style={{ marginLeft: "-0.5rem" }}
         >
-          ← Back to {issue.parent_key}
-        </Button>
+          <IconArrowLeft size={12} />
+          {issue.parent_key}
+        </button>
       )}
 
-      <Group gap="xs">
-        {issue.key}
+      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <span className="modal-header-key">{issue.key}</span>
         {isSubtask && (
-          <Badge size="sm" variant="light" color="blue">
+          <Badge
+            size="xs"
+            variant="light"
+            color="violet"
+            style={{
+              textTransform: "uppercase",
+              letterSpacing: "0.03em",
+              marginTop: "10px",
+            }}
+          >
             Subtask
           </Badge>
         )}
-      </Group>
-    </>
+      </div>
+    </div>
   );
 }

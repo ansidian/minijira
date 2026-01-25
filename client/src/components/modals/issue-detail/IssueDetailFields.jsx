@@ -17,30 +17,51 @@ export function IssueDetailFields({
 }) {
   if (editing) {
     return (
-      <>
+      <div className="modal-section">
         <Textarea
-          label="Title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Issue title"
           autosize
           minRows={1}
-          mb="md"
+          autoFocus
+          styles={{
+            input: {
+              fontSize: "var(--text-lg)",
+              fontWeight: 500,
+              background: "var(--bg-tertiary)",
+              border: "1px solid var(--border-primary)",
+              "&:focus": {
+                borderColor: "var(--accent)",
+              },
+            },
+          }}
         />
         <Textarea
-          label="Description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Add a description..."
           autosize
-          minRows={2}
-          mb="md"
+          minRows={3}
+          styles={{
+            input: {
+              fontSize: "var(--text-base)",
+              lineHeight: 1.6,
+              background: "var(--bg-tertiary)",
+              border: "1px solid var(--border-primary)",
+              "&:focus": {
+                borderColor: "var(--accent)",
+              },
+            },
+          }}
         />
-        <Group justify="flex-end" mb="xl">
+        <Group justify="flex-end" gap="sm">
           {!isEditDirty || !confirmingCancel ? (
             <>
               <Button
-                variant="default"
+                variant="subtle"
+                color="gray"
+                size="sm"
                 onClick={() => {
                   if (isEditDirty) {
                     setConfirmingCancel(true);
@@ -51,8 +72,8 @@ export function IssueDetailFields({
               >
                 Cancel
               </Button>
-              <Button variant="filled" onClick={onSave}>
-                Save
+              <Button variant="filled" size="sm" onClick={onSave}>
+                Save Changes
               </Button>
             </>
           ) : (
@@ -60,108 +81,75 @@ export function IssueDetailFields({
               <span
                 style={{
                   marginRight: "auto",
-                  color: "var(--text-secondary)",
+                  color: "var(--text-muted)",
+                  fontSize: "var(--text-sm)",
                 }}
               >
-                Discard changes?
+                Discard unsaved changes?
               </span>
-              <Button variant="light" color="orange" onClick={onCancelEdit}>
-                Yes, Discard
+              <Button
+                variant="light"
+                color="orange"
+                size="sm"
+                onClick={onCancelEdit}
+              >
+                Discard
               </Button>
-              <Button variant="filled" onClick={() => setConfirmingCancel(false)}>
+              <Button
+                variant="filled"
+                size="sm"
+                onClick={() => setConfirmingCancel(false)}
+              >
                 Keep Editing
               </Button>
             </>
           )}
         </Group>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
-      <div
-        style={{
-          marginBottom: "1rem",
-          cursor: "pointer",
-        }}
-        onClick={onStartEditTitle}
-      >
-        <div
-          style={{
-            fontSize: "var(--text-base)",
-            fontWeight: 500,
-            marginBottom: "0.25rem",
-          }}
-        >
-          Title
-        </div>
-        <div
-          style={{
-            padding: "0.5rem 0.75rem",
-            backgroundColor: "var(--bg-tertiary)",
-            borderRadius: "var(--radius-sm)",
-            minHeight: "36px",
-            display: "flex",
-            alignItems: "center",
-          }}
-        >
-          {title}
-        </div>
+    <div className="modal-section">
+      {/* Title - editable block */}
+      <div className="editable-block" onClick={onStartEditTitle}>
+        <div className="editable-block-title">{title}</div>
       </div>
+
+      {/* Description - editable block */}
       <div
-        style={{
-          marginBottom: "1rem",
-          cursor: "pointer",
-        }}
+        className="editable-block"
         onClick={(e) => {
           if (e.target.tagName !== "A") {
             onStartEditDescription();
           }
         }}
       >
-        <div
-          style={{
-            fontSize: "var(--text-base)",
-            fontWeight: 500,
-            marginBottom: "0.25rem",
-          }}
-        >
-          Description
-        </div>
-        <div
-          style={{
-            padding: "0.5rem 0.75rem",
-            backgroundColor: "var(--bg-tertiary)",
-            borderRadius: "var(--radius-sm)",
-            minHeight: "60px",
-            whiteSpace: "pre-wrap",
-            wordWrap: "break-word",
-            fontSize: "var(--text-base)",
-            lineHeight: "1.5",
-            color: description ? "inherit" : "var(--text-muted)",
-          }}
-        >
-          {description
-            ? linkifyText(description).map((part, index) =>
-                part.type === "link" ? (
-                  <a
-                    key={index}
-                    href={part.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="comment-link"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {part.content}
-                  </a>
-                ) : (
-                  <span key={index}>{part.content}</span>
-                )
+        {description ? (
+          <div className="editable-block-description">
+            {linkifyText(description).map((part, index) =>
+              part.type === "link" ? (
+                <a
+                  key={index}
+                  href={part.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="comment-link"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {part.content}
+                </a>
+              ) : (
+                <span key={index}>{part.content}</span>
               )
-            : "Click to add a description..."}
-        </div>
+            )}
+          </div>
+        ) : (
+          <div className="editable-block-description editable-block-placeholder">
+            Click to add a description...
+          </div>
+        )}
       </div>
-    </>
+    </div>
   );
 }

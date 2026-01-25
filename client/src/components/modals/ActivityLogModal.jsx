@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Avatar, Badge, Button, Modal, Skeleton, Stack } from "@mantine/core";
+import { Avatar, Button, Modal, Skeleton, Stack } from "@mantine/core";
 import { api } from "../../utils/api";
 import { notifyApiError } from "../../utils/notify";
 import {
@@ -9,13 +9,13 @@ import {
 
 function ActivityEntrySkeleton() {
   return (
-    <div className="activity-entry">
+    <div className="activity-entry skeleton-animate">
       <div className="activity-header">
         <Skeleton height={28} width={28} circle />
         <Skeleton height={14} width={100} radius="sm" />
         <Skeleton height={12} width={60} radius="sm" ml="auto" />
       </div>
-      <div className="activity-body" style={{ marginTop: "8px" }}>
+      <div className="activity-body">
         <Skeleton height={14} width="80%" radius="sm" />
       </div>
     </div>
@@ -81,7 +81,12 @@ export function ActivityLogModal({ opened, onClose, onViewIssue }) {
   }
 
   return (
-    <Modal opened={opened} onClose={onClose} size="lg" title="Recent Activity">
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      size="lg"
+      title={<span className="modal-header-key">Recent Activity</span>}
+    >
       {loading ? (
         <Stack gap="sm">
           <ActivityEntrySkeleton />
@@ -89,15 +94,7 @@ export function ActivityLogModal({ opened, onClose, onViewIssue }) {
           <ActivityEntrySkeleton />
         </Stack>
       ) : activities.length === 0 ? (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "2rem",
-            color: "var(--text-secondary)",
-          }}
-        >
-          No recent activity
-        </div>
+        <div className="empty-state">No recent activity</div>
       ) : (
         <>
           <Stack gap="sm">
@@ -119,24 +116,27 @@ export function ActivityLogModal({ opened, onClose, onViewIssue }) {
                 <div className="activity-body">
                   <span className="activity-description">
                     {formatActivityDescription(entry)}{" "}
-                    <Badge
-                      variant="light"
-                      size="sm"
-                      style={{ cursor: entry.issue_id ? "pointer" : "default" }}
+                    <button
+                      className="issue-key-badge"
                       onClick={() => {
                         if (entry.issue_id) {
                           onViewIssue(entry.issue_id);
                           onClose();
                         }
                       }}
+                      disabled={!entry.issue_id}
+                      style={{
+                        cursor: entry.issue_id ? "pointer" : "default",
+                        opacity: entry.issue_id ? 1 : 0.6,
+                      }}
                     >
                       {entry.issue_key}
-                    </Badge>
+                    </button>
                     {entry.issue_title && (
                       <span
                         style={{
-                          marginLeft: "0.5rem",
-                          color: "var(--text-secondary)",
+                          marginLeft: "8px",
+                          color: "var(--text-muted)",
                         }}
                       >
                         {entry.issue_title}
@@ -147,29 +147,33 @@ export function ActivityLogModal({ opened, onClose, onViewIssue }) {
               </div>
             ))}
           </Stack>
+
           {hasMore && (
             <Button
               variant="subtle"
+              color="gray"
               size="sm"
               fullWidth
               onClick={() => fetchActivities(true)}
               loading={loadingMore}
               disabled={loadingMore}
-              style={{ marginTop: "1rem" }}
+              style={{ marginTop: "16px" }}
             >
               Load More
             </Button>
           )}
-          {!hasMore && (
+
+          {!hasMore && activities.length > 0 && (
             <div
               style={{
                 textAlign: "center",
-                padding: "1rem",
-                color: "var(--text-secondary)",
-                fontSize: "0.875rem",
+                padding: "16px",
+                color: "var(--text-muted)",
+                fontSize: "var(--text-xs)",
+                fontFamily: "var(--font-mono)",
               }}
             >
-              No more activity
+              End of activity log
             </div>
           )}
         </>
