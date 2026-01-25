@@ -1,9 +1,24 @@
-import { Button } from "@mantine/core";
+import { Button, ActionIcon, Indicator } from "@mantine/core";
 import { StatsDisplay } from "./header/StatsDisplay";
 import { SearchButton } from "./header/SearchButton";
 import { ActivityButton } from "./header/ActivityButton";
 import { ThemeToggle } from "./header/ThemeToggle";
 import { UserSelector } from "./header/UserSelector";
+
+function FilterIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+    </svg>
+  );
+}
 
 export function Header({
   stats,
@@ -19,6 +34,9 @@ export function Header({
   currentUser,
   currentUserId,
   setCurrentUserId,
+  filterPanelExpanded,
+  setFilterPanelExpanded,
+  activeFilterCount,
 }) {
   return (
     <header className={`header ${isUserLocked ? "user-locked" : ""}`}>
@@ -59,6 +77,23 @@ export function Header({
         <StatsDisplay stats={stats} statsBadgeAnimate={statsBadgeAnimate} />
       </div>
       <div className="header-right">
+        <Indicator
+          label={activeFilterCount}
+          size={16}
+          disabled={activeFilterCount === 0 || filterPanelExpanded}
+          color="blue"
+        >
+          <ActionIcon
+            variant={filterPanelExpanded ? "filled" : "light"}
+            color={activeFilterCount > 0 ? "blue" : "gray"}
+            size="lg"
+            onClick={() => setFilterPanelExpanded(!filterPanelExpanded)}
+            disabled={isUserLocked}
+            aria-label="Toggle filters"
+          >
+            <FilterIcon />
+          </ActionIcon>
+        </Indicator>
         <SearchButton isUserLocked={isUserLocked} />
         <ActivityButton
           hasNewActivity={hasNewActivity}
