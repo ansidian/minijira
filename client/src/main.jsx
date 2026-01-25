@@ -18,18 +18,18 @@ import "./styles/responsive.css";
 
 const theme = createTheme({
   colors: {
-    // Warm dark mode colors
+    // Cool charcoal dark mode colors
     dark: [
-      "#faf9f7", // 0 - text-primary (dark mode)
-      "#a8a5a0", // 1 - text-secondary
-      "#78746e", // 2 - text-muted
-      "#3d3935", // 3 - border-secondary
-      "#2e2b28", // 4 - border-primary
-      "#2a2725", // 5 - bg-hover
-      "#211f1d", // 6 - bg-card
-      "#1c1a19", // 7 - bg-tertiary
-      "#141312", // 8 - bg-secondary
-      "#0c0b0a", // 9 - bg-primary
+      "#fafafa", // 0 - text-primary (dark mode)
+      "#a1a1aa", // 1 - text-secondary
+      "#71717a", // 2 - text-muted
+      "#36363e", // 3 - border-secondary
+      "#26262c", // 4 - border-primary
+      "#24242a", // 5 - bg-hover
+      "#1c1c21", // 6 - bg-card
+      "#16161a", // 7 - bg-tertiary
+      "#0f0f12", // 8 - bg-secondary
+      "#09090b", // 9 - bg-primary
     ],
   },
   primaryColor: "orange",

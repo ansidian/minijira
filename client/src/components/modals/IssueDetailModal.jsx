@@ -96,7 +96,7 @@ export function IssueDetailModal({
           padding: "16px 20px",
           background: isMobile
             ? "var(--bg-secondary)"
-            : "linear-gradient(to right, transparent calc(100% - 281px), var(--border-primary) calc(100% - 281px), var(--border-primary) calc(100% - 280px), var(--bg-secondary) calc(100% - 280px))",
+            : "linear-gradient(to right, var(--bg-tertiary) calc(100% - 281px), var(--border-primary) calc(100% - 281px), var(--border-primary) calc(100% - 280px), var(--bg-secondary) calc(100% - 280px))",
         },
         close: {
           marginRight: "4px",

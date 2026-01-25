@@ -34,29 +34,28 @@
 
 /* Dark theme variables */
 [data-mantine-color-scheme="dark"] {
-	/* Warm dark palette - hint of brown in the grays */
-	--bg-primary: #0c0b0a;
-	--bg-secondary: #141312;
-	--bg-tertiary: #1c1a19;
-	--bg-card: #211f1d;
-	--bg-hover: #2a2725;
+	--bg-primary: #09090b;
+		--bg-secondary: #0f0f12;
+		--bg-tertiary: #16161a;
+		--bg-card: #1c1c21;
+		--bg-hover: #24242a;
 
-	--border-primary: #2e2b28;
-	--border-secondary: #3d3935;
-	--border-accent: #4d4843;
+	--border-primary: #26262c;
+		--border-secondary: #36363e;
+		--border-accent: #46464f;
 
-	--text-primary: #faf9f7;
-	--text-secondary: #a8a5a0;
-	--text-muted: #78746e;
+	--text-primary: #fafafa;
+		--text-secondary: #a1a1aa;
+		--text-muted: #71717a;
 
 	/* Status indicator colors */
-	--status-todo: #78746e;
+	--status-todo: #71717a;
 	--status-progress: #3b82f6;
 	--status-review: #a855f7;
 	--status-done: #22c55e;
 
 	/* Priority */
-	--priority-low: #78746e;
+	--priority-low: #71717a;
 	--priority-medium: #f59e0b;
 	--priority-high: #ef4444;
 
@@ -729,6 +728,7 @@ body {
 	flex-direction: column;
 	gap: 20px;
 	border-right: 1px solid var(--border-primary);
+	background: var(--bg-tertiary);
 }
 
 .modal-sidebar {

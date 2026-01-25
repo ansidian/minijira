@@ -1,6 +1,5 @@
 /* === Sonner + custom toast styling === */
 
-/* Dark theme variables - warm palette with amber accent */
 [data-mantine-color-scheme="dark"] {
   --sonner-bg: var(--bg-card);
   --sonner-border: var(--border-primary);
