@@ -49,12 +49,12 @@ export function SubtaskCardInline({
           backgroundColor: "var(--bg-tertiary)",
           borderLeft:
             subtask.status === "done"
-              ? "10px solid var(--mantine-color-green-6)"
+              ? "4px solid var(--status-done)"
               : subtask.status === "in_progress"
-              ? "6px solid var(--mantine-color-blue-6)"
+              ? "4px solid var(--status-progress)"
               : subtask.status === "review"
-              ? "8px solid var(--mantine-color-violet-6)"
-              : "3px solid var(--mantine-color-gray-6)",
+              ? "4px solid var(--status-review)"
+              : "4px solid var(--status-todo)",
         }}
         onClick={(e) => {
           e.stopPropagation();
@@ -74,7 +74,7 @@ export function SubtaskCardInline({
               />
               <div
                 style={{
-                  fontSize: "0.7rem",
+                  fontSize: "var(--text-xs)",
                   color: "var(--text-secondary)",
                   fontWeight: 500,
                 }}
@@ -94,7 +94,7 @@ export function SubtaskCardInline({
           </Group>
           <div
             style={{
-              fontSize: "0.8rem",
+              fontSize: "var(--text-md)",
               lineHeight: 1.3,
               textDecoration:
                 subtask.status === "done" ? "line-through" : "none",
@@ -106,7 +106,7 @@ export function SubtaskCardInline({
           {subtask.description && (
             <div
               style={{
-                fontSize: "0.7rem",
+                fontSize: "var(--text-xs)",
                 color: "var(--text-secondary)",
                 lineHeight: 1.4,
                 display: "-webkit-box",

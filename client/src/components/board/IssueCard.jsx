@@ -87,7 +87,7 @@ export function IssueCard({
             <div
               className={issue.key ? undefined : "issue-key-pending"}
               style={{
-                fontSize: "0.75rem",
+                fontSize: "var(--text-sm)",
                 color: "var(--text-secondary)",
                 fontWeight: 500,
               }}
@@ -97,7 +97,7 @@ export function IssueCard({
           </Group>
           <div
             style={{
-              fontSize: "0.875rem",
+              fontSize: "var(--text-base)",
               lineHeight: 1.4,
               wordWrap: "break-word",
               overflowWrap: "break-word",
@@ -108,7 +108,7 @@ export function IssueCard({
           {issue.description && (
             <div
               style={{
-                fontSize: "0.75rem",
+                fontSize: "var(--text-sm)",
                 lineHeight: 1.5,
                 color: "var(--text-secondary)",
                 display: "-webkit-box",
@@ -125,7 +125,11 @@ export function IssueCard({
           )}
           <Group justify="space-between" mt="xs">
             <Group gap="xs">
-              <Badge color={getPriorityColor(issue.priority)} size="sm" variant="light">
+              <Badge
+                color={getPriorityColor(issue.priority)}
+                size="sm"
+                variant="light"
+              >
                 {issue.priority}
               </Badge>
               {/* Subtask progress indicator - now clickable */}

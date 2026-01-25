@@ -11,7 +11,7 @@ export function IssueComments({
     <>
       <h3
         style={{
-          fontSize: "0.875rem",
+          fontSize: "var(--text-base)",
           fontWeight: 600,
           marginTop: "1.5rem",
           marginBottom: "0.75rem",

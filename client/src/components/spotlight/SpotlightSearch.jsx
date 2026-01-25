@@ -41,12 +41,12 @@ export function SpotlightSearch({ allIssues, setSelectedIssue }) {
                         : "2px",
                     backgroundColor:
                       issue.status === "todo"
-                        ? "#71717a"
+                        ? "var(--status-todo)"
                         : issue.status === "in_progress"
-                        ? "#3b82f6"
+                        ? "var(--status-progress)"
                         : issue.status === "review"
-                        ? "#a855f7"
-                        : "#22c55e",
+                        ? "var(--status-review)"
+                        : "var(--status-done)",
                     flexShrink: 0,
                     borderRadius: "2px",
                   }}
@@ -60,19 +60,19 @@ export function SpotlightSearch({ allIssues, setSelectedIssue }) {
                   borderRadius: "50%",
                   backgroundColor:
                     issue.status === "todo"
-                      ? "#71717a"
+                      ? "var(--status-todo)"
                       : issue.status === "in_progress"
-                      ? "#3b82f6"
+                      ? "var(--status-progress)"
                       : issue.status === "review"
-                      ? "#a855f7"
-                      : "#22c55e",
+                      ? "var(--status-review)"
+                      : "var(--status-done)",
                   flexShrink: 0,
                 }}
               />
               {/* Issue key */}
               <div
                 style={{
-                  fontSize: "0.75rem",
+                  fontSize: "var(--text-sm)",
                   color: "var(--text-secondary)",
                   fontWeight: 500,
                   flexShrink: 0,

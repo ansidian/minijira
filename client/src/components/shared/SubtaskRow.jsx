@@ -32,7 +32,7 @@ export function SubtaskRow({
       data-failing={subtask._isFailing ? "true" : undefined}
       style={{
         backgroundColor: "var(--bg-tertiary)",
-        borderRadius: "4px",
+        borderRadius: "var(--radius-sm)",
         cursor: "pointer",
         transition: "background-color 0.15s ease",
       }}
@@ -66,7 +66,7 @@ export function SubtaskRow({
         <div
           className={subtask.key ? undefined : "issue-key-pending"}
           style={{
-            fontSize: "0.8rem",
+            fontSize: "var(--text-sm)",
             color: "var(--text-secondary)",
             marginBottom: "2px",
           }}
@@ -78,7 +78,7 @@ export function SubtaskRow({
             textDecoration: subtask.status === "done" ? "line-through" : "none",
             color:
               subtask.status === "done" ? "var(--text-secondary)" : "inherit",
-            fontSize: "0.875rem",
+            fontSize: "var(--text-base)",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -89,7 +89,7 @@ export function SubtaskRow({
         {subtask.description && (
           <div
             style={{
-              fontSize: "0.75rem",
+              fontSize: "var(--text-sm)",
               color: "var(--text-secondary)",
               marginTop: "4px",
               display: "-webkit-box",

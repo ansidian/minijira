@@ -89,7 +89,7 @@ export function IssueDetailFields({
       >
         <div
           style={{
-            fontSize: "0.875rem",
+            fontSize: "var(--text-base)",
             fontWeight: 500,
             marginBottom: "0.25rem",
           }}
@@ -100,7 +100,7 @@ export function IssueDetailFields({
           style={{
             padding: "0.5rem 0.75rem",
             backgroundColor: "var(--bg-tertiary)",
-            borderRadius: "4px",
+            borderRadius: "var(--radius-sm)",
             minHeight: "36px",
             display: "flex",
             alignItems: "center",
@@ -122,7 +122,7 @@ export function IssueDetailFields({
       >
         <div
           style={{
-            fontSize: "0.875rem",
+            fontSize: "var(--text-base)",
             fontWeight: 500,
             marginBottom: "0.25rem",
           }}
@@ -133,11 +133,11 @@ export function IssueDetailFields({
           style={{
             padding: "0.5rem 0.75rem",
             backgroundColor: "var(--bg-tertiary)",
-            borderRadius: "4px",
+            borderRadius: "var(--radius-sm)",
             minHeight: "60px",
             whiteSpace: "pre-wrap",
             wordWrap: "break-word",
-            fontSize: "0.875rem",
+            fontSize: "var(--text-base)",
             lineHeight: "1.5",
             color: description ? "inherit" : "var(--text-muted)",
           }}
