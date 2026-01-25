@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { Button } from "@mantine/core";
 import { IssueCard } from "./IssueCard";
+import { IssueCardSkeletons } from "../shared/IssueCardSkeleton";
 
 export function Column({
   column,
@@ -17,6 +19,8 @@ export function Column({
   onToggleSubtasks,
   onRequestAddSubtask,
   isTouchDevice,
+  paginationState,
+  onLoadMore,
 }) {
   const [dragOver, setDragOver] = useState(false);
 
@@ -64,29 +68,53 @@ export function Column({
           />
           {column.title}
         </div>
-        <span className="column-count">{issues.length}</span>
+        <span className="column-count">
+          {paginationState?.total ?? issues.length}
+        </span>
       </div>
       <div className="column-content">
-        {issues.length === 0 ? (
+        {/* Show skeletons during initial load */}
+        {paginationState?.loading && issues.length === 0 && (
+          <IssueCardSkeletons count={3} />
+        )}
+
+        {/* Empty state when not loading and no issues */}
+        {!paginationState?.loading && issues.length === 0 && (
           <div className="empty-column">Drop issues here</div>
-        ) : (
-          issues.map((issue) => (
-            <IssueCard
-              key={issue.id}
-              issue={issue}
-              users={users}
-              onClick={onIssueClick}
-              onStatusChange={onStatusChange}
-              onUpdateIssue={onUpdateIssue}
-              onDeleteIssue={onDeleteIssue}
-              onSubtaskChange={onSubtaskChange}
-              isExpanded={expandedIssues.has(issue.id)}
-              subtasks={subtasksCache[issue.id] || []}
-              onToggleSubtasks={onToggleSubtasks}
-              onRequestAddSubtask={onRequestAddSubtask}
-              isTouchDevice={isTouchDevice}
-            />
-          ))
+        )}
+
+        {/* Issue cards */}
+        {issues.map((issue) => (
+          <IssueCard
+            key={issue.id}
+            issue={issue}
+            users={users}
+            onClick={onIssueClick}
+            onStatusChange={onStatusChange}
+            onUpdateIssue={onUpdateIssue}
+            onDeleteIssue={onDeleteIssue}
+            onSubtaskChange={onSubtaskChange}
+            isExpanded={expandedIssues.has(issue.id)}
+            subtasks={subtasksCache[issue.id] || []}
+            onToggleSubtasks={onToggleSubtasks}
+            onRequestAddSubtask={onRequestAddSubtask}
+            isTouchDevice={isTouchDevice}
+          />
+        ))}
+
+        {/* Load More button */}
+        {paginationState?.hasMore && issues.length > 0 && (
+          <Button
+            variant="subtle"
+            size="sm"
+            fullWidth
+            onClick={onLoadMore}
+            loading={paginationState.loading}
+            disabled={paginationState.loading}
+            style={{ marginTop: "8px" }}
+          >
+            Load More
+          </Button>
         )}
       </div>
       <button className="add-issue-btn" onClick={onAddClick}>
