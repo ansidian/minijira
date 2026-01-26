@@ -126,7 +126,7 @@ async function init() {
   await db.execute(`
     CREATE TABLE IF NOT EXISTS notification_queue (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      issue_id INTEGER NOT NULL,
+      issue_id INTEGER,
       user_id INTEGER NOT NULL,
       event_type TEXT NOT NULL,
       event_payload TEXT NOT NULL,
@@ -142,7 +142,7 @@ async function init() {
 
   await db.execute(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_queue_debounce
-      ON notification_queue(issue_id, user_id, status)
+      ON notification_queue(user_id, status)
       WHERE status = 'pending'
   `);
 
@@ -163,6 +163,76 @@ async function init() {
     await db.execute(`ALTER TABLE notification_queue ADD COLUMN first_queued_at TEXT`);
   } catch (err) {
     // Column already exists, ignore
+  }
+
+  // Migration: Make issue_id nullable and change unique index to user_id only
+  // This enables batching multiple issues into a single notification
+  try {
+    // Check if migration is needed by looking at table schema
+    const tableInfo = await db.execute(`PRAGMA table_info(notification_queue)`);
+    const issueIdCol = tableInfo.rows.find(r => r.name === 'issue_id');
+
+    if (issueIdCol && issueIdCol.notnull === 1) {
+      console.log('[Migration] Updating notification_queue for multi-issue batching...');
+
+      // SQLite doesn't support ALTER COLUMN, so recreate the table
+      await db.execute(`
+        CREATE TABLE notification_queue_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          issue_id INTEGER,
+          user_id INTEGER NOT NULL,
+          event_type TEXT NOT NULL,
+          event_payload TEXT NOT NULL,
+          scheduled_at TEXT NOT NULL,
+          status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'processing', 'sent', 'failed')),
+          attempt_count INTEGER DEFAULT 0,
+          processing_started_at TEXT,
+          sent_at TEXT,
+          error_message TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          first_queued_at TEXT
+        )
+      `);
+
+      // Copy existing data
+      await db.execute(`
+        INSERT INTO notification_queue_new
+        SELECT id, issue_id, user_id, event_type, event_payload, scheduled_at,
+               status, attempt_count, processing_started_at, sent_at, error_message,
+               created_at, first_queued_at
+        FROM notification_queue
+      `);
+
+      // Drop old table and indexes
+      await db.execute(`DROP TABLE notification_queue`);
+
+      // Rename new table
+      await db.execute(`ALTER TABLE notification_queue_new RENAME TO notification_queue`);
+
+      // Create new unique index (user_id only, not issue_id)
+      await db.execute(`
+        CREATE UNIQUE INDEX idx_queue_debounce
+          ON notification_queue(user_id, status)
+          WHERE status = 'pending'
+      `);
+
+      // Recreate other indexes
+      await db.execute(`
+        CREATE INDEX idx_queue_pending
+          ON notification_queue(status, scheduled_at)
+          WHERE status = 'pending'
+      `);
+
+      await db.execute(`
+        CREATE INDEX idx_queue_cleanup
+          ON notification_queue(status, sent_at)
+          WHERE status IN ('sent', 'failed')
+      `);
+
+      console.log('[Migration] notification_queue updated successfully');
+    }
+  } catch (err) {
+    console.error('[Migration] Failed to update notification_queue:', err);
   }
 
   await db.execute(`

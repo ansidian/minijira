@@ -269,7 +269,74 @@ export async function resolveAssigneeNames(changes, dbClient) {
 }
 
 /**
+ * Build embed for a single issue from the multi-issue payload
+ * @param {Object} issueEntry - Issue entry from payload { issue_id, issue_key, issue_title, changes }
+ * @param {Object} user - User object
+ * @param {string} timestamp - Notification timestamp
+ * @param {Object} dbClient - Database client
+ * @returns {Promise<Object|null>} Discord embed object or null if skipped
+ */
+async function buildIssueEmbed(issueEntry, user, timestamp, dbClient) {
+  const { issue_id, issue_key, issue_title, changes: rawChanges } = issueEntry;
+
+  // Fetch current issue data
+  const issueResult = await dbClient.execute({
+    sql: 'SELECT * FROM issues WHERE id = ?',
+    args: [issue_id]
+  });
+
+  let issue = issueResult.rows[0];
+  let options = {};
+
+  // Handle deleted issues - use payload data
+  if (!issue) {
+    issue = {
+      id: issue_id,
+      key: issue_key,
+      title: issue_title,
+      status: 'deleted'
+    };
+    options.deleted = true;
+  }
+
+  // Get subtask summary if this is a parent issue (not deleted)
+  if (!options.deleted && issue.parent_id === null) {
+    const subtaskSummary = await getSubtaskSummary(issue_id, dbClient);
+    if (subtaskSummary) {
+      options.subtaskSummary = subtaskSummary;
+    }
+  }
+
+  // Extract changes - handle both array of raw changes and pre-processed changes
+  let changes = [];
+  for (const change of rawChanges) {
+    const extracted = extractChangesFromPayload(change, 'update');
+    changes.push(...extracted);
+  }
+
+  // Resolve assignee IDs to user names for display
+  changes = await resolveAssigneeNames(changes, dbClient);
+
+  // Skip if all changes were filtered out (net-zero)
+  if (changes.length === 0) {
+    return null;
+  }
+
+  // Check for created event to add description
+  const createdChange = rawChanges.find(c => c.action_type === 'issue_created');
+  if (createdChange && createdChange.description) {
+    options.description = createdChange.description;
+    options.eventType = 'issue_created';
+  }
+
+  // Build embed (returns { embeds: [embed] }, extract just the embed)
+  const result = buildEmbed(issue, changes, user, timestamp, options);
+  return result.embeds[0];
+}
+
+/**
  * Prepare complete notification payload from queue row
+ * Handles multi-issue payloads, building up to 10 embeds
  * @param {Object} notificationRow - Row from notification_queue table
  * @param {Object} dbClient - Database client
  * @returns {Promise<Object>} Discord webhook payload ready to send
@@ -278,7 +345,40 @@ export async function prepareNotificationPayload(notificationRow, dbClient) {
   // Parse event payload
   const eventPayload = JSON.parse(notificationRow.event_payload);
 
-  // Fetch issue data
+  // Fetch user data
+  const userResult = await dbClient.execute({
+    sql: 'SELECT * FROM users WHERE id = ?',
+    args: [notificationRow.user_id]
+  });
+  const user = userResult.rows[0];
+
+  // Handle multi-issue payload format
+  if (eventPayload.issues) {
+    const issueIds = Object.keys(eventPayload.issues);
+
+    // Warn if truncating (Discord limit is 10 embeds)
+    if (issueIds.length > 10) {
+      console.warn(`[Discord] Truncating notification from ${issueIds.length} to 10 issues`);
+    }
+
+    const embeds = [];
+    for (const issueId of issueIds.slice(0, 10)) {
+      const issueEntry = eventPayload.issues[issueId];
+      const embed = await buildIssueEmbed(issueEntry, user, notificationRow.scheduled_at, dbClient);
+      if (embed) {
+        embeds.push(embed);
+      }
+    }
+
+    // Skip if all issues were filtered out (net-zero)
+    if (embeds.length === 0) {
+      return { skip: true, reason: 'all issues net-zero' };
+    }
+
+    return { embeds };
+  }
+
+  // Legacy single-issue payload fallback
   const issueResult = await dbClient.execute({
     sql: 'SELECT * FROM issues WHERE id = ?',
     args: [notificationRow.issue_id]
@@ -297,13 +397,6 @@ export async function prepareNotificationPayload(notificationRow, dbClient) {
     };
     options.deleted = true;
   }
-
-  // Fetch user data
-  const userResult = await dbClient.execute({
-    sql: 'SELECT * FROM users WHERE id = ?',
-    args: [notificationRow.user_id]
-  });
-  const user = userResult.rows[0];
 
   // Get subtask summary if this is a parent issue (not deleted)
   if (!options.deleted && issue.parent_id === null) {

@@ -59,3 +59,50 @@ if (res.status === 204) {
 } else {
   console.log('Response:', await res.text());
 }
+
+// Test: Multi-issue batch (simulating moving multiple issues to Done)
+console.log('\n--- Multi-embed test (batch of 4 issues) ---\n');
+
+const multiEmbedPayload = {
+  embeds: [
+    buildEmbed(
+      { id: 1, key: 'MJ-1', title: 'Set up project repository', status: 'done' },
+      [{ type: 'status', old: 'in_progress', new: 'done' }],
+      { name: 'Andy Su' },
+      new Date().toISOString()
+    ).embeds[0],
+    buildEmbed(
+      { id: 2, key: 'MJ-2', title: 'Design system architecture', status: 'done' },
+      [{ type: 'status', old: 'review', new: 'done' }],
+      { name: 'Andy Su' },
+      new Date().toISOString()
+    ).embeds[0],
+    buildEmbed(
+      { id: 3, key: 'MJ-3', title: 'Implement user authentication', status: 'done' },
+      [{ type: 'status', old: 'todo', new: 'done' }],
+      { name: 'Andy Su' },
+      new Date().toISOString()
+    ).embeds[0],
+    buildEmbed(
+      { id: 4, key: 'MJ-4', title: 'Write project documentation', status: 'done' },
+      [{ type: 'status', old: 'in_progress', new: 'done' }, { type: 'assignee', old: null, new: 'Garen Artsrounian' }],
+      { name: 'Andy Su' },
+      new Date().toISOString()
+    ).embeds[0],
+  ]
+};
+
+console.log('Sending multi-embed:', JSON.stringify(multiEmbedPayload, null, 2));
+
+const res2 = await fetch(webhookUrl, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(multiEmbedPayload)
+});
+
+console.log('Status:', res2.status);
+if (res2.status === 204) {
+  console.log('✓ Multi-embed sent successfully!');
+} else {
+  console.log('Response:', await res2.text());
+}
