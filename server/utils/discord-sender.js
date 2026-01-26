@@ -216,6 +216,59 @@ export function extractChangesFromPayload(eventPayload, eventType) {
 }
 
 /**
+ * Look up user name by ID
+ * @param {number|string} userId - User ID to look up
+ * @param {Object} dbClient - Database client
+ * @returns {Promise<string|null>} User name or null if not found
+ */
+async function getUserName(userId, dbClient) {
+  if (userId === null || userId === undefined) return null;
+  const result = await dbClient.execute({
+    sql: 'SELECT name FROM users WHERE id = ?',
+    args: [userId]
+  });
+  return result.rows[0]?.name || null;
+}
+
+/**
+ * Resolve assignee IDs to names in changes array
+ * @param {Array} changes - Changes array from extractChangesFromPayload
+ * @param {Object} dbClient - Database client
+ * @returns {Promise<Array>} Changes with assignee IDs replaced by names
+ */
+export async function resolveAssigneeNames(changes, dbClient) {
+  // Collect unique user IDs to look up
+  const userIds = new Set();
+  for (const change of changes) {
+    if (change.type === 'assignee') {
+      if (change.old) userIds.add(change.old);
+      if (change.new) userIds.add(change.new);
+    }
+  }
+
+  if (userIds.size === 0) return changes;
+
+  // Batch lookup all user names
+  const userNameMap = new Map();
+  for (const userId of userIds) {
+    const name = await getUserName(userId, dbClient);
+    if (name) userNameMap.set(String(userId), name);
+  }
+
+  // Replace IDs with names in changes
+  return changes.map(change => {
+    if (change.type === 'assignee') {
+      return {
+        ...change,
+        old: change.old ? (userNameMap.get(String(change.old)) || change.old) : change.old,
+        new: change.new ? (userNameMap.get(String(change.new)) || change.new) : change.new
+      };
+    }
+    return change;
+  });
+}
+
+/**
  * Prepare complete notification payload from queue row
  * @param {Object} notificationRow - Row from notification_queue table
  * @param {Object} dbClient - Database client
@@ -261,7 +314,10 @@ export async function prepareNotificationPayload(notificationRow, dbClient) {
   }
 
   // Extract changes from event payload
-  const changes = extractChangesFromPayload(eventPayload, notificationRow.event_type);
+  let changes = extractChangesFromPayload(eventPayload, notificationRow.event_type);
+
+  // Resolve assignee IDs to user names for display
+  changes = await resolveAssigneeNames(changes, dbClient);
 
   // Skip notification if all changes were filtered out (net-zero)
   if (changes.length === 0) {

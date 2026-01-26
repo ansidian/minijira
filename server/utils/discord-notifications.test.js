@@ -17,7 +17,7 @@ import {
   buildEmbed
 } from './discord-embed-builder.js';
 
-import { extractChangesFromPayload } from './discord-sender.js';
+import { extractChangesFromPayload, resolveAssigneeNames } from './discord-sender.js';
 
 // ============================================================================
 // discord-embed-builder.js tests
@@ -331,6 +331,113 @@ describe('extractChangesFromPayload', () => {
     assert.strictEqual(changes.length, 2);
     assert.strictEqual(changes[0].type, 'status');
     assert.strictEqual(changes[1].type, 'assignee');
+  });
+});
+
+describe('resolveAssigneeNames', () => {
+  // Mock database client
+  function createMockDb(users) {
+    return {
+      execute: async ({ sql, args }) => {
+        const userId = args[0];
+        const user = users.find(u => u.id === userId || u.id === Number(userId));
+        return { rows: user ? [user] : [] };
+      }
+    };
+  }
+
+  it('replaces assignee IDs with names', async () => {
+    const mockDb = createMockDb([
+      { id: 1, name: 'Alice' },
+      { id: 2, name: 'Bob' }
+    ]);
+
+    const changes = [
+      { type: 'assignee', old: null, new: 1 }
+    ];
+
+    const resolved = await resolveAssigneeNames(changes, mockDb);
+
+    assert.strictEqual(resolved[0].old, null);
+    assert.strictEqual(resolved[0].new, 'Alice');
+  });
+
+  it('handles reassignment from one user to another', async () => {
+    const mockDb = createMockDb([
+      { id: 1, name: 'Alice' },
+      { id: 2, name: 'Bob' }
+    ]);
+
+    const changes = [
+      { type: 'assignee', old: 1, new: 2 }
+    ];
+
+    const resolved = await resolveAssigneeNames(changes, mockDb);
+
+    assert.strictEqual(resolved[0].old, 'Alice');
+    assert.strictEqual(resolved[0].new, 'Bob');
+  });
+
+  it('handles clearing assignee (new is null)', async () => {
+    const mockDb = createMockDb([
+      { id: 1, name: 'Alice' }
+    ]);
+
+    const changes = [
+      { type: 'assignee', old: 1, new: null }
+    ];
+
+    const resolved = await resolveAssigneeNames(changes, mockDb);
+
+    assert.strictEqual(resolved[0].old, 'Alice');
+    assert.strictEqual(resolved[0].new, null);
+  });
+
+  it('falls back to ID if user not found', async () => {
+    const mockDb = createMockDb([]); // empty users
+
+    const changes = [
+      { type: 'assignee', old: null, new: 999 }
+    ];
+
+    const resolved = await resolveAssigneeNames(changes, mockDb);
+
+    assert.strictEqual(resolved[0].new, 999); // falls back to original ID
+  });
+
+  it('leaves non-assignee changes unchanged', async () => {
+    const mockDb = createMockDb([{ id: 1, name: 'Alice' }]);
+
+    const changes = [
+      { type: 'status', old: 'todo', new: 'done' },
+      { type: 'assignee', old: null, new: 1 },
+      { type: 'priority', old: 'low', new: 'high' }
+    ];
+
+    const resolved = await resolveAssigneeNames(changes, mockDb);
+
+    assert.strictEqual(resolved[0].type, 'status');
+    assert.strictEqual(resolved[0].old, 'todo');
+    assert.strictEqual(resolved[0].new, 'done');
+
+    assert.strictEqual(resolved[1].type, 'assignee');
+    assert.strictEqual(resolved[1].new, 'Alice');
+
+    assert.strictEqual(resolved[2].type, 'priority');
+    assert.strictEqual(resolved[2].old, 'low');
+    assert.strictEqual(resolved[2].new, 'high');
+  });
+
+  it('returns changes unchanged if no assignee changes present', async () => {
+    const mockDb = createMockDb([]);
+
+    const changes = [
+      { type: 'status', old: 'todo', new: 'done' }
+    ];
+
+    const resolved = await resolveAssigneeNames(changes, mockDb);
+
+    assert.deepStrictEqual(resolved, changes);
   });
 });
 
