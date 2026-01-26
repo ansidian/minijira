@@ -169,7 +169,7 @@ export function IssuesProvider({
         const [statsDataRaw, allIssuesData, ...columnResults] =
           await Promise.all([
             api.get("/stats"),
-            api.get("/issues?include_subtasks=true"),
+            api.get("/issues?include_subtasks=true&show_archived=true"),
             ...columnPromises,
           ]);
 
