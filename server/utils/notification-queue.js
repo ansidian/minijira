@@ -72,6 +72,12 @@ function mergePayloads(existingPayload, newPayload) {
  * @param {object} eventPayload - Full event data (will be JSON stringified)
  */
 export async function queueNotification(issueId, userId, eventType, eventPayload) {
+  // Skip notification if no user - prevents "System" notifications
+  if (!userId) {
+    console.warn(`[Queue] Skipping notification for issue ${issueId} - no user_id`);
+    return;
+  }
+
   // Check if a pending notification already exists for this issue+user
   const existing = await db.execute({
     sql: `

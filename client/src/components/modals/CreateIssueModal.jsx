@@ -55,6 +55,7 @@ export function CreateIssueModal({
   const [assigneeId, setAssigneeId] = useState("");
   const [shake, setShake] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isMobile = useMobile();
   const { textareaProps: descriptionProps } = useMarkdownTextarea({
@@ -72,18 +73,25 @@ export function CreateIssueModal({
     setStatus(createStatus);
   }, [createStatus]);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e?.preventDefault();
-    if (!title.trim()) return;
-    onCreate({
-      title: title.trim(),
-      description: description.trim(),
-      status,
-      priority,
-      assignee_id: assigneeId || null,
-      reporter_id: currentUserId || null,
-      parent_id: parentIssue?.id || null,
-    });
+    if (!title.trim() || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      await onCreate({
+        title: title.trim(),
+        description: description.trim(),
+        status,
+        priority,
+        assignee_id: assigneeId || null,
+        reporter_id: currentUserId || null,
+        parent_id: parentIssue?.id || null,
+      });
+    } catch {
+      // Error handled by parent, just re-enable button
+      setIsSubmitting(false);
+    }
   }
 
   // Hotkey for submit (Cmd/Ctrl + Enter)
@@ -341,7 +349,7 @@ export function CreateIssueModal({
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={!title.trim()}>
+                <Button type="submit" disabled={!title.trim() || isSubmitting} loading={isSubmitting}>
                   {isSubtask ? "Create Subtask" : "Create Issue"}
                 </Button>
               </>

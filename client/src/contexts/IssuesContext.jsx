@@ -73,6 +73,7 @@ export function IssuesProvider({
 }) {
   const [state, dispatch] = useReducer(issuesReducer, initialState);
   const stateRef = useRef(state);
+  const currentUserIdRef = useRef(currentUserId);
   const activeFiltersRef = useRef(EMPTY_FILTERS);
   const loadingColumnsRef = useRef(new Set());
 
@@ -111,6 +112,11 @@ export function IssuesProvider({
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  // Keep currentUserId ref in sync - ensures async callbacks always read the latest value
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+  }, [currentUserId]);
 
   /**
    * Fetch a single column's issues with pagination and filters.
@@ -311,8 +317,9 @@ export function IssuesProvider({
   };
 
   // Wire up action factories
+  // Note: getCurrentUserId reads from ref to avoid stale closure issues in async callbacks
   const statusActions = createStatusChangeActions(dispatch, stateRef, {
-    currentUserId,
+    getCurrentUserId: () => currentUserIdRef.current,
     selectedIssue,
     setSelectedIssue,
     refreshSubtasksCache,
@@ -321,7 +328,7 @@ export function IssuesProvider({
   });
 
   const issueActions = createIssueActions(dispatch, stateRef, {
-    currentUserId,
+    getCurrentUserId: () => currentUserIdRef.current,
     selectedIssue,
     setSelectedIssue,
     refreshSubtasksCache,
@@ -337,7 +344,7 @@ export function IssuesProvider({
     onUndo: notifyUndo,
     onError: notifyError,
     onRefreshSubtasks: cacheManager.fetchSubtasksForParent,
-    getCurrentUserId: () => currentUserId,
+    getCurrentUserId: () => currentUserIdRef.current,
   });
 
   const handleSubtaskChange = async (parentIdToExpand = null) => {

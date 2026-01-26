@@ -312,7 +312,7 @@ router.post("/", async (req, res) => {
     // Subtasks queue under parent's ID so they merge with parent notifications
     queueNotification(
       parent_id ? Number(parent_id) : Number(result.lastInsertRowid),
-      reporter_id || 1,
+      reporter_id || null,
       'create',
       {
         action_type: parent_id ? 'subtask_created' : 'issue_created',
@@ -414,6 +414,9 @@ router.patch("/:id", async (req, res) => {
       });
 
       if (status !== undefined && oldIssue.status !== status) {
+        if (!user_id) {
+          console.warn(`[Activity] Status change for issue ${id} logged without user_id`);
+        }
         await logActivity(
           id,
           "status_changed",
@@ -500,7 +503,7 @@ router.patch("/:id", async (req, res) => {
       const isSubtask = !!oldIssue.parent_id;
       queueNotification(
         isSubtask ? Number(oldIssue.parent_id) : parseInt(id),
-        user_id || 1,
+        user_id || null,
         'update',
         {
           action_type: isSubtask ? 'subtask_updated' : 'issue_updated',
@@ -571,7 +574,7 @@ router.delete("/:id", async (req, res) => {
     // Subtasks queue under parent's ID so they merge with parent notifications
     queueNotification(
       isSubtask ? Number(issue.parent_id) : Number(req.params.id),
-      user_id || 1,
+      user_id || null,
       'delete',
       {
         action_type: isSubtask ? 'subtask_deleted' : 'issue_deleted',

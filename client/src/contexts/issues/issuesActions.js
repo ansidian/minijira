@@ -7,9 +7,20 @@ import { notifyError, notifyUndo, notifyApiError } from "../../utils/notify";
 import { generateTempId } from "../../utils/tempId";
 
 export function createStatusChangeActions(dispatch, stateRef, deps) {
-  const { currentUserId, selectedIssue, setSelectedIssue, refreshSubtasksCache, statusLabels, cacheManager } = deps;
+  const { getCurrentUserId, selectedIssue, setSelectedIssue, refreshSubtasksCache, statusLabels, cacheManager } = deps;
 
   const applyStatusChange = async (issueId, newStatus, { showUndo = true, showErrors = true } = {}) => {
+    // Get fresh user ID to avoid stale closure issues
+    const currentUserId = getCurrentUserId();
+
+    if (!currentUserId) {
+      console.error('[Status Change] Cannot change status without a selected user');
+      if (showErrors) {
+        notifyError('Please select yourself before making changes');
+      }
+      return;
+    }
+
     const currentIssue =
       stateRef.current.issues.find((i) => i.id === issueId) ||
       stateRef.current.allIssues.find((i) => i.id === issueId);
@@ -142,7 +153,7 @@ export function createStatusChangeActions(dispatch, stateRef, deps) {
 }
 
 export function createIssueActions(dispatch, stateRef, deps) {
-  const { currentUserId, selectedIssue, setSelectedIssue, refreshSubtasksCache, statusLabels } = deps;
+  const { getCurrentUserId, selectedIssue, setSelectedIssue, refreshSubtasksCache, statusLabels } = deps;
 
   const createIssue = async (data) => {
     const tempId = generateTempId();
@@ -241,6 +252,14 @@ export function createIssueActions(dispatch, stateRef, deps) {
   };
 
   const updateIssue = async (issueId, data) => {
+    // Get fresh user ID to avoid stale closure issues
+    const currentUserId = getCurrentUserId();
+
+    if (!currentUserId) {
+      console.error('[Update Issue] Cannot update issue without a selected user');
+      throw new Error('No user selected');
+    }
+
     const currentIssue =
       stateRef.current.issues.find((i) => i.id === issueId) ||
       stateRef.current.allIssues.find((i) => i.id === issueId);
