@@ -7,7 +7,16 @@ import { useMediaQuery } from '@mantine/hooks';
  * @returns {boolean} true if viewport width <= 768px
  */
 export function useMobile() {
+  // Get initial value synchronously to avoid flash
+  const getInitialValue = () => {
+    if (typeof window !== 'undefined') {
+      return window.matchMedia('(max-width: 48em)').matches;
+    }
+    return false;
+  };
+
   // Mantine breakpoint sm = 48em = 768px
-  // Returns true for mobile, false for desktop
-  return useMediaQuery('(max-width: 48em)');
+  return useMediaQuery('(max-width: 48em)', getInitialValue(), {
+    getInitialValueInEffect: false,
+  });
 }
