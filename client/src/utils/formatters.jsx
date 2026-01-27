@@ -1,5 +1,5 @@
 export function formatDate(dateStr) {
-  const date = new Date(dateStr);
+  const date = new Date(dateStr.replace(" ", "T") + "Z");
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
