@@ -1,5 +1,6 @@
-import { Avatar, Group, Select } from "@mantine/core";
-import { IconCheck } from "@tabler/icons-react";
+import { useState, useLayoutEffect } from "react";
+import { Avatar, Collapse, Group, Select } from "@mantine/core";
+import { IconCheck, IconChevronDown, IconChevronRight } from "@tabler/icons-react";
 import { formatDate } from "../../../utils/formatters.jsx";
 
 const STATUS_OPTIONS = [
@@ -37,14 +38,24 @@ function PriorityOption({ option }) {
   );
 }
 
-export function IssueMetaPanel({ issue, users, onStatusChange, onUpdate }) {
+export function IssueMetaPanel({ issue, users, onStatusChange, onUpdate, isMobile }) {
+  const [expanded, setExpanded] = useState(false);
   const currentStatus = STATUS_OPTIONS.find((s) => s.value === issue.status);
+
+  // Sync expanded state with viewport size (useLayoutEffect to avoid flash)
+  useLayoutEffect(() => {
+    if (isMobile === true) {
+      setExpanded(false);
+    } else if (isMobile === false) {
+      setExpanded(true);
+    }
+  }, [isMobile]);
   const currentPriority = PRIORITY_OPTIONS.find(
     (p) => p.value === issue.priority,
   );
   const assignee = users.find((u) => u.id === issue.assignee_id);
 
-  return (
+  const content = (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       {/* Status */}
       <div className="meta-field">
@@ -165,11 +176,58 @@ export function IssueMetaPanel({ issue, users, onStatusChange, onUpdate }) {
         />
       </div>
 
-      {/* Created date - read only */}
+      {/* Dates - read only */}
       <div className="meta-field">
-        <span className="meta-field-label">Created</span>
+        <span className="meta-field-label">Created on</span>
         <span className="meta-field-value">{formatDate(issue.created_at)}</span>
+        <span className="meta-field-label">Last Updated</span>
+        <span className="meta-field-value">{formatDate(issue.updated_at)}</span>
       </div>
+    </div>
+  );
+
+  // On desktop, render content directly (explicit false, not undefined)
+  if (isMobile === false) {
+    return content;
+  }
+
+  // On mobile, wrap in collapsible
+  return (
+    <div className="meta-panel-mobile">
+      <button
+        className="meta-panel-trigger"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="meta-panel-trigger-content">
+          {expanded ? (
+            <IconChevronDown size={14} />
+          ) : (
+            <IconChevronRight size={14} />
+          )}
+          <span>Details</span>
+        </div>
+        {!expanded && (
+          <div className="meta-panel-summary">
+            <span
+              className="status-dot"
+              style={{ background: currentStatus?.color }}
+            />
+            <span
+              className="priority-bar"
+              style={{ background: currentPriority?.color }}
+            />
+            {assignee && (
+              <Avatar
+                color={assignee.color || "gray"}
+                name={assignee.name}
+                size={18}
+                radius="xl"
+              />
+            )}
+          </div>
+        )}
+      </button>
+      <Collapse in={expanded}>{content}</Collapse>
     </div>
   );
 }
