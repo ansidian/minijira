@@ -1,8 +1,8 @@
 import db from '../db/connection.js';
 
 // Timing configuration for notification debouncing
-const DEBOUNCE_WINDOW = '+60 seconds';  // Sliding window - each new event resets timer
-const MAX_WAIT = '+3 minutes';          // Maximum wait from first event in batch
+const DEBOUNCE_WINDOW = '+150 seconds';  // Sliding window - each new event resets timer
+const MAX_WAIT = '+5 minutes';          // Maximum wait from first event in batch
 
 /**
  * Merge a single change into a changes array.
