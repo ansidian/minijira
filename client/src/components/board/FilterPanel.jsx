@@ -1,32 +1,40 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
-  Select,
-  Button,
+  MultiSelect,
   Group,
   Stack,
   Text,
   CloseButton,
-  Checkbox,
-  Divider,
+  Switch,
+  SegmentedControl,
+  ActionIcon,
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import "@mantine/dates/styles.css";
 import dayjs from "dayjs";
 import { useUsers } from "../../contexts/UsersContext";
 import { useMobile } from "../../hooks/useMobile";
+import { isMac } from "../../utils/platform";
+import { IconTrash } from "@tabler/icons-react";
 
 // Shared date presets used by both DatePickerInput and mobile preset buttons
 function getDatePresets(today) {
   return [
     {
       key: "last-2-days",
-      label: "Last 2 days",
-      value: [today.subtract(2, "day").startOf("day").toDate(), today.endOf("day").toDate()],
+      label: "2 days",
+      value: [
+        today.subtract(2, "day").startOf("day").toDate(),
+        today.endOf("day").toDate(),
+      ],
     },
     {
       key: "last-7-days",
-      label: "Last 7 days",
-      value: [today.subtract(7, "day").startOf("day").toDate(), today.endOf("day").toDate()],
+      label: "7 days",
+      value: [
+        today.subtract(7, "day").startOf("day").toDate(),
+        today.endOf("day").toDate(),
+      ],
     },
     {
       key: "this-month",
@@ -41,18 +49,10 @@ function getDatePresets(today) {
         today.subtract(1, "month").endOf("month").toDate(),
       ],
     },
-    {
-      key: "last-year",
-      label: "Last year",
-      value: [
-        today.subtract(1, "year").startOf("year").toDate(),
-        today.subtract(1, "year").endOf("year").toDate(),
-      ],
-    },
   ];
 }
 
-// Mobile-only preset button selector
+// Preset button selector for date ranges
 function DatePresetButtons({ presets, value, onChange }) {
   // Check if current value matches a preset
   const selectedPresetKey = useMemo(() => {
@@ -60,13 +60,13 @@ function DatePresetButtons({ presets, value, onChange }) {
     const preset = presets.find(
       (p) =>
         p.value[0].getTime() === value[0].getTime() &&
-        p.value[1].getTime() === value[1].getTime()
+        p.value[1].getTime() === value[1].getTime(),
     );
     return preset?.key || null;
   }, [presets, value]);
 
   return (
-    <Group gap={6} wrap="wrap">
+    <Group gap={4} wrap="wrap">
       {presets.map((preset) => (
         <button
           key={preset.key}
@@ -79,21 +79,21 @@ function DatePresetButtons({ presets, value, onChange }) {
             }
           }}
           style={{
-            padding: "6px 10px",
-            borderRadius: "var(--radius-md)",
+            padding: "5px 10px",
+            borderRadius: "var(--radius-sm)",
             border:
               selectedPresetKey === preset.key
-                ? "1.5px solid var(--accent)"
-                : "1.5px solid var(--border-primary)",
+                ? "1px solid var(--accent)"
+                : "1px solid var(--border-primary)",
             backgroundColor:
               selectedPresetKey === preset.key
-                ? "var(--accent-light)"
+                ? "var(--accent-subtle)"
                 : "transparent",
             color:
               selectedPresetKey === preset.key
                 ? "var(--accent)"
                 : "var(--text-secondary)",
-            fontSize: "var(--text-xs)",
+            fontSize: "var(--text-sm)",
             fontFamily: "var(--font-sans)",
             fontWeight: 500,
             cursor: "pointer",
@@ -107,9 +107,47 @@ function DatePresetButtons({ presets, value, onChange }) {
   );
 }
 
+// Section header with optional clear button
+function SectionHeader({ label, count, onClear }) {
+  return (
+    <Group justify="space-between" gap={4}>
+      <Text
+        size="sm"
+        c="var(--text-muted)"
+        tt="uppercase"
+        fw={500}
+        style={{ letterSpacing: "0.04em" }}
+      >
+        {label}
+        {count > 0 && (
+          <span style={{ color: "var(--accent)", marginLeft: 4 }}>
+            ({count})
+          </span>
+        )}
+      </Text>
+      {count > 0 && onClear && (
+        <ActionIcon
+          size="sm"
+          variant="subtle"
+          color="gray"
+          onClick={onClear}
+          aria-label={`Clear ${label.toLowerCase()} filters`}
+          title="Clear"
+        >
+          <IconTrash size={14} />
+        </ActionIcon>
+      )}
+    </Group>
+  );
+}
+
 const STATUS_OPTIONS = [
   { value: "todo", label: "To Do", color: "var(--status-todo)" },
-  { value: "in_progress", label: "In Progress", color: "var(--status-progress)" },
+  {
+    value: "in_progress",
+    label: "In Progress",
+    color: "var(--status-progress)",
+  },
   { value: "review", label: "Review", color: "var(--status-review)" },
   { value: "done", label: "Done", color: "var(--status-done)" },
 ];
@@ -138,11 +176,11 @@ function FilterChip({ label, color, selected, onClick }) {
       }}
       style={{
         padding: "6px 12px",
-        borderRadius: "var(--radius-md)",
+        borderRadius: "var(--radius-sm)",
         border: selected
-          ? `1.5px solid ${color}`
-          : "1.5px solid var(--border-primary)",
-        backgroundColor: selected ? `${color}20` : "transparent",
+          ? `1px solid ${color}`
+          : "1px solid var(--border-primary)",
+        backgroundColor: selected ? `${color}18` : "transparent",
         color: selected ? color : "var(--text-secondary)",
         fontSize: "var(--text-sm)",
         fontFamily: "var(--font-sans)",
@@ -168,21 +206,15 @@ export function FilterPanel({
   const today = dayjs();
   const datePresets = useMemo(() => getDatePresets(today), [today]);
 
-  // Draft state for local edits - initialized from applied
-  const [draftFilters, setDraftFilters] = useState({
+  // Time filter mode: created vs updated
+  const [timeMode, setTimeMode] = useState("created");
+
+  // Normalize filters for consistent access
+  const filters = {
     ...appliedFilters,
     createdRange: appliedFilters.createdRange || [null, null],
     updatedRange: appliedFilters.updatedRange || [null, null],
-  });
-
-  // Sync draft to applied when panel first opens or applied changes externally
-  useEffect(() => {
-    setDraftFilters({
-      ...appliedFilters,
-      createdRange: appliedFilters.createdRange || [null, null],
-      updatedRange: appliedFilters.updatedRange || [null, null],
-    });
-  }, [appliedFilters]);
+  };
 
   // Assignee options: Unassigned first, then all users
   const assigneeOptions = useMemo(() => {
@@ -192,69 +224,78 @@ export function FilterPanel({
     ];
   }, [users]);
 
-  // Check if draft differs from applied
-  const hasChanges =
-    JSON.stringify(draftFilters) !==
-    JSON.stringify({
-      ...appliedFilters,
-      createdRange: appliedFilters.createdRange || [null, null],
-      updatedRange: appliedFilters.updatedRange || [null, null],
-    });
+  // Count active filters per section
+  const statusCount = filters.status.length;
+  const priorityCount = filters.priority.length;
+  const ownerCount = (filters.myIssues ? 1 : 0) + filters.assignee.length;
+  const timeCount =
+    (filters.createdRange[0] && filters.createdRange[1] ? 1 : 0) +
+    (filters.updatedRange[0] && filters.updatedRange[1] ? 1 : 0);
+  const totalCount =
+    statusCount +
+    priorityCount +
+    ownerCount +
+    timeCount +
+    (filters.showArchived ? 1 : 0);
 
-  const hasActiveFilters =
-    draftFilters.status.length > 0 ||
-    draftFilters.assignee.length > 0 ||
-    draftFilters.priority.length > 0 ||
-    draftFilters.myIssues ||
-    draftFilters.showArchived ||
-    (draftFilters.createdRange[0] && draftFilters.createdRange[1]) ||
-    (draftFilters.updatedRange[0] && draftFilters.updatedRange[1]);
-
-  function handleApply() {
-    onApply(draftFilters);
-    onClose();
-  }
-
-  function handleCancel() {
-    setDraftFilters({
-      ...appliedFilters,
-      createdRange: appliedFilters.createdRange || [null, null],
-      updatedRange: appliedFilters.updatedRange || [null, null],
-    });
-    onClose();
-  }
+  // Instant apply helper - applies changes immediately
+  const applyChange = (updates) => {
+    onApply({ ...filters, ...updates });
+  };
 
   const toggleStatus = (value) => {
-    setDraftFilters((prev) => ({
-      ...prev,
-      status: prev.status.includes(value)
-        ? prev.status.filter((s) => s !== value)
-        : [...prev.status, value],
-    }));
+    const newStatus = filters.status.includes(value)
+      ? filters.status.filter((s) => s !== value)
+      : [...filters.status, value];
+    applyChange({ status: newStatus });
   };
 
   const togglePriority = (value) => {
-    setDraftFilters((prev) => ({
-      ...prev,
-      priority: prev.priority.includes(value)
-        ? prev.priority.filter((p) => p !== value)
-        : [...prev.priority, value],
-    }));
+    const newPriority = filters.priority.includes(value)
+      ? filters.priority.filter((p) => p !== value)
+      : [...filters.priority, value];
+    applyChange({ priority: newPriority });
   };
 
-  const setAssignee = (value) => {
-    setDraftFilters((prev) => ({
-      ...prev,
-      assignee: value ? [value] : [],
-    }));
+  const setAssignees = (values) => {
+    applyChange({ assignee: values || [] });
   };
 
   const toggleMyIssues = () => {
-    setDraftFilters((prev) => ({ ...prev, myIssues: !prev.myIssues }));
+    applyChange({ myIssues: !filters.myIssues });
+  };
+
+  const toggleArchived = () => {
+    applyChange({ showArchived: !filters.showArchived });
+  };
+
+  const setCreatedRange = (range) => {
+    applyChange({ createdRange: range });
+  };
+
+  const setUpdatedRange = (range) => {
+    applyChange({ updatedRange: range });
+  };
+
+  const clearSection = (section) => {
+    switch (section) {
+      case "status":
+        applyChange({ status: [] });
+        break;
+      case "priority":
+        applyChange({ priority: [] });
+        break;
+      case "owner":
+        applyChange({ myIssues: false, assignee: [] });
+        break;
+      case "time":
+        applyChange({ createdRange: [null, null], updatedRange: [null, null] });
+        break;
+    }
   };
 
   const clearAllFilters = () => {
-    const clearedFilters = {
+    onApply({
       status: [],
       assignee: [],
       priority: [],
@@ -262,15 +303,19 @@ export function FilterPanel({
       showArchived: false,
       createdRange: [null, null],
       updatedRange: [null, null],
-    };
-    onApply(clearedFilters);
-    onClose();
+    });
   };
+
+  // Current time range based on mode
+  const currentTimeRange =
+    timeMode === "created" ? filters.createdRange : filters.updatedRange;
+  const setCurrentTimeRange =
+    timeMode === "created" ? setCreatedRange : setUpdatedRange;
 
   return (
     <div
       style={{
-        width: 280,
+        width: 340,
         backgroundColor: "var(--bg-secondary)",
         borderRadius: "var(--radius-lg)",
         boxShadow: "var(--shadow-lg)",
@@ -280,191 +325,182 @@ export function FilterPanel({
       {showHeader && (
         <Group
           justify="space-between"
-          p="sm"
+          px="md"
+          py={12}
           style={{
             borderBottom: "1px solid var(--border-primary)",
           }}
         >
-          <Text size="sm" fw={600} c="var(--text-primary)">
-            Filters
-          </Text>
-          <CloseButton size="sm" onClick={handleCancel} />
+          <Group gap={8}>
+            <Text size="md" fw={600} c="var(--text-primary)">
+              Filters
+            </Text>
+            <Text
+              size="xs"
+              c="var(--text-muted)"
+              style={{ fontFamily: "var(--font-mono)" }}
+            >
+              {isMac ? "⌘" : "Ctrl"}+X
+            </Text>
+          </Group>
+          <Group gap={6}>
+            {totalCount > 0 && (
+              <ActionIcon
+                size="md"
+                variant="subtle"
+                color="orange"
+                onClick={clearAllFilters}
+                aria-label="Clear all filters"
+                title="Clear all filters"
+              >
+                <IconTrash size={16} />
+              </ActionIcon>
+            )}
+            <CloseButton size="sm" onClick={onClose} />
+          </Group>
         </Group>
       )}
 
-      <Stack gap="md" p="sm">
-        {/* Status chips */}
+      <Stack gap={14} p="md">
+        {/* STATUS section */}
         <div>
-          <Text size="xs" c="var(--text-muted)" mb={8} tt="uppercase" fw={500}>
-            Status
-          </Text>
-          <Group gap={6}>
+          <SectionHeader
+            label="Status"
+            count={statusCount}
+            onClear={() => clearSection("status")}
+          />
+          <Group gap={6} mt={8}>
             {STATUS_OPTIONS.map((opt) => (
               <FilterChip
                 key={opt.value}
                 label={opt.label}
                 color={opt.color}
-                selected={draftFilters.status.includes(opt.value)}
+                selected={filters.status.includes(opt.value)}
                 onClick={() => toggleStatus(opt.value)}
               />
             ))}
           </Group>
         </div>
 
-        {/* Priority chips */}
+        {/* PRIORITY section */}
         <div>
-          <Text size="xs" c="var(--text-muted)" mb={8} tt="uppercase" fw={500}>
-            Priority
-          </Text>
-          <Group gap={6}>
+          <SectionHeader
+            label="Priority"
+            count={priorityCount}
+            onClear={() => clearSection("priority")}
+          />
+          <Group gap={6} mt={8}>
             {PRIORITY_OPTIONS.map((opt) => (
               <FilterChip
                 key={opt.value}
                 label={opt.label}
                 color={opt.color}
-                selected={draftFilters.priority.includes(opt.value)}
+                selected={filters.priority.includes(opt.value)}
                 onClick={() => togglePriority(opt.value)}
               />
             ))}
           </Group>
         </div>
 
-        {/* Assignee dropdown */}
+        {/* OWNER section - combines My Issues + Assignee */}
         <div>
-          <Text size="xs" c="var(--text-muted)" mb={8} tt="uppercase" fw={500}>
-            Assignee
-          </Text>
-          <Select
-            data={assigneeOptions}
-            value={draftFilters.assignee[0] || null}
-            onChange={setAssignee}
-            placeholder="Anyone"
-            searchable
-            clearable
-            size="sm"
-            comboboxProps={{ withinPortal: false }}
+          <SectionHeader
+            label="Owner"
+            count={ownerCount}
+            onClear={() => clearSection("owner")}
+          />
+          <Stack gap={10} mt={8}>
+            <Switch
+              label="My Issues Only"
+              checked={filters.myIssues}
+              onChange={toggleMyIssues}
+              disabled={!currentUserId}
+              size="md"
+              styles={{
+                label: {
+                  fontSize: "var(--text-sm)",
+                  color: "var(--text-secondary)",
+                },
+              }}
+            />
+            {!filters.myIssues && (
+              <MultiSelect
+                data={assigneeOptions}
+                value={filters.assignee}
+                onChange={setAssignees}
+                placeholder="Any assignee"
+                searchable
+                size="sm"
+                comboboxProps={{ withinPortal: false }}
+              />
+            )}
+          </Stack>
+        </div>
+
+        {/* TIME section - Created/Updated toggle + presets */}
+        <div>
+          <SectionHeader
+            label="Time"
+            count={timeCount}
+            onClear={() => clearSection("time")}
+          />
+          <Stack gap={8} mt={8}>
+            <SegmentedControl
+              size="sm"
+              value={timeMode}
+              onChange={setTimeMode}
+              data={[
+                { label: "Created", value: "created" },
+                { label: "Updated", value: "updated" },
+              ]}
+              styles={{
+                root: { backgroundColor: "var(--bg-tertiary)" },
+              }}
+            />
+            {isMobile ? (
+              <DatePresetButtons
+                presets={datePresets}
+                value={currentTimeRange}
+                onChange={setCurrentTimeRange}
+              />
+            ) : (
+              <DatePickerInput
+                type="range"
+                presets={datePresets}
+                value={currentTimeRange}
+                onChange={setCurrentTimeRange}
+                allowSingleDateInRange
+                placeholder="Select range"
+                firstDayOfWeek={0}
+                size="sm"
+                clearable
+                highlightToday
+                popoverProps={{ withinPortal: false }}
+              />
+            )}
+          </Stack>
+        </div>
+
+        {/* VISIBILITY section */}
+        <div
+          style={{
+            borderTop: "1px solid var(--border-primary)",
+            paddingTop: 12,
+          }}
+        >
+          <Switch
+            label="Show Archived"
+            checked={filters.showArchived}
+            onChange={toggleArchived}
+            size="md"
+            styles={{
+              label: {
+                fontSize: "var(--text-sm)",
+                color: "var(--text-secondary)",
+              },
+            }}
           />
         </div>
-
-        {/* Created Date Range */}
-        <div>
-          <Text size="xs" c="var(--text-muted)" mb={8} tt="uppercase" fw={500}>
-            Created Date
-          </Text>
-          {isMobile ? (
-            <DatePresetButtons
-              presets={datePresets}
-              value={draftFilters.createdRange}
-              onChange={(range) =>
-                setDraftFilters((prev) => ({ ...prev, createdRange: range }))
-              }
-            />
-          ) : (
-            <DatePickerInput
-              type="range"
-              presets={datePresets}
-              value={draftFilters.createdRange}
-              onChange={(range) =>
-                setDraftFilters((prev) => ({ ...prev, createdRange: range }))
-              }
-              allowSingleDateInRange
-              placeholder="Select date range"
-              firstDayOfWeek={0}
-              size="sm"
-              clearable
-              highlightToday
-              popoverProps={{ withinPortal: false }}
-            />
-          )}
-        </div>
-
-        {/* Updated Date Range */}
-        <div>
-          <Text size="xs" c="var(--text-muted)" mb={8} tt="uppercase" fw={500}>
-            Updated Date
-          </Text>
-          {isMobile ? (
-            <DatePresetButtons
-              presets={datePresets}
-              value={draftFilters.updatedRange}
-              onChange={(range) =>
-                setDraftFilters((prev) => ({ ...prev, updatedRange: range }))
-              }
-            />
-          ) : (
-            <DatePickerInput
-              type="range"
-              presets={datePresets}
-              value={draftFilters.updatedRange}
-              onChange={(range) =>
-                setDraftFilters((prev) => ({ ...prev, updatedRange: range }))
-              }
-              placeholder="Select date range"
-              allowSingleDateInRange
-              firstDayOfWeek={0}
-              size="sm"
-              clearable
-              highlightToday
-              popoverProps={{ withinPortal: false }}
-            />
-          )}
-        </div>
-
-        <Divider color="var(--border-primary)" />
-
-        {/* My Issues toggle */}
-        <Checkbox
-          label="My Issues Only"
-          checked={draftFilters.myIssues}
-          onChange={toggleMyIssues}
-          disabled={!currentUserId}
-          size="sm"
-        />
-
-        {/* Show Archived toggle */}
-        <Checkbox
-          label="Show Archived"
-          checked={draftFilters.showArchived}
-          onChange={() =>
-            setDraftFilters((prev) => ({
-              ...prev,
-              showArchived: !prev.showArchived,
-            }))
-          }
-          size="sm"
-        />
-
-        {/* Apply/Cancel buttons */}
-        <Group justify="space-between" mt="xs">
-          <Button
-            variant="subtle"
-            color="gray"
-            size="xs"
-            onClick={handleCancel}
-          >
-            Cancel
-          </Button>
-          <Group gap="xs">
-            {hasActiveFilters && (
-              <Button
-                variant="subtle"
-                color="red"
-                size="xs"
-                onClick={clearAllFilters}
-              >
-                Clear
-              </Button>
-            )}
-            <Button
-              color="orange"
-              size="xs"
-              onClick={handleApply}
-              disabled={!hasChanges}
-            >
-              Apply
-            </Button>
-          </Group>
-        </Group>
       </Stack>
     </div>
   );
