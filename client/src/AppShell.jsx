@@ -161,6 +161,14 @@ function AppContent() {
     await deleteIssue(issueId);
   }
 
+  async function handleArchiveIssue(issueId) {
+    await updateIssue(issueId, { archived_at: "now" });
+  }
+
+  async function handleUnarchiveIssue(issueId) {
+    await updateIssue(issueId, { archived_at: null });
+  }
+
   const currentUser = users.find((u) => u.id === currentUserId);
 
   return (
@@ -234,6 +242,8 @@ function AppContent() {
             onUpdate={handleUpdateIssue}
             onMetaUpdate={handleUpdateIssue}
             onDelete={handleDeleteIssue}
+            onArchive={handleArchiveIssue}
+            onUnarchive={handleUnarchiveIssue}
             onStatusChange={handleStatusChangeSilent}
             onViewIssue={handleViewIssue}
             onSubtaskChange={handleSubtaskChange}

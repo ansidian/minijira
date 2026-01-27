@@ -342,6 +342,7 @@ router.patch("/:id", async (req, res) => {
       parent_id,
       previous_status,
       user_id,
+      archived_at,
     } = req.body;
     const { id } = req.params;
 
@@ -376,9 +377,11 @@ router.patch("/:id", async (req, res) => {
       if (status !== "done" && existing[0].status === "done") {
         updates.push("previous_status = ?");
         args.push(null);
-        // Clear archive when moving out of done
-        updates.push("archived_at = ?");
-        args.push(null);
+        // Clear archive when moving out of done (only if not explicitly setting archived_at)
+        if (archived_at === undefined) {
+          updates.push("archived_at = ?");
+          args.push(null);
+        }
       }
       updates.push("status = ?");
       args.push(status);
@@ -403,6 +406,11 @@ router.patch("/:id", async (req, res) => {
       }
       updates.push("parent_id = ?");
       args.push(parent_id || null);
+    }
+    if (archived_at !== undefined) {
+      // archived_at can be 'now' (archive) or null (unarchive)
+      updates.push("archived_at = ?");
+      args.push(archived_at === 'now' ? new Date().toISOString() : null);
     }
 
     if (updates.length > 0) {
@@ -476,6 +484,14 @@ router.patch("/:id", async (req, res) => {
         await db.execute({
           sql: `UPDATE issues SET archived_at = NULL WHERE parent_id = ?`,
           args: [id]
+        });
+      }
+
+      // Cascade archive/unarchive to subtasks when explicitly archiving/unarchiving a parent
+      if (archived_at !== undefined && oldIssue.parent_id === null) {
+        await db.execute({
+          sql: `UPDATE issues SET archived_at = ? WHERE parent_id = ?`,
+          args: [archived_at === 'now' ? new Date().toISOString() : null, id]
         });
       }
     }

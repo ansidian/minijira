@@ -1,11 +1,12 @@
-import { Modal } from "@mantine/core";
+import { Button, Modal } from "@mantine/core";
 import { useHotkeys } from "@mantine/hooks";
+import { IconArchiveOff } from "@tabler/icons-react";
 import { SubtasksSection } from "./SubtasksSection";
 import { IssueDetailHeader } from "./issue-detail/IssueDetailHeader";
 import { IssueDetailFields } from "./issue-detail/IssueDetailFields";
 import { IssueMetaPanel } from "./issue-detail/IssueMetaPanel";
 import { IssueComments } from "./issue-detail/IssueComments";
-import { IssueDeleteSection } from "./issue-detail/IssueDeleteSection";
+import { IssueDangerSection } from "./issue-detail/IssueDangerSection";
 import { useIssueDetailState } from "../../hooks/useIssueDetailState";
 import { useMobile } from "../../hooks/useMobile";
 
@@ -17,6 +18,8 @@ export function IssueDetailModal({
   onUpdate,
   onMetaUpdate,
   onDelete,
+  onArchive,
+  onUnarchive,
   onStatusChange,
   onViewIssue,
   onSubtaskChange,
@@ -33,8 +36,6 @@ export function IssueDetailModal({
     comments,
     newComment,
     setNewComment,
-    confirmingDelete,
-    setConfirmingDelete,
     confirmingCancel,
     setConfirmingCancel,
     shake,
@@ -106,6 +107,21 @@ export function IssueDetailModal({
       <div className="modal-two-column">
         {/* Main content area - left side */}
         <div className="modal-main-content">
+          {issue.archived_at && (
+            <div className="archived-banner">
+              <span>This {isSubtask ? "subtask" : "issue"} is archived</span>
+              <Button
+                variant="light"
+                color="gray"
+                size="xs"
+                leftSection={<IconArchiveOff size={14} />}
+                onClick={() => onUnarchive(issue.id)}
+              >
+                Unarchive
+              </Button>
+            </div>
+          )}
+
           <IssueDetailFields
             editing={editing}
             title={title}
@@ -150,13 +166,14 @@ export function IssueDetailModal({
             users={users}
             onStatusChange={onStatusChange}
             onUpdate={onMetaUpdate}
+            isMobile={isMobile}
           />
 
-          <IssueDeleteSection
+          <IssueDangerSection
+            issue={issue}
             isSubtask={isSubtask}
-            confirmingDelete={confirmingDelete}
-            setConfirmingDelete={setConfirmingDelete}
             onDelete={() => onDelete(issue.id)}
+            onArchive={() => onArchive(issue.id)}
           />
         </div>
       </div>

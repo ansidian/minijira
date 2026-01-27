@@ -11,7 +11,6 @@ export function useIssueDetailState({
   const [description, setDescription] = useState(issue.description || "");
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [shake, setShake] = useState(false);
   const [fieldToFocus, setFieldToFocus] = useState(null);
@@ -26,7 +25,6 @@ export function useIssueDetailState({
     setTitle(issue.title);
     setDescription(issue.description || "");
     setEditing(false);
-    setConfirmingDelete(false);
     setConfirmingCancel(false);
   }, [issue.id]);
 
@@ -118,8 +116,6 @@ export function useIssueDetailState({
     comments,
     newComment,
     setNewComment,
-    confirmingDelete,
-    setConfirmingDelete,
     confirmingCancel,
     setConfirmingCancel,
     shake,
