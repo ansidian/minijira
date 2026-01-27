@@ -1,5 +1,71 @@
-/* modal shake animation (prevent close with content) */
+/* ========================================
+   ANIMATIONS & UTILITIES
+   ======================================== */
+
+/* Pending pulse for optimistic updates */
+@keyframes pending-pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 0.85; }
+  100% { opacity: 0.85; }
+}
+
+/* Ghost fade for failed creates */
+@keyframes ghost-fade {
+  0% { opacity: 0.6; }
+  100% { opacity: 0; }
+}
+
+/* Loading skeleton pulse */
+@keyframes skeleton-pulse {
+
+	0%,
+	100% {
+		opacity: 0.4;
+	}
+
+	50% {
+		opacity: 0.7;
+	}
+}
+
+.skeleton-animate {
+	animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* Shake animation for unsaved changes warning */
 @keyframes shake {
+
+	0%,
+	100% {
+		transform: translateX(0);
+	}
+
+	10%,
+	30%,
+	50%,
+	70%,
+	90% {
+		transform: translateX(-4px);
+	}
+
+	20%,
+	40%,
+	60%,
+	80% {
+		transform: translateX(4px);
+	}
+}
+
+.shake {
+	animation: shake 0.5s ease-in-out;
+}
+
+/* Modal shake animation (prevent close with content) - uses larger transform */
+.modal.shake {
+  animation: modal-shake 0.5s ease-in-out;
+}
+
+@keyframes modal-shake {
   0%,
   100% {
     transform: translateX(0);
@@ -19,11 +85,7 @@
   }
 }
 
-.modal.shake {
-  animation: shake 0.5s ease-in-out;
-}
-
-/* flash animation for status dropdown */
+/* Flash animation for status dropdown */
 @keyframes flash {
   0%,
   100% {
@@ -47,6 +109,7 @@
   animation: flash 1s ease-in-out;
 }
 
+/* User prompt message animation */
 .user-prompt-message {
   color: var(--text-primary);
   font-size: 14px;
@@ -71,7 +134,7 @@
   }
 }
 
-/* user selector pulsing when unselected */
+/* User selector pulsing when unselected */
 .user-selector.unselected {
   animation: pulse-selector 2s ease-in-out infinite;
   position: relative;
@@ -92,5 +155,5 @@
 
 /* Mantine Modal shake animation */
 .mantine-Modal-content.shake {
-  animation: shake 0.5s ease-in-out;
+  animation: modal-shake 0.5s ease-in-out;
 }

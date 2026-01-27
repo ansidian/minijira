@@ -1,48 +1,229 @@
-/* Comments section */
-.comment {
-  padding: 12px;
-  background: var(--bg-tertiary);
-  border-radius: var(--radius-md);
-  margin-bottom: 8px;
+/* ========================================
+   SHARED COMPONENT STYLES
+   ======================================== */
+
+/* Editable field hover state */
+.editable-field:hover {
+  background-color: var(--bg-tertiary);
 }
 
-.comment-header {
+/* Subtask expansion styles */
+.subtasks-container {
+  margin-top: 0.5rem;
+  margin-left: 1rem;
+  position: relative;
+}
+
+.subtask-item {
+  position: relative;
+  margin-bottom: 0.5rem;
+}
+
+.subtask-connector {
+  position: absolute;
+  left: -1rem;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--status-progress);
+  opacity: 0.3;
+}
+
+.subtask-connector::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 0.75rem;
+  height: 2px;
+  background: var(--status-progress);
+  opacity: 0.3;
+}
+
+.subtask-card {
+  transition: all 0.2s ease;
+  margin-left: 0.5rem;
+}
+
+.subtask-card:hover {
+  background-color: var(--bg-hover) !important;
+  transform: translateX(2px);
+}
+
+/* Subtask toggle button visibility - show desktop version by default, mobile on small screens */
+.subtask-toggle-mobile {
+  display: none;
+}
+
+.subtask-toggle-desktop {
+  display: inline-flex;
+}
+
+/* Hint pills for keyboard shortcuts */
+.hints-container {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.hint-pill {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
+  gap: 6px;
+  cursor: help;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  max-width: 40px;
+  overflow: hidden;
 }
 
-.comment-author {
-  font-size: var(--text-md);
-  font-weight: 500;
+.hint-pill:hover {
+  max-width: 300px;
+  background: var(--bg-card);
+  border-color: var(--border-accent);
+  color: var(--text-primary);
 }
 
-.comment-time {
-  font-size: var(--text-xs);
+.hint-pill-icon {
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+}
+
+.hint-pill-text {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.hint-pill:hover .hint-pill-text {
+  opacity: 1;
+}
+
+.kbd {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+/* Optimistic update pending state indicator */
+.issue-card[data-pending="true"],
+.subtask-row[data-pending="true"] {
+  opacity: 0.85;
+  animation: pending-pulse 0.4s ease-in-out;
+}
+
+/* Ghost state for failed creates */
+.issue-card[data-failing="true"],
+.subtask-row[data-failing="true"] {
+  opacity: 0.4;
+  animation: ghost-fade 0.5s ease-out forwards;
+  pointer-events: none;
+}
+
+/* Issue key placeholder for optimistic creates */
+.issue-key-pending {
   color: var(--text-muted);
-  margin-left: auto;
+  font-style: italic;
 }
 
-.comment-body {
-  font-size: var(--text-md);
-  color: var(--text-secondary);
-  line-height: 1.5;
-  word-break: break-word;
-  white-space: pre-wrap;
+/* Archived issue styling - muted/faded appearance */
+.issue-card[data-archived="true"],
+.subtask-card[data-archived="true"] {
+	opacity: 0.55;
+	filter: grayscale(30%);
 }
 
-.comment-link {
-  color: var(--accent);
-  text-decoration: none;
-  border-bottom: 1px solid transparent;
-  transition: all 0.15s ease;
+.issue-card[data-archived="true"]:hover,
+.subtask-card[data-archived="true"]:hover {
+	opacity: 0.75;
+	filter: grayscale(15%);
 }
 
-.comment-link:hover {
-  color: var(--accent-hover);
-  border-bottom-color: var(--accent-hover);
+/* Hide hints on mobile */
+@media (max-width: 768px) {
+	.hints-container {
+		display: none;
+	}
 }
+
+/* Status indicator dots for select options */
+.status-option {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.status-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+
+.status-dot-todo {
+	background: var(--status-todo);
+}
+
+.status-dot-in_progress {
+	background: var(--status-progress);
+}
+
+.status-dot-review {
+	background: var(--status-review);
+}
+
+.status-dot-done {
+	background: var(--status-done);
+}
+
+/* Priority indicator */
+.priority-option {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.priority-bar {
+	width: 3px;
+	height: 14px;
+	border-radius: 1px;
+	flex-shrink: 0;
+}
+
+.priority-bar-low {
+	background: var(--priority-low);
+}
+
+.priority-bar-medium {
+	background: var(--priority-medium);
+}
+
+.priority-bar-high {
+	background: var(--priority-high);
+}
+
+/* Empty state for lists */
+.empty-state {
+	text-align: center;
+	padding: 32px 16px;
+	color: var(--text-muted);
+	font-size: var(--text-sm);
+}
+
+/* ========================================
+   MARKDOWN STYLES
+   ======================================== */
 
 /* Markdown rendering styles */
 .markdown-image {
@@ -161,7 +342,10 @@
   pointer-events: none;
 }
 
-/* Footer */
+/* ========================================
+   FOOTER STYLES
+   ======================================== */
+
 .footer {
   background: var(--bg-secondary);
   box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.1);

@@ -1,0 +1,110 @@
+/* ========================================
+   CSS VARIABLES
+   ======================================== */
+
+:root {
+	/* Fonts */
+	--font-mono: "JetBrains Mono", monospace;
+	--font-sans: "Space Grotesk", system-ui, sans-serif;
+
+	/* Type scale */
+	--text-xs: 11px;
+	--text-sm: 12px;
+	--text-md: 13px;
+	--text-base: 14px;
+	--text-lg: 16px;
+	--text-xl: 18px;
+
+	/* Border radius */
+	--radius-sm: 4px;
+	--radius-md: 6px;
+	--radius-lg: 12px;
+
+	/* Sizing */
+	--header-height: 56px;
+
+	/* Safe area insets for notched devices */
+	--safe-top: env(safe-area-inset-top, 0px);
+	--safe-bottom: env(safe-area-inset-bottom, 0px);
+	--safe-left: env(safe-area-inset-left, 0px);
+	--safe-right: env(safe-area-inset-right, 0px);
+}
+
+/* Dark theme variables */
+[data-mantine-color-scheme="dark"] {
+	--bg-primary: #09090b;
+		--bg-secondary: #0f0f12;
+		--bg-tertiary: #16161a;
+		--bg-card: #1c1c21;
+		--bg-hover: #24242a;
+
+	--border-primary: #26262c;
+		--border-secondary: #36363e;
+		--border-accent: #46464f;
+
+	--text-primary: #fafafa;
+		--text-secondary: #a1a1aa;
+		--text-muted: #71717a;
+
+	/* Status indicator colors */
+	--status-todo: #71717a;
+	--status-progress: #3b82f6;
+	--status-review: #a855f7;
+	--status-done: #22c55e;
+
+	/* Priority */
+	--priority-low: #71717a;
+	--priority-medium: #f59e0b;
+	--priority-high: #ef4444;
+
+	/* Accent - warm amber */
+	--accent: #f59e0b;
+	--accent-hover: #d97706;
+	--accent-subtle: rgba(245, 158, 11, 0.1);
+
+	/* Shadows for depth */
+	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.15);
+	--shadow-md: 0 2px 4px rgba(0, 0, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.2);
+	--shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.3), 0 8px 16px rgba(0, 0, 0, 0.25);
+	--shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Light theme variables */
+[data-mantine-color-scheme="light"] {
+	/* Warm light palette - cream tinted whites */
+	--bg-primary: #fdfcfb;
+	--bg-secondary: #f8f6f4;
+	--bg-tertiary: #f2f0ed;
+	--bg-card: #ffffff;
+	--bg-hover: #f2f0ed;
+
+	--border-primary: #e8e4e0;
+	--border-secondary: #d9d4ce;
+	--border-accent: #b8b2aa;
+
+	--text-primary: #1c1917;
+	--text-secondary: #57534e;
+	--text-muted: #78716c;
+
+	/* Status indicator colors */
+	--status-todo: #78716c;
+	--status-progress: #2563eb;
+	--status-review: #9333ea;
+	--status-done: #16a34a;
+
+	/* Priority */
+	--priority-low: #78716c;
+	--priority-medium: #d97706;
+	--priority-high: #dc2626;
+
+	/* Accent - warm amber (darker for light mode contrast) */
+	--accent: #d97706;
+	--accent-hover: #b45309;
+	--accent-subtle: rgba(217, 119, 6, 0.08);
+
+	/* Shadows for depth - lighter for light mode */
+	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+	--shadow-md: 0 2px 4px rgba(0, 0, 0, 0.06), 0 4px 8px rgba(0, 0, 0, 0.04);
+	--shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.08), 0 8px 16px rgba(0, 0, 0, 0.06);
+	--shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+}

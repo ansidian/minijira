@@ -1,0 +1,17 @@
+/* ========================================
+   APP LAYOUT
+   ======================================== */
+
+.app {
+	height: 100svh;
+	display: flex;
+	flex-direction: column;
+	padding-left: var(--safe-left);
+	padding-right: var(--safe-right);
+}
+
+.main {
+	flex: 1;
+	display: flex;
+	overflow: hidden;
+}
