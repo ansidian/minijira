@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 /**
- * Manual test script for Discord embeds
+ * Comprehensive Discord Embed Tester
  *
- * Usage: node server/utils/test-discord-embed.js
+ * Tests all embed scenarios from discord-notifications.test.js
+ * Usage: node server/utils/test-discord-embed.js [test-number]
  *
+ * Run without arguments to see all available tests, or specify a test number to run.
  * Requires DISCORD_WEBHOOK_URL in .env
  */
 
@@ -23,86 +25,540 @@ for (const line of envContent.split('\n')) {
 
 const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
 if (!webhookUrl) {
-  console.error('DISCORD_WEBHOOK_URL not set in .env');
+  console.error("❌ DISCORD_WEBHOOK_URL not set in .env");
   process.exit(1);
 }
 
-// Test: Subtask created with assignment 
-const issue = { id: 25, key: 'JPL-25', title: 'Change structure of the code to make it more reusable and can run on any computer', status: 'todo' };
-const changes = [
-  {
-    type: "created",
-    isSubtask: true,
-    title:
-      "Refactor Lunar-Pipeline-Full [branch](https://github.com/JPL-Project/JPL-Project/tree/Garen/Lunar...)",
-  },
-  { type: "assignee", old: null, new: "Andy Su" },
-];
-const user = { name: 'Andy Su' };
-const timestamp = new Date().toISOString();
+// Helper to send embed
+async function sendEmbed(payload, description) {
+  console.log(`\n${'='.repeat(70)}`);
+  console.log(`📤 ${description}`);
+  console.log('='.repeat(70));
+  console.log(JSON.stringify(payload, null, 2));
+  console.log('');
 
-const payload = buildEmbed(issue, changes, user, timestamp, {
-  subtaskSummary: "0/1 subtasks done",
-});
+  const res = await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 
-console.log('Sending embed:', JSON.stringify(payload, null, 2));
-
-const res = await fetch(webhookUrl, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(payload)
-});
-
-console.log('Status:', res.status);
-if (res.status === 204) {
-  console.log('✓ Sent successfully!');
-} else {
-  console.log('Response:', await res.text());
+  if (res.status === 204) {
+    console.log("✅ Sent successfully!\n");
+    return true;
+  } else {
+    console.log("❌ Failed!");
+    console.log("Status:", res.status);
+    console.log("Response:", await res.text(), "\n");
+    return false;
+  }
 }
 
-// Test: Multi-issue batch (simulating moving multiple issues to Done)
-console.log('\n--- Multi-embed test (batch of 4 issues) ---\n');
+// Test suite
+const tests = [
+  {
+    name: "Issue Created (basic)",
+    build: () =>
+      buildEmbed(
+        {
+          id: 1,
+          key: "JPL-464",
+          title: "Implement user authentication",
+          status: "todo",
+        },
+        [
+          {
+            type: "created",
+            isSubtask: false,
+            title: "Implement user authentication",
+          },
+        ],
+        { name: "Andy Su" },
+        new Date().toISOString(),
+      ),
+  },
 
-const multiEmbedPayload = {
-  embeds: [
-    buildEmbed(
-      { id: 1, key: 'MJ-1', title: 'Set up project repository', status: 'done' },
-      [{ type: 'status', old: 'in_progress', new: 'done' }],
-      { name: 'Andy Su' },
-      new Date().toISOString()
-    ).embeds[0],
-    buildEmbed(
-      { id: 2, key: 'MJ-2', title: 'Design system architecture', status: 'done' },
-      [{ type: 'status', old: 'review', new: 'done' }],
-      { name: 'Andy Su' },
-      new Date().toISOString()
-    ).embeds[0],
-    buildEmbed(
-      { id: 3, key: 'MJ-3', title: 'Implement user authentication', status: 'done' },
-      [{ type: 'status', old: 'todo', new: 'done' }],
-      { name: 'Andy Su' },
-      new Date().toISOString()
-    ).embeds[0],
-    buildEmbed(
-      { id: 4, key: 'MJ-4', title: 'Write project documentation', status: 'done' },
-      [{ type: 'status', old: 'in_progress', new: 'done' }, { type: 'assignee', old: null, new: 'Garen Artsrounian' }],
-      { name: 'Andy Su' },
-      new Date().toISOString()
-    ).embeds[0],
-  ]
-};
+  {
+    name: "Issue Created with Single Assignee",
+    build: () =>
+      buildEmbed(
+        {
+          id: 2,
+          key: "JPL-465",
+          title: "Add dark mode support",
+          status: "todo",
+        },
+        [
+          { type: "created", isSubtask: false, title: "Add dark mode support" },
+          { type: "assignee", old: null, new: "Alice" },
+        ],
+        { name: "Andy Su" },
+        new Date().toISOString(),
+      ),
+  },
 
-console.log('Sending multi-embed:', JSON.stringify(multiEmbedPayload, null, 2));
+  {
+    name: "Issue Created with Multiple Assignees",
+    build: () =>
+      buildEmbed(
+        {
+          id: 3,
+          key: "JPL-466",
+          title: "Refactor notification system",
+          status: "todo",
+        },
+        [
+          {
+            type: "created",
+            isSubtask: false,
+            title: "Refactor notification system",
+          },
+          { type: "assignee", old: null, new: "Alice, Bob, Charlie" },
+        ],
+        { name: "Andy Su" },
+        new Date().toISOString(),
+      ),
+  },
 
-const res2 = await fetch(webhookUrl, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(multiEmbedPayload)
-});
+  {
+    name: "Subtask Created (under parent)",
+    build: () =>
+      buildEmbed(
+        {
+          id: 4,
+          key: "JPL-467",
+          title: "Parent issue for subtasks",
+          status: "in_progress",
+        },
+        [
+          {
+            type: "created",
+            isSubtask: true,
+            subtaskKey: "JPL-468",
+            title: "Write unit tests for auth module",
+          },
+        ],
+        { name: "Bob" },
+        new Date().toISOString(),
+      ),
+  },
 
-console.log('Status:', res2.status);
-if (res2.status === 204) {
-  console.log('✓ Multi-embed sent successfully!');
+  {
+    name: "Subtask Deleted (under parent)",
+    build: () =>
+      buildEmbed(
+        { id: 5, key: "JPL-469", title: "Parent issue", status: "in_progress" },
+        [{ type: "deleted", isSubtask: true, subtaskKey: "JPL-470", title: "Obsolete subtask" }],
+        { name: "Charlie" },
+        new Date().toISOString(),
+        { deleted: true },
+      ),
+  },
+
+  {
+    name: "Status Change (Todo → In Progress)",
+    build: () =>
+      buildEmbed(
+        {
+          id: 6,
+          key: "JPL-469",
+          title: "Optimize database queries",
+          status: "in_progress",
+        },
+        [{ type: "status", old: "todo", new: "in_progress" }],
+        { name: "Andy Su" },
+        new Date().toISOString(),
+      ),
+  },
+
+  {
+    name: "Status Change (In Progress → Done)",
+    build: () =>
+      buildEmbed(
+        {
+          id: 7,
+          key: "JPL-470",
+          title: "Fix authentication bug",
+          status: "done",
+        },
+        [{ type: "status", old: "in_progress", new: "done" }],
+        { name: "Alice" },
+        new Date().toISOString(),
+      ),
+  },
+
+  {
+    name: "Priority Change (Low → High)",
+    build: () =>
+      buildEmbed(
+        {
+          id: 8,
+          key: "JPL-471",
+          title: "Security vulnerability patch",
+          status: "todo",
+        },
+        [{ type: "priority", old: "low", new: "high" }],
+        { name: "Bob" },
+        new Date().toISOString(),
+      ),
+  },
+
+  {
+    name: "Assignee Change (Single → Single)",
+    build: () =>
+      buildEmbed(
+        {
+          id: 9,
+          key: "JPL-472",
+          title: "Update documentation",
+          status: "in_progress",
+        },
+        [{ type: "assignee", old: "Alice", new: "Bob" }],
+        { name: "Andy Su" },
+        new Date().toISOString(),
+      ),
+  },
+
+  {
+    name: "Assignee Change (Single → Multiple)",
+    build: () =>
+      buildEmbed(
+        {
+          id: 10,
+          key: "JPL-473",
+          title: "Code review for PR #42",
+          status: "in_progress",
+        },
+        [{ type: "assignee", old: "Alice", new: "Alice, Bob, Charlie" }],
+        { name: "Andy Su" },
+        new Date().toISOString(),
+      ),
+  },
+
+  {
+    name: "Assignee Cleared (Unassigned)",
+    build: () =>
+      buildEmbed(
+        { id: 11, key: "JPL-474", title: "Backlog item", status: "todo" },
+        [{ type: "assignee", old: "Bob", new: null }],
+        { name: "Andy Su" },
+        new Date().toISOString(),
+      ),
+  },
+
+  {
+    name: "Comment Added",
+    build: () =>
+      buildEmbed(
+        {
+          id: 12,
+          key: "JPL-475",
+          title: "Discuss architecture changes",
+          status: "in_progress",
+        },
+        [
+          {
+            type: "comment",
+            value:
+              "We should consider using a queue-based approach here for better scalability. What do you think?",
+          },
+        ],
+        { name: "Alice" },
+        new Date().toISOString(),
+      ),
+  },
+
+  {
+    name: "Multiple Field Changes (Status + Priority + Assignee)",
+    build: () =>
+      buildEmbed(
+        {
+          id: 13,
+          key: "JPL-476",
+          title: "Critical production bug",
+          status: "in_progress",
+        },
+        [
+          { type: "assignee", old: null, new: "Alice, Bob" },
+          { type: "status", old: "todo", new: "in_progress" },
+          { type: "priority", old: "low", new: "high" },
+        ],
+        { name: "Andy Su" },
+        new Date().toISOString(),
+      ),
+  },
+
+  {
+    name: "Subtask Status Change (grouped under parent)",
+    build: () =>
+      buildEmbed(
+        {
+          id: 14,
+          key: "JPL-477",
+          title: "Parent: Implement feature X",
+          status: "in_progress",
+        },
+        [
+          {
+            type: "status",
+            old: "todo",
+            new: "done",
+            isSubtask: true,
+            subtaskKey: "JPL-478",
+          },
+        ],
+        { name: "Charlie" },
+        new Date().toISOString(),
+      ),
+  },
+
+  {
+    name: "Subtask Multiple Field Changes (grouped under parent)",
+    build: () =>
+      buildEmbed(
+        {
+          id: 15,
+          key: "JPL-479",
+          title: "Parent: Complex feature",
+          status: "in_progress",
+        },
+        [
+          {
+            type: "status",
+            old: "todo",
+            new: "in_progress",
+            isSubtask: true,
+            subtaskKey: "JPL-480",
+          },
+          {
+            type: "priority",
+            old: "low",
+            new: "high",
+            isSubtask: true,
+            subtaskKey: "JPL-480",
+          },
+        ],
+        { name: "Bob" },
+        new Date().toISOString(),
+      ),
+  },
+
+  {
+    name: "Merged: Parent Status + Subtask Created",
+    build: () =>
+      buildEmbed(
+        {
+          id: 16,
+          key: "JPL-481",
+          title: "Build notification system",
+          status: "in_progress",
+        },
+        [
+          { type: "status", old: "todo", new: "in_progress" },
+          {
+            type: "created",
+            isSubtask: true,
+            subtaskKey: "JPL-482",
+            title: "Design Discord embed format",
+          },
+        ],
+        { name: "Andy Su" },
+        new Date().toISOString(),
+      ),
+  },
+
+  {
+    name: "With Subtask Summary",
+    build: () =>
+      buildEmbed(
+        {
+          id: 17,
+          key: "JPL-482",
+          title: "Feature with multiple subtasks",
+          status: "in_progress",
+        },
+        [{ type: "status", old: "todo", new: "in_progress" }],
+        { name: "Alice" },
+        new Date().toISOString(),
+        { subtaskSummary: "✅ 2/5 subtasks done" },
+      ),
+  },
+
+  {
+    name: "Issue Deleted",
+    build: () =>
+      buildEmbed(
+        {
+          id: 18,
+          key: "JPL-483",
+          title: "Duplicate issue (deleted)",
+          status: "deleted",
+        },
+        [
+          {
+            type: "deleted",
+            isSubtask: false,
+            title: "Duplicate issue (deleted)",
+          },
+        ],
+        { name: "Andy Su" },
+        new Date().toISOString(),
+        { deleted: true },
+      ),
+  },
+
+  {
+    name: "Standalone Subtask (parent not in batch)",
+    build: () =>
+      buildEmbed(
+        {
+          id: 19,
+          key: "JPL-484",
+          title: "Add unit tests for login flow",
+          status: "in_progress",
+        },
+        [
+          { type: "status", old: "todo", new: "in_progress" },
+          { type: "assignee", old: null, new: "Alice" },
+        ],
+        { name: "Bob" },
+        new Date().toISOString(),
+        { isSubtask: true },
+      ),
+  },
+
+  {
+    name: "Parent + Multiple Subtasks Combined",
+    build: () =>
+      buildEmbed(
+        {
+          id: 20,
+          key: "JPL-485",
+          title: "User Authentication System",
+          status: "done",
+        },
+        [
+          { type: "status", old: "in_progress", new: "done" },
+          {
+            type: "status",
+            old: "in_progress",
+            new: "done",
+            isSubtask: true,
+            subtaskKey: "JPL-486",
+          },
+          {
+            type: "status",
+            old: "todo",
+            new: "done",
+            isSubtask: true,
+            subtaskKey: "JPL-487",
+          },
+          {
+            type: "assignee",
+            old: "Alice",
+            new: "Bob",
+            isSubtask: true,
+            subtaskKey: "JPL-487",
+          },
+        ],
+        { name: "Alice" },
+        new Date().toISOString(),
+        { subtaskSummary: "5/5 subtasks done" },
+      ),
+  },
+];
+
+// Main execution
+const arg = process.argv[2];
+
+// Check for "all" first, before parsing as integer
+if (arg === "all") {
+  console.log(
+    "\n🚀 Running all tests (batched into multi-embed messages)...\n",
+  );
+  const MAX_EMBEDS_PER_MESSAGE = 10;
+  let passed = 0;
+  let failed = 0;
+
+  // Batch tests into groups of up to 10 embeds
+  for (
+    let batchStart = 0;
+    batchStart < tests.length;
+    batchStart += MAX_EMBEDS_PER_MESSAGE
+  ) {
+    const batchEnd = Math.min(
+      batchStart + MAX_EMBEDS_PER_MESSAGE,
+      tests.length,
+    );
+    const batch = tests.slice(batchStart, batchEnd);
+
+    // Build multi-embed payload
+    const embeds = batch
+      .map((test) => {
+        const payload = test.build();
+        // Extract the first embed from the payload
+        return payload.embeds?.[0] || null;
+      })
+      .filter((embed) => embed !== null);
+
+    const multiEmbedPayload = { embeds };
+
+    const batchNum = Math.floor(batchStart / MAX_EMBEDS_PER_MESSAGE) + 1;
+    const totalBatches = Math.ceil(tests.length / MAX_EMBEDS_PER_MESSAGE);
+    const testRange = `${batchStart + 1}-${batchEnd}`;
+
+    const success = await sendEmbed(
+      multiEmbedPayload,
+      `Batch ${batchNum}/${totalBatches}: Tests ${testRange} (${batch.length} embeds)`,
+    );
+
+    if (success) {
+      passed += batch.length;
+    } else {
+      failed += batch.length;
+    }
+
+    // Wait 1 second between batches to avoid rate limiting
+    if (batchEnd < tests.length) {
+      console.log("⏳ Waiting 1 second before next batch...\n");
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+
+  console.log("\n" + "=".repeat(70));
+  console.log(
+    `📊 Results: ${passed} passed, ${failed} failed (${Math.ceil(tests.length / MAX_EMBEDS_PER_MESSAGE)} batches sent)`,
+  );
+  console.log("=".repeat(70) + "\n");
+} else if (arg) {
+  // Try to parse as test number
+  const testIndex = parseInt(arg);
+
+  if (isNaN(testIndex)) {
+    console.error(`❌ Invalid argument: "${arg}"`);
+    console.log(`   Valid options: 1-${tests.length} or "all"\n`);
+    process.exit(1);
+  }
+
+  const test = tests[testIndex - 1];
+  if (!test) {
+    console.error(
+      `❌ Invalid test number: ${testIndex} (valid range: 1-${tests.length})`,
+    );
+    process.exit(1);
+  }
+
+  const payload = test.build();
+  await sendEmbed(payload, test.name);
 } else {
-  console.log('Response:', await res2.text());
+  // No argument - show help
+  console.log("\n📋 Available Tests:\n");
+  tests.forEach((test, i) => {
+    console.log(`  ${i + 1}. ${test.name}`);
+  });
+  console.log(
+    `\n💡 Usage: node server/utils/test-discord-embed.js <test-number>`,
+  );
+  console.log(`   Example: node server/utils/test-discord-embed.js 1`);
+  console.log(`   Or run all: node server/utils/test-discord-embed.js all\n`);
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { Avatar, Badge, Button, Group, Modal, Select, Textarea } from "@mantine/core";
+import { Avatar, Badge, Button, Group, Modal, Select, MultiSelect, Textarea } from "@mantine/core";
 import { useHotkeys } from "@mantine/hooks";
-import { IconArrowLeft } from "@tabler/icons-react";
+import { IconArrowLeft, IconCheck } from "@tabler/icons-react";
 import { useMobile } from "../../hooks/useMobile";
 import { useMarkdownTextarea } from "../../hooks/useMarkdownTextarea";
 
@@ -52,7 +52,7 @@ export function CreateIssueModal({
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState(createStatus);
   const [priority, setPriority] = useState("medium");
-  const [assigneeId, setAssigneeId] = useState("");
+  const [assigneeIds, setAssigneeIds] = useState([]);
   const [shake, setShake] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -84,7 +84,7 @@ export function CreateIssueModal({
         description: description.trim(),
         status,
         priority,
-        assignee_id: assigneeId || null,
+        assignee_ids: assigneeIds.map(id => parseInt(id)),
         reporter_id: currentUserId || null,
         parent_id: parentIssue?.id || null,
       });
@@ -136,8 +136,6 @@ export function CreateIssueModal({
   ) : (
     <span className="modal-header-key">New Issue</span>
   );
-
-  const assignee = users.find((u) => u.id.toString() === assigneeId);
 
   return (
     <Modal
@@ -297,25 +295,30 @@ export function CreateIssueModal({
               />
             </div>
 
-            {/* Assignee */}
+            {/* Assignees */}
             <div className="meta-field">
-              <span className="meta-field-label">Assignee</span>
-              <Select
-                value={assigneeId}
-                onChange={(value) => setAssigneeId(value || "")}
+              <span className="meta-field-label">Assignees</span>
+              <MultiSelect
+                value={assigneeIds}
+                onChange={setAssigneeIds}
                 placeholder="Unassigned"
                 clearable
                 searchable
-                leftSection={
-                  assignee ? (
+                hidePickedOptions
+                renderOption={({ option, checked }) => (
+                  <Group gap="xs">
+                    {checked && (
+                      <IconCheck size={14} style={{ color: "var(--accent)" }} />
+                    )}
                     <Avatar
-                      color={assignee.color || "gray"}
-                      name={assignee.name}
+                      color={users.find(u => u.id.toString() === option.value)?.avatar_color || "gray"}
+                      name={option.label}
                       size={20}
                       radius="xl"
                     />
-                  ) : null
-                }
+                    <span>{option.label}</span>
+                  </Group>
+                )}
                 data={users.map((user) => ({
                   value: user.id.toString(),
                   label: user.name,
@@ -325,7 +328,6 @@ export function CreateIssueModal({
                     background: "var(--bg-tertiary)",
                     border: "1px solid var(--border-primary)",
                     fontSize: "var(--text-sm)",
-                    paddingLeft: assignee ? "36px" : undefined,
                   },
                   wrapper: {
                     "--input-bg": "transparent",

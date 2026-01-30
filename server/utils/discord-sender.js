@@ -163,7 +163,15 @@ export function extractChangesFromPayload(eventPayload, eventType) {
       title: eventPayload.issue_title || null
     });
     // Add assignee change if assigned at creation
-    if (eventPayload.assignee_name) {
+    // Handle both new assignees array and legacy assignee_name
+    if (eventPayload.assignees && eventPayload.assignees.length > 0) {
+      const assigneeNames = eventPayload.assignees.map(a => a.name).join(', ');
+      changes.push({
+        type: 'assignee',
+        old: null,
+        new: assigneeNames
+      });
+    } else if (eventPayload.assignee_name) {
       changes.push({
         type: 'assignee',
         old: null,
@@ -235,17 +243,39 @@ async function getUserName(userId, dbClient) {
 
 /**
  * Resolve assignee IDs to names in changes array
+ * Handles both single IDs and comma-separated ID lists for multi-assignee support
  * @param {Array} changes - Changes array from extractChangesFromPayload
  * @param {Object} dbClient - Database client
  * @returns {Promise<Array>} Changes with assignee IDs replaced by names
  */
 export async function resolveAssigneeNames(changes, dbClient) {
-  // Collect unique user IDs to look up
+  // Collect unique user IDs to look up (including from comma-separated lists)
   const userIds = new Set();
   for (const change of changes) {
     if (change.type === 'assignee') {
-      if (change.old) userIds.add(change.old);
-      if (change.new) userIds.add(change.new);
+      // Helper to extract IDs
+      const extractIds = (val) => {
+        if (!val && val !== 0) return;
+        const str = String(val);
+
+        if (str.includes(',')) {
+          // Comma-separated list - extract each ID
+          str.split(',').forEach(id => {
+            const trimmed = id.trim();
+            // Only add if it's numeric (an ID to resolve)
+            if (trimmed && !isNaN(trimmed)) {
+              userIds.add(trimmed);
+            }
+          });
+        } else if (!isNaN(str)) {
+          // Single numeric ID
+          userIds.add(str);
+        }
+        // If not numeric and not comma-separated, it's already a name - skip
+      };
+
+      extractIds(change.old);
+      extractIds(change.new);
     }
   }
 
@@ -258,13 +288,42 @@ export async function resolveAssigneeNames(changes, dbClient) {
     if (name) userNameMap.set(String(userId), name);
   }
 
+  // Helper to resolve comma-separated IDs to names
+  const resolveIds = (idsString) => {
+    if (!idsString && idsString !== 0) return idsString;
+
+    // Convert to string if it's a number
+    const str = String(idsString);
+
+    // Handle comma-separated IDs
+    if (str.includes(',')) {
+      const ids = str.split(',').map(id => id.trim()).filter(Boolean);
+      // Check if all parts are numeric (IDs to resolve)
+      const allNumeric = ids.every(id => !isNaN(id));
+      if (allNumeric) {
+        const names = ids.map(id => userNameMap.get(String(id)) || id);
+        return names.join(', ');
+      }
+      // Already names, return as-is
+      return str;
+    }
+
+    // Single value - check if it's a numeric ID
+    if (!isNaN(str)) {
+      return userNameMap.get(str) || idsString;
+    }
+
+    // Already a name, return as-is
+    return str;
+  };
+
   // Replace IDs with names in changes
   return changes.map(change => {
     if (change.type === 'assignee') {
       return {
         ...change,
-        old: change.old ? (userNameMap.get(String(change.old)) || change.old) : change.old,
-        new: change.new ? (userNameMap.get(String(change.new)) || change.new) : change.new
+        old: resolveIds(change.old),
+        new: resolveIds(change.new)
       };
     }
     return change;
@@ -278,9 +337,10 @@ export async function resolveAssigneeNames(changes, dbClient) {
  * @param {Object} user - User object
  * @param {string} timestamp - Notification timestamp
  * @param {Object} dbClient - Database client
+ * @param {Array} subtaskChanges - Optional array of subtask change entries to include in parent embed
  * @returns {Promise<Object|null>} Discord embed object or null if skipped
  */
-async function buildIssueEmbed(issueEntry, user, timestamp, dbClient) {
+async function buildIssueEmbed(issueEntry, user, timestamp, dbClient, subtaskChanges = []) {
   const { issue_id, issue_key, issue_title, changes: rawChanges } = issueEntry;
 
   // Fetch current issue data (this is the parent for subtasks, or the issue itself)
@@ -318,7 +378,7 @@ async function buildIssueEmbed(issueEntry, user, timestamp, dbClient) {
     return result.embeds[0];
   }
 
-  // Detect if this is a subtask change
+  // Detect if this is a subtask change (standalone subtask, not grouped under parent)
   const isSubtaskChange = rawChanges.some(
     (c) => c.action_type === "subtask_updated",
   );
@@ -326,8 +386,64 @@ async function buildIssueEmbed(issueEntry, user, timestamp, dbClient) {
   if (isSubtaskChange) {
     return buildSubtaskEmbed(issue, rawChanges, user, timestamp, dbClient);
   } else {
-    return buildParentIssueEmbed(issue, rawChanges, user, timestamp, dbClient);
+    return buildParentIssueEmbed(issue, rawChanges, user, timestamp, dbClient, subtaskChanges);
   }
+}
+
+/**
+ * Group issues by parent-child relationships
+ * Subtasks are grouped under their parent if the parent is also in the batch
+ * @param {Object} issues - Issues object from payload { [issueId]: issueEntry }
+ * @param {Object} dbClient - Database client
+ * @returns {Promise<Object>} { parentIssues: { [id]: { entry, subtaskEntries } }, orphanSubtasks: [entries] }
+ */
+async function groupIssuesByParent(issues, dbClient) {
+  const issueIds = Object.keys(issues);
+
+  // Fetch parent_id for all issues in one query
+  const placeholders = issueIds.map(() => '?').join(', ');
+  const result = await dbClient.execute({
+    sql: `SELECT id, parent_id FROM issues WHERE id IN (${placeholders})`,
+    args: issueIds.map(id => parseInt(id)),
+  });
+
+  // Build a map of issue_id -> parent_id
+  const parentMap = new Map();
+  for (const row of result.rows) {
+    parentMap.set(String(row.id), row.parent_id ? String(row.parent_id) : null);
+  }
+
+  // Identify parent issues and subtasks
+  const parentIssues = {}; // { [parentId]: { entry, subtaskEntries: [] } }
+  const orphanSubtasks = []; // Subtasks whose parent is not in the batch
+  const subtaskIds = new Set(); // Track which IDs are subtasks (to exclude from top-level)
+
+  for (const issueId of issueIds) {
+    const parentId = parentMap.get(issueId);
+
+    if (parentId) {
+      // This is a subtask
+      subtaskIds.add(issueId);
+
+      if (issues[parentId]) {
+        // Parent is in the batch - group under parent
+        if (!parentIssues[parentId]) {
+          parentIssues[parentId] = { entry: issues[parentId], subtaskEntries: [] };
+        }
+        parentIssues[parentId].subtaskEntries.push(issues[issueId]);
+      } else {
+        // Parent not in batch - standalone subtask
+        orphanSubtasks.push(issues[issueId]);
+      }
+    } else {
+      // This is a parent issue (or has no parent_id in DB, e.g., deleted)
+      if (!parentIssues[issueId]) {
+        parentIssues[issueId] = { entry: issues[issueId], subtaskEntries: [] };
+      }
+    }
+  }
+
+  return { parentIssues, orphanSubtasks };
 }
 
 /**
@@ -350,27 +466,47 @@ export async function prepareNotificationPayload(notificationRow, dbClient) {
 
   // Handle multi-issue payload format
   if (eventPayload.issues) {
-    const issueIds = Object.keys(eventPayload.issues);
-
-    // Warn if truncating (Discord limit is 10 embeds)
-    if (issueIds.length > 10) {
-      console.warn(
-        `[Discord] Truncating notification from ${issueIds.length} to 10 issues`,
-      );
-    }
+    // Group issues by parent-child relationships
+    const { parentIssues, orphanSubtasks } = await groupIssuesByParent(
+      eventPayload.issues,
+      dbClient
+    );
 
     const embeds = [];
-    for (const issueId of issueIds.slice(0, 10)) {
-      const issueEntry = eventPayload.issues[issueId];
+
+    // Build embeds for parent issues (with their subtask changes included)
+    for (const parentId of Object.keys(parentIssues)) {
+      const { entry, subtaskEntries } = parentIssues[parentId];
       const embed = await buildIssueEmbed(
-        issueEntry,
+        entry,
         user,
         notificationRow.scheduled_at,
         dbClient,
+        subtaskEntries
       );
       if (embed) {
         embeds.push(embed);
       }
+    }
+
+    // Build embeds for orphan subtasks (parent not in batch)
+    for (const subtaskEntry of orphanSubtasks) {
+      const embed = await buildIssueEmbed(
+        subtaskEntry,
+        user,
+        notificationRow.scheduled_at,
+        dbClient
+      );
+      if (embed) {
+        embeds.push(embed);
+      }
+    }
+
+    // Warn if truncating (Discord limit is 10 embeds)
+    if (embeds.length > 10) {
+      console.warn(
+        `[Discord] Truncating notification from ${embeds.length} to 10 embeds`,
+      );
     }
 
     // Skip if all issues were filtered out (net-zero)
@@ -378,7 +514,7 @@ export async function prepareNotificationPayload(notificationRow, dbClient) {
       return { skip: true, reason: "all issues net-zero" };
     }
 
-    return { embeds };
+    return { embeds: embeds.slice(0, 10) };
   }
 
   // Legacy single-issue payload fallback

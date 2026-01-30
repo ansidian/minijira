@@ -1,5 +1,5 @@
 import { useState, useLayoutEffect } from "react";
-import { Avatar, Collapse, Group, Select } from "@mantine/core";
+import { Avatar, Collapse, Group, Select, MultiSelect } from "@mantine/core";
 import { IconCheck, IconChevronDown, IconChevronRight } from "@tabler/icons-react";
 import { formatDate } from "../../../utils/formatters.jsx";
 
@@ -53,7 +53,8 @@ export function IssueMetaPanel({ issue, users, onStatusChange, onUpdate, isMobil
   const currentPriority = PRIORITY_OPTIONS.find(
     (p) => p.value === issue.priority,
   );
-  const assignee = users.find((u) => u.id === issue.assignee_id);
+  const assigneeIds = (issue.assignees || []).map(a => a.id.toString());
+  const selectedAssignees = (issue.assignees || []);
 
   const content = (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -127,37 +128,34 @@ export function IssueMetaPanel({ issue, users, onStatusChange, onUpdate, isMobil
         />
       </div>
 
-      {/* Assignee */}
+      {/* Assignees */}
       <div className="meta-field">
-        <span className="meta-field-label">Assignee</span>
-        <Select
-          value={issue.assignee_id?.toString() || null}
-          onChange={(value) =>
+        <span className="meta-field-label">Assignees</span>
+        <MultiSelect
+          value={assigneeIds}
+          onChange={(values) =>
             onUpdate(issue.id, {
-              assignee_id: value ? parseInt(value) : null,
+              assignee_ids: values.map(v => parseInt(v)),
             })
           }
           placeholder="Unassigned"
           clearable
           searchable
-          renderOption={({ option }) => (
+          hidePickedOptions
+          renderOption={({ option, checked }) => (
             <Group gap="xs">
-              {option.value === issue.assignee_id?.toString() && (
+              {checked && (
                 <IconCheck size={14} style={{ color: "var(--accent)" }} />
               )}
-              <span>{option.label}</span>
-            </Group>
-          )}
-          leftSection={
-            assignee ? (
               <Avatar
-                color={assignee.color || "gray"}
-                name={assignee.name}
+                color={users.find(u => u.id.toString() === option.value)?.avatar_color || "gray"}
+                name={option.label}
                 size={20}
                 radius="xl"
               />
-            ) : null
-          }
+              <span>{option.label}</span>
+            </Group>
+          )}
           data={users.map((user) => ({
             value: user.id.toString(),
             label: user.name,
@@ -167,7 +165,6 @@ export function IssueMetaPanel({ issue, users, onStatusChange, onUpdate, isMobil
               background: "var(--bg-tertiary)",
               border: "1px solid var(--border-primary)",
               fontSize: "var(--text-sm)",
-              paddingLeft: assignee ? "36px" : undefined,
             },
             wrapper: {
               "--input-bg": "transparent",
@@ -216,13 +213,23 @@ export function IssueMetaPanel({ issue, users, onStatusChange, onUpdate, isMobil
               className="priority-bar"
               style={{ background: currentPriority?.color }}
             />
-            {assignee && (
-              <Avatar
-                color={assignee.color || "gray"}
-                name={assignee.name}
-                size={18}
-                radius="xl"
-              />
+            {selectedAssignees.length > 0 && (
+              <Avatar.Group spacing="xs">
+                {selectedAssignees.slice(0, 2).map((assignee) => (
+                  <Avatar
+                    key={assignee.id}
+                    color={assignee.avatar_color || "gray"}
+                    name={assignee.name}
+                    size={18}
+                    radius="xl"
+                  />
+                ))}
+                {selectedAssignees.length > 2 && (
+                  <Avatar size={18} radius="xl" color="gray">
+                    +{selectedAssignees.length - 2}
+                  </Avatar>
+                )}
+              </Avatar.Group>
             )}
           </div>
         )}

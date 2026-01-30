@@ -1,7 +1,8 @@
 /**
  * Discord Subtask Sender
  *
- * Handles building Discord embeds for subtask changes.
+ * Handles building Discord embeds for standalone subtask changes
+ * (when the parent issue is not in the same notification batch).
  */
 
 import { buildEmbed } from "./discord-embed-builder.js";
@@ -12,8 +13,8 @@ import {
 } from "./discord-sender.js";
 
 /**
- * Build embed for a subtask
- * @param {Object} parentIssue - Parent issue object from database
+ * Build embed for a standalone subtask (parent not in batch)
+ * @param {Object} _parentIssue - Parent issue object (unused, kept for API compatibility)
  * @param {Array} rawChanges - Raw changes array from payload (contains subtask info)
  * @param {Object} user - User object
  * @param {string} timestamp - Notification timestamp
@@ -21,7 +22,7 @@ import {
  * @returns {Promise<Object|null>} Discord embed object or null if skipped
  */
 export async function buildSubtaskEmbed(
-  parentIssue,
+  _parentIssue,
   rawChanges,
   user,
   timestamp,
@@ -69,7 +70,7 @@ export async function buildSubtaskEmbed(
   }
 
   // Strip isSubtask/subtaskKey flags since the title already identifies this as a subtask
-  // This prevents "JPL-2 (Subtask) Status" field names when the title is "[JPL-2] ... (subtask)"
+  // This prevents "└─ [JPL-2] Status" field names when the title is "[JPL-2] ... (Subtask)"
   changes = changes.map((change) => {
     const { isSubtask, subtaskKey, ...rest } = change;
     return rest;
@@ -83,10 +84,19 @@ export async function buildSubtaskEmbed(
     status: subtask.status,
   };
 
-  // Mark as subtask for embed builder
+  // Mark as subtask for embed builder (adds "(Subtask)" to title)
   const options = {
     isSubtask: true,
   };
+
+  // Check for description change
+  const descriptionChange = rawChanges.find(
+    (c) => c.action_type === "description_changed",
+  );
+  if (descriptionChange && descriptionChange.new_value) {
+    options.description = descriptionChange.new_value;
+    options.descriptionChanged = true;
+  }
 
   // Build embed (returns { embeds: [embed] }, extract just the embed)
   const result = buildEmbed(subtaskIssue, changes, user, timestamp, options);

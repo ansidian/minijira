@@ -246,6 +246,47 @@ async function init() {
     )
   `);
 
+  // Create issue_assignees junction table for multi-assignee support
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS issue_assignees (
+      issue_id INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (issue_id, user_id)
+    )
+  `);
+
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_issue_assignees_user ON issue_assignees(user_id)
+  `);
+
+  // Migration: Copy existing assignee_id values to issue_assignees table
+  try {
+    const { rows } = await db.execute(`
+      SELECT COUNT(*) as count FROM issue_assignees
+    `);
+
+    // Only migrate if junction table is empty
+    if (rows[0].count === 0) {
+      console.log('[Migration] Migrating single assignees to junction table...');
+
+      await db.execute(`
+        INSERT INTO issue_assignees (issue_id, user_id)
+        SELECT id, assignee_id
+        FROM issues
+        WHERE assignee_id IS NOT NULL
+      `);
+
+      const { rows: migratedRows } = await db.execute(`
+        SELECT COUNT(*) as count FROM issue_assignees
+      `);
+
+      console.log(`[Migration] Migrated ${migratedRows[0].count} assignee relationships`);
+    }
+  } catch (err) {
+    console.error('[Migration] Failed to migrate assignees:', err);
+  }
+
   const seedUsers = [
     { name: "Andy Su", email: "alex@team.edu", avatar_color: "#ef4444" },
     {

@@ -93,15 +93,26 @@ export function SpotlightSearch({ allIssues, setSelectedIssue }) {
               >
                 {issue.priority}
               </Badge>
-              {/* Assignee */}
-              {issue.assignee_name ? (
-                <Avatar
-                  color={issue.assignee_color}
-                  name={issue.assignee_name}
-                  size="sm"
-                  title={issue.assignee_name}
-                  style={{ flexShrink: 0 }}
-                />
+              {/* Assignees */}
+              {issue.assignees && issue.assignees.length > 0 ? (
+                <Avatar.Group spacing="xs">
+                  {issue.assignees.slice(0, 2).map((assignee) => (
+                    <Avatar
+                      key={assignee.id}
+                      color={assignee.avatar_color}
+                      name={assignee.name}
+                      size="sm"
+                      title={assignee.name}
+                      variant="filled"
+                      style={{ flexShrink: 0 }}
+                    />
+                  ))}
+                  {issue.assignees.length > 2 && (
+                    <Avatar size="sm" variant="filled" color="gray" style={{ flexShrink: 0 }}>
+                      +{issue.assignees.length - 2}
+                    </Avatar>
+                  )}
+                </Avatar.Group>
               ) : (
                 <UnassignedAvatar size="sm" />
               )}

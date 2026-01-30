@@ -2,7 +2,7 @@ import express from "express";
 import db from "../db/connection.js";
 import sseManager from "../sse-manager.js";
 import { logActivity } from "../utils/activity-logger.js";
-import { issueSelect, issueSelectWithCounts, subtaskSelect } from "../utils/queries.js";
+import { issueSelect, issueSelectWithCounts, subtaskSelect, transformIssueRow, transformIssueRows } from "../utils/queries.js";
 import { queueNotification } from '../utils/notification-queue.js';
 
 const router = express.Router();
@@ -63,19 +63,20 @@ router.get("/", async (req, res) => {
     }
 
     // Multi-value assignee filter (OR logic, with special handling for '0' = unassigned)
+    // Now filters against junction table for multi-assignee support
     if (assigneeIds && assigneeIds.length > 0) {
       const hasUnassigned = assigneeIds.includes('0') || assigneeIds.includes(0);
       const numericIds = assigneeIds.filter(id => id !== '0' && id !== 0);
 
       if (hasUnassigned && numericIds.length > 0) {
         const placeholders = numericIds.map(() => '?').join(', ');
-        sql += ` AND (issues.assignee_id IS NULL OR issues.assignee_id IN (${placeholders}))`;
+        sql += ` AND (NOT EXISTS (SELECT 1 FROM issue_assignees WHERE issue_id = issues.id) OR EXISTS (SELECT 1 FROM issue_assignees WHERE issue_id = issues.id AND user_id IN (${placeholders})))`;
         args.push(...numericIds);
       } else if (hasUnassigned) {
-        sql += " AND issues.assignee_id IS NULL";
+        sql += " AND NOT EXISTS (SELECT 1 FROM issue_assignees WHERE issue_id = issues.id)";
       } else {
         const placeholders = numericIds.map(() => '?').join(', ');
-        sql += ` AND issues.assignee_id IN (${placeholders})`;
+        sql += ` AND EXISTS (SELECT 1 FROM issue_assignees WHERE issue_id = issues.id AND user_id IN (${placeholders}))`;
         args.push(...numericIds);
       }
     }
@@ -122,6 +123,7 @@ router.get("/", async (req, res) => {
       args.push(cursorData.created_at, cursorData.created_at, cursorData.id);
     }
 
+    sql += " GROUP BY issues.id";
     sql += " ORDER BY issues.created_at DESC, issues.id DESC";
 
     // Fetch limit + 1 to determine hasMore
@@ -131,15 +133,16 @@ router.get("/", async (req, res) => {
     }
 
     const { rows } = await db.execute({ sql, args });
+    const transformedRows = transformIssueRows(rows);
 
     // Backwards compatibility: return array when no limit param
     if (!usePagination) {
-      return res.json(rows);
+      return res.json(transformedRows);
     }
 
     // Paginated response
-    const hasMore = rows.length > limit;
-    const issues = hasMore ? rows.slice(0, limit) : rows;
+    const hasMore = transformedRows.length > limit;
+    const issues = hasMore ? transformedRows.slice(0, limit) : transformedRows;
     const lastRow = issues[issues.length - 1];
     const nextCursor = hasMore ? encodeCursor(lastRow) : null;
 
@@ -176,17 +179,20 @@ router.get("/subtasks/batch", async (req, res) => {
       sql: `
         ${subtaskSelect}
         WHERE issues.parent_id IN (${placeholders})${archiveFilter}
+        GROUP BY issues.id
         ORDER BY issues.parent_id, issues.created_at ASC
       `,
       args: ids,
     });
+
+    const transformedRows = transformIssueRows(rows);
 
     // Group by parent_id for frontend consumption
     const grouped = {};
     for (const id of ids) {
       grouped[id] = []; // Initialize all requested parents (even if empty)
     }
-    for (const subtask of rows) {
+    for (const subtask of transformedRows) {
       grouped[subtask.parent_id].push(subtask);
     }
 
@@ -204,11 +210,12 @@ router.get("/:id/subtasks", async (req, res) => {
       sql: `
         ${subtaskSelect}
         WHERE issues.parent_id = ?${archiveFilter}
+        GROUP BY issues.id
         ORDER BY issues.created_at ASC
       `,
       args: [req.params.id],
     });
-    res.json(rows);
+    res.json(transformIssueRows(rows));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -223,12 +230,13 @@ router.get("/:id", async (req, res) => {
       sql: `
         ${query}
         WHERE issues.id = ?
+        GROUP BY issues.id
       `,
       args: [req.params.id],
     });
     if (rows.length === 0)
       return res.status(404).json({ error: "Issue not found" });
-    res.json(rows[0]);
+    res.json(transformIssueRow(rows[0]));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -242,6 +250,7 @@ router.post("/", async (req, res) => {
       status,
       priority,
       assignee_id,
+      assignee_ids,
       reporter_id,
       parent_id,
     } = req.body;
@@ -260,36 +269,56 @@ router.post("/", async (req, res) => {
       }
     }
 
+    // Support both assignee_ids (new) and assignee_id (backwards compat)
+    let assigneeIdsArray = assignee_ids || [];
+    if (assignee_id && !assignee_ids) {
+      assigneeIdsArray = [assignee_id];
+    }
+
     const { rows: counterRows } = await db.execute(
       "UPDATE counters SET value = value + 1 WHERE name = 'issue_key' RETURNING value"
     );
     const key = `JPL-${counterRows[0].value}`;
 
     const result = await db.execute({
-      sql: `INSERT INTO issues (key, title, description, status, priority, assignee_id, reporter_id, parent_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO issues (key, title, description, status, priority, reporter_id, parent_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
       args: [
         key,
         title,
         description || null,
         status || "todo",
         priority || "medium",
-        assignee_id || null,
         reporter_id || null,
         parent_id || null,
       ],
     });
 
+    const issueId = Number(result.lastInsertRowid);
+
+    // Insert assignees into junction table
+    if (assigneeIdsArray.length > 0) {
+      for (const userId of assigneeIdsArray) {
+        await db.execute({
+          sql: "INSERT INTO issue_assignees (issue_id, user_id) VALUES (?, ?)",
+          args: [issueId, userId],
+        });
+      }
+    }
+
     const { rows } = await db.execute({
       sql: `
         ${issueSelectWithCounts}
         WHERE issues.id = ?
+        GROUP BY issues.id
       `,
-      args: [result.lastInsertRowid],
+      args: [issueId],
     });
 
+    const transformedIssue = transformIssueRow(rows[0]);
+
     await logActivity(
-      result.lastInsertRowid,
+      issueId,
       parent_id ? "subtask_created" : "issue_created",
       parent_id ? "subtask" : "issue",
       reporter_id || null,
@@ -301,17 +330,17 @@ router.post("/", async (req, res) => {
 
     sseManager.broadcast({
       type: "issue_created",
-      issueId: Number(result.lastInsertRowid),
+      issueId,
       parentId: parent_id || undefined,
       userId: reporter_id || null,
     });
 
-    res.status(201).json(rows[0]);
+    res.status(201).json(transformedIssue);
 
     // Queue notification (don't await - don't block response)
     // Subtasks queue under parent's ID so they merge with parent notifications
     queueNotification(
-      parent_id ? Number(parent_id) : Number(result.lastInsertRowid),
+      parent_id ? Number(parent_id) : issueId,
       reporter_id || null,
       'create',
       {
@@ -320,8 +349,7 @@ router.post("/", async (req, res) => {
         issue_title: title,
         description: description || null,
         is_subtask: !!parent_id,
-        assignee_id: assignee_id || null,
-        assignee_name: rows[0].assignee_name || null
+        assignees: transformedIssue.assignees
       }
     ).catch(err => {
       console.error('[Queue] Failed to queue issue creation:', err.message);
@@ -339,6 +367,7 @@ router.patch("/:id", async (req, res) => {
       status,
       priority,
       assignee_id,
+      assignee_ids,
       parent_id,
       previous_status,
       user_id,
@@ -354,6 +383,13 @@ router.patch("/:id", async (req, res) => {
       return res.status(404).json({ error: "Issue not found" });
 
     const oldIssue = { ...existing[0] };
+
+    // Fetch old assignees from junction table
+    const { rows: oldAssigneeRows } = await db.execute({
+      sql: "SELECT user_id FROM issue_assignees WHERE issue_id = ? ORDER BY user_id",
+      args: [id],
+    });
+    const oldAssigneeIds = oldAssigneeRows.map(r => r.user_id);
 
     // Track changes for notification (separate from activity log)
     const notificationChanges = [];
@@ -394,10 +430,7 @@ router.patch("/:id", async (req, res) => {
       updates.push("priority = ?");
       args.push(priority);
     }
-    if (assignee_id !== undefined) {
-      updates.push("assignee_id = ?");
-      args.push(assignee_id || null);
-    }
+    // assignee_id and assignee_ids are handled via junction table, not column update
     if (parent_id !== undefined) {
       if (Number(parent_id) === parseInt(id)) {
         return res
@@ -411,6 +444,44 @@ router.patch("/:id", async (req, res) => {
       // archived_at can be 'now' (archive) or null (unarchive)
       updates.push("archived_at = ?");
       args.push(archived_at === 'now' ? new Date().toISOString() : null);
+    }
+
+    // Handle assignee updates via junction table
+    let newAssigneeIds = null;
+    if (assignee_ids !== undefined) {
+      newAssigneeIds = assignee_ids || [];
+    } else if (assignee_id !== undefined) {
+      // Backwards compatibility: single assignee_id
+      newAssigneeIds = assignee_id ? [assignee_id] : [];
+    }
+
+    if (newAssigneeIds !== null) {
+      // Update junction table
+      const sortedNewIds = [...newAssigneeIds].sort((a, b) => a - b);
+      const sortedOldIds = [...oldAssigneeIds].sort((a, b) => a - b);
+      const idsChanged = JSON.stringify(sortedNewIds) !== JSON.stringify(sortedOldIds);
+
+      if (idsChanged) {
+        // Delete existing assignees
+        await db.execute({
+          sql: "DELETE FROM issue_assignees WHERE issue_id = ?",
+          args: [id],
+        });
+
+        // Insert new assignees
+        for (const userId of newAssigneeIds) {
+          await db.execute({
+            sql: "INSERT INTO issue_assignees (issue_id, user_id) VALUES (?, ?)",
+            args: [id, userId],
+          });
+        }
+
+        // Trigger updated_at
+        await db.execute({
+          sql: "UPDATE issues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+          args: [id],
+        });
+      }
     }
 
     if (updates.length > 0) {
@@ -448,14 +519,22 @@ router.patch("/:id", async (req, res) => {
           title !== undefined ? title : oldIssue.title
         );
       }
-      if (assignee_id !== undefined && oldIssue.assignee_id !== assignee_id) {
+    }
+
+    // Log assignee changes after junction table update
+    if (newAssigneeIds !== null) {
+      const sortedNewIds = [...newAssigneeIds].sort((a, b) => a - b);
+      const sortedOldIds = [...oldAssigneeIds].sort((a, b) => a - b);
+      const idsChanged = JSON.stringify(sortedNewIds) !== JSON.stringify(sortedOldIds);
+
+      if (idsChanged) {
         await logActivity(
           id,
           "assignee_changed",
           "issue",
           user_id || null,
-          oldIssue.assignee_id?.toString() || null,
-          assignee_id?.toString() || null,
+          oldAssigneeIds.length > 0 ? oldAssigneeIds.join(',') : null,
+          newAssigneeIds.length > 0 ? newAssigneeIds.join(',') : null,
           oldIssue.key,
           title !== undefined ? title : oldIssue.title
         );
@@ -466,9 +545,6 @@ router.patch("/:id", async (req, res) => {
       if (status !== undefined && oldIssue.status !== status) {
         notificationChanges.push({ action_type: 'status_changed', old_value: oldIssue.status, new_value: status });
       }
-      if (assignee_id !== undefined && String(oldIssue.assignee_id) !== String(assignee_id)) {
-        notificationChanges.push({ action_type: 'assignee_changed', old_value: oldIssue.assignee_id, new_value: assignee_id });
-      }
       if (priority !== undefined && oldIssue.priority !== priority) {
         notificationChanges.push({ action_type: 'priority_changed', old_value: oldIssue.priority, new_value: priority });
       }
@@ -477,6 +553,21 @@ router.patch("/:id", async (req, res) => {
       }
       if (description !== undefined && oldIssue.description !== description) {
         notificationChanges.push({ action_type: 'description_changed', old_value: oldIssue.description, new_value: description });
+      }
+    }
+
+    // Track assignee changes for notifications
+    if (newAssigneeIds !== null) {
+      const sortedNewIds = [...newAssigneeIds].sort((a, b) => a - b);
+      const sortedOldIds = [...oldAssigneeIds].sort((a, b) => a - b);
+      const idsChanged = JSON.stringify(sortedNewIds) !== JSON.stringify(sortedOldIds);
+
+      if (idsChanged) {
+        notificationChanges.push({
+          action_type: 'assignee_changed',
+          old_value: oldAssigneeIds.join(','),
+          new_value: newAssigneeIds.join(',')
+        });
       }
 
       // If parent was unarchived (moved out of done), unarchive its subtasks too
@@ -500,18 +591,21 @@ router.patch("/:id", async (req, res) => {
       sql: `
         ${issueSelectWithCounts}
         WHERE issues.id = ?
+        GROUP BY issues.id
       `,
       args: [id],
     });
 
+    const transformedIssue = transformIssueRow(rows[0]);
+
     sseManager.broadcast({
       type: "issue_updated",
       issueId: parseInt(id),
-      parentId: rows[0].parent_id || undefined,
+      parentId: transformedIssue.parent_id || undefined,
       userId: user_id || null,
     });
 
-    res.json(rows[0]);
+    res.json(transformedIssue);
 
     // Queue notification only if actual changes occurred
     // Subtasks queue under parent's ID so they merge with parent notifications

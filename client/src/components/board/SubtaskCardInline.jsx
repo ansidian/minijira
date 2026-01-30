@@ -128,13 +128,24 @@ export function SubtaskCardInline({
             >
               {subtask.priority}
             </Badge>
-            {subtask.assignee_name ? (
-              <Avatar
-                color={subtask.assignee_color}
-                name={subtask.assignee_name}
-                size="sm"
-                title={subtask.assignee_name}
-              />
+            {subtask.assignees && subtask.assignees.length > 0 ? (
+              <Avatar.Group spacing="xs">
+                {subtask.assignees.slice(0, 3).map((assignee) => (
+                  <Avatar
+                    key={assignee.id}
+                    color={assignee.avatar_color}
+                    name={assignee.name}
+                    size="sm"
+                    title={assignee.name}
+                    variant="filled"
+                  />
+                ))}
+                {subtask.assignees.length > 3 && (
+                  <Avatar size="sm" variant="filled" color="gray">
+                    +{subtask.assignees.length - 3}
+                  </Avatar>
+                )}
+              </Avatar.Group>
             ) : (
               <UnassignedAvatar size="sm" />
             )}

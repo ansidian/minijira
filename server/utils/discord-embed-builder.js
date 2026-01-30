@@ -64,27 +64,57 @@ export function formatValue(val, type) {
 }
 
 /**
- * Format a change from old to new value
+ * Format a change from old to new value using Discord markdown
  * @param {any} oldVal - Previous value
  * @param {any} newVal - New value
  * @param {string} type - Type of value for formatting
- * @returns {string} Formatted change string
+ * @returns {string} Formatted change string with Discord markdown
  */
 export function formatChange(oldVal, newVal, type = null) {
   const isEmpty = (v) => v === null || v === undefined || v === '';
 
+  // Special handling for assignee changes with multiple people
+  if (type === 'assignee') {
+    const formatAssignees = (val) => {
+      if (isEmpty(val)) return null;
+      // If it's a comma-separated list, format nicely
+      if (typeof val === 'string' && val.includes(',')) {
+        const names = val.split(',').map(n => n.trim());
+        if (names.length === 2) {
+          return `${names[0]} and ${names[1]}`;
+        } else if (names.length > 2) {
+          return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
+        }
+      }
+      return val;
+    };
+
+    const formattedOld = formatAssignees(oldVal);
+    const formattedNew = formatAssignees(newVal);
+
+    if (isEmpty(oldVal) && !isEmpty(newVal)) {
+      return `Assigned to: **${formattedNew}**`;
+    }
+
+    if (!isEmpty(oldVal) && isEmpty(newVal)) {
+      return `Unassigned (was: ~~${formattedOld}~~)`;
+    }
+
+    return `~~${formattedOld}~~ → **${formattedNew}**`;
+  }
+
   if (isEmpty(oldVal) && !isEmpty(newVal)) {
-    // Empty to value: "Set to: X"
-    return `Set to: ${formatValue(newVal, type)}`;
+    // Empty to value: "Set to: **X**"
+    return `Set to: **${formatValue(newVal, type)}**`;
   }
 
   if (!isEmpty(oldVal) && isEmpty(newVal)) {
-    // Value to empty: "Cleared (was: X)"
-    return `Cleared (was: ${formatValue(oldVal, type)})`;
+    // Value to empty: "Cleared (was: ~~X~~)"
+    return `Cleared (was: ~~${formatValue(oldVal, type)}~~)`;
   }
 
-  // Value to value: "X → Y"
-  return `${formatValue(oldVal, type)} → ${formatValue(newVal, type)}`;
+  // Value to value: "~~X~~ → **Y**"
+  return `~~${formatValue(oldVal, type)}~~ → **${formatValue(newVal, type)}**`;
 }
 
 /**
@@ -101,9 +131,33 @@ function formatFieldName(type) {
 }
 
 /**
+ * Emoji mapping for field types
+ */
+const fieldEmojis = {
+  status: '🔄',
+  assignee: '👤',
+  priority: '🎯',
+  description: '📝',
+  comment: '💬',
+  created: '✨',
+  deleted: '🗑️',
+  due_date: '📅',
+  subtasks: '📊'
+};
+
+/**
+ * Get emoji for a field type
+ * @param {string} type - Field type
+ * @returns {string} Emoji or empty string if not found
+ */
+function getFieldEmoji(type) {
+  return fieldEmojis[type] || '';
+}
+
+/**
  * Build Discord fields array from changes
- * @param {Array} changes - Array of {type, old, new, value?, isSubtask?, title?}
- * @returns {Array} Discord fields with name, value, inline
+ * @param {Array} changes - Array of {type, old, new, value?, isSubtask?, title?, subtaskKey?}
+ * @returns {Array} Discord fields with name, value, inline (always false for block layout)
  */
 export function formatChangeFields(changes) {
   if (!changes || changes.length === 0) {
@@ -131,8 +185,9 @@ export function formatChangeFields(changes) {
 
     // Handle comment fields
     if (type === 'comment') {
+      const emoji = getFieldEmoji('comment');
       return {
-        name: 'Comment Added',
+        name: `${emoji} Comment Added`,
         value: truncate(value || newVal || '', 200),
         inline: false
       };
@@ -140,9 +195,11 @@ export function formatChangeFields(changes) {
 
     // Handle created events
     if (type === 'created') {
-      const itemType = isSubtask ? 'Subtask' : 'Issue';
+      const emoji = getFieldEmoji('created');
+      const prefix = isSubtask && subtaskKey ? `└─ [${subtaskKey}] ` : '';
+      const itemType = isSubtask ? 'Subtask Created' : 'Issue Created';
       return {
-        name: `${itemType} Created`,
+        name: `${prefix}${emoji} ${itemType}`,
         value: title ? `"${truncate(title, 100)}"` : 'New item',
         inline: false
       };
@@ -150,51 +207,40 @@ export function formatChangeFields(changes) {
 
     // Handle deleted events
     if (type === 'deleted') {
-      const itemType = isSubtask ? 'Subtask' : 'Issue';
+      const emoji = getFieldEmoji('deleted');
+      const prefix = isSubtask && subtaskKey ? `└─ [${subtaskKey}] ` : '';
+      const itemType = isSubtask ? 'Subtask Deleted' : 'Issue Deleted';
       return {
-        name: `${itemType} Deleted`,
+        name: `${prefix}${emoji} ${itemType}`,
         value: title ? `"${truncate(title, 100)}"` : 'Item removed',
         inline: false
       };
     }
 
+    // Get emoji for field type
+    const emoji = getFieldEmoji(type);
+    const emojiPrefix = emoji ? `${emoji} ` : '';
+
     // Format field name (capitalize and replace underscores)
     let fieldName = formatFieldName(type);
 
-    // Prefix with subtask key for subtask field changes
+    // Prefix with └─ [subtaskKey] for subtask field changes
     if (isSubtask && subtaskKey) {
-      fieldName = `${subtaskKey} (Subtask) ${fieldName}`;
+      fieldName = `└─ [${subtaskKey}] ${emojiPrefix}${fieldName}`;
+    } else {
+      fieldName = `${emojiPrefix}${fieldName}`;
     }
 
     // Format the change
     const fieldValue = formatChange(old, newVal, type);
 
-    // Short fields are inline (assignee, status, priority) - but not subtask changes
-    const isShortField = !isSubtask && ['assignee', 'status', 'priority'].includes(type);
-
+    // Always use block fields (inline: false)
     return {
       name: fieldName,
       value: fieldValue,
-      inline: isShortField
+      inline: false
     };
   });
-}
-
-/**
- * Format timestamp to PST timezone string
- * @param {string|Date} timestamp - ISO 8601 timestamp or SQLite datetime string
- * @returns {string} Formatted time in PST (e.g., "Jan 24, 10:36 AM PST")
- */
-function formatPSTTime(timestamp) {
-  const date = parseTimestamp(timestamp);
-  return date.toLocaleString('en-US', {
-    timeZone: 'America/Los_Angeles',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true
-  }) + ' PST';
 }
 
 /**
@@ -232,7 +278,7 @@ function formatDiscordRelativeTime(timestamp) {
  * @param {Array} changes - Array of change objects
  * @param {Object} user - User object with name
  * @param {string} timestamp - ISO 8601 timestamp
- * @param {Object} options - Optional settings (deleted, subtaskSummary, description, etc.)
+ * @param {Object} options - Optional settings (deleted, subtaskSummary, description, descriptionChanged, etc.)
  * @returns {Object} Discord webhook payload with embeds array
  */
 export function buildEmbed(issue, changes, user, timestamp, options = {}) {
@@ -252,16 +298,18 @@ export function buildEmbed(issue, changes, user, timestamp, options = {}) {
   // Add subtask summary if provided
   if (options.subtaskSummary) {
     fields.push({
-      name: 'Subtasks',
+      name: `${getFieldEmoji('subtasks')} Subtasks`,
       value: options.subtaskSummary,
-      inline: true
+      inline: false
     });
   }
 
-  // Add description if this is issue creation and description exists
-  if (options.description && options.eventType === 'issue_created') {
+  // Add description if:
+  // 1. This is issue creation and description exists, OR
+  // 2. Description was changed (options.descriptionChanged)
+  if (options.description && (options.eventType === 'issue_created' || options.descriptionChanged)) {
     fields.push({
-      name: 'Description',
+      name: `${getFieldEmoji('description')} Description`,
       value: truncate(options.description, 500),
       inline: false
     });
@@ -270,7 +318,7 @@ export function buildEmbed(issue, changes, user, timestamp, options = {}) {
   // Build title with optional subtask indicator
   let title = `[${issue.key}] ${issue.title}`;
   if (options.isSubtask) {
-    title += ' (subtask)';
+    title += ' (Subtask)';
   }
 
   // Build the embed object
@@ -281,7 +329,7 @@ export function buildEmbed(issue, changes, user, timestamp, options = {}) {
     color: color,
     fields: fields,
     footer: {
-      text: `Changed by ${user.name} • ${formatPSTTime(timestamp)}`
+      text: `Changed by ${user.name}`
     }
   };
 

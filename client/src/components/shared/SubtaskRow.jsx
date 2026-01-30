@@ -111,14 +111,23 @@ export function SubtaskRow({
       >
         {subtask.priority}
       </Badge>
-      {subtask.assignee_name ? (
-        <Tooltip label={subtask.assignee_name}>
-          <Avatar
-            color={subtask.assignee_color}
-            name={subtask.assignee_name}
-            size="sm"
-          />
-        </Tooltip>
+      {subtask.assignees && subtask.assignees.length > 0 ? (
+        <Avatar.Group spacing="xs">
+          {subtask.assignees.slice(0, 3).map((assignee) => (
+            <Tooltip key={assignee.id} label={assignee.name}>
+              <Avatar
+                color={assignee.avatar_color}
+                name={assignee.name}
+                size="sm"
+              />
+            </Tooltip>
+          ))}
+          {subtask.assignees.length > 3 && (
+            <Avatar size="sm" variant="filled" color="gray">
+              +{subtask.assignees.length - 3}
+            </Avatar>
+          )}
+        </Avatar.Group>
       ) : (
         <UnassignedAvatar size="sm" />
       )}

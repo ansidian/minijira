@@ -159,14 +159,24 @@ export function IssueCard({
                 </Tooltip>
               )}
             </Group>
-            {issue.assignee_name ? (
-              <Avatar
-                color={issue.assignee_color}
-                name={issue.assignee_name}
-                size="sm"
-                title={issue.assignee_name}
-                variant="filled"
-              />
+            {issue.assignees && issue.assignees.length > 0 ? (
+              <Avatar.Group spacing="xs">
+                {issue.assignees.slice(0, 3).map((assignee) => (
+                  <Avatar
+                    key={assignee.id}
+                    color={assignee.avatar_color}
+                    name={assignee.name}
+                    size="sm"
+                    title={assignee.name}
+                    variant="filled"
+                  />
+                ))}
+                {issue.assignees.length > 3 && (
+                  <Avatar size="sm" variant="filled" color="gray">
+                    +{issue.assignees.length - 3}
+                  </Avatar>
+                )}
+              </Avatar.Group>
             ) : (
               <UnassignedAvatar size="sm" />
             )}

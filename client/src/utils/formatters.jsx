@@ -57,10 +57,17 @@ export function formatActivityDescription(entry) {
         </>
       );
     case "assignee_changed":
-      if (!old_value || old_value === "null") {
-        return "assigned issue";
+      // Handle both single IDs and comma-separated IDs (multi-assignee)
+      const oldIds = old_value && old_value !== "null" ? old_value.split(',').filter(Boolean) : [];
+      const newIds = new_value && new_value !== "null" ? new_value.split(',').filter(Boolean) : [];
+
+      if (oldIds.length === 0 && newIds.length > 0) {
+        return newIds.length === 1 ? "assigned issue" : "assigned issue to multiple people";
       }
-      return "reassigned issue";
+      if (oldIds.length > 0 && newIds.length === 0) {
+        return "unassigned issue";
+      }
+      return "updated assignees";
     case "priority_changed":
       return (
         <>
