@@ -6,6 +6,9 @@
  */
 
 import { buildEmbed } from './discord-embed-builder.js';
+import { filterChangesForNotification } from "./discord-filter.js";
+import { buildParentIssueEmbed } from "./discord-sender-parent.js";
+import { buildSubtaskEmbed } from "./discord-sender-subtask.js";
 
 /**
  * Sleep helper for retry delays
@@ -270,6 +273,7 @@ export async function resolveAssigneeNames(changes, dbClient) {
 
 /**
  * Build embed for a single issue from the multi-issue payload
+ * Routes to appropriate builder based on whether it's a subtask or parent issue
  * @param {Object} issueEntry - Issue entry from payload { issue_id, issue_key, issue_title, changes }
  * @param {Object} user - User object
  * @param {string} timestamp - Notification timestamp
@@ -279,14 +283,13 @@ export async function resolveAssigneeNames(changes, dbClient) {
 async function buildIssueEmbed(issueEntry, user, timestamp, dbClient) {
   const { issue_id, issue_key, issue_title, changes: rawChanges } = issueEntry;
 
-  // Fetch current issue data
+  // Fetch current issue data (this is the parent for subtasks, or the issue itself)
   const issueResult = await dbClient.execute({
-    sql: 'SELECT * FROM issues WHERE id = ?',
-    args: [issue_id]
+    sql: "SELECT * FROM issues WHERE id = ?",
+    args: [issue_id],
   });
 
   let issue = issueResult.rows[0];
-  let options = {};
 
   // Handle deleted issues - use payload data
   if (!issue) {
@@ -294,44 +297,37 @@ async function buildIssueEmbed(issueEntry, user, timestamp, dbClient) {
       id: issue_id,
       key: issue_key,
       title: issue_title,
-      status: 'deleted'
+      status: "deleted",
     };
-    options.deleted = true;
-  }
+    const options = { deleted: true };
 
-  // Get subtask summary if this is a parent issue (not deleted)
-  if (!options.deleted && issue.parent_id === null) {
-    const subtaskSummary = await getSubtaskSummary(issue_id, dbClient);
-    if (subtaskSummary) {
-      options.subtaskSummary = subtaskSummary;
+    // Extract and filter changes
+    let changes = [];
+    for (const change of rawChanges) {
+      const extracted = extractChangesFromPayload(change, "update");
+      changes.push(...extracted);
     }
+    changes = await resolveAssigneeNames(changes, dbClient);
+    changes = filterChangesForNotification(changes);
+
+    if (changes.length === 0) {
+      return null;
+    }
+
+    const result = buildEmbed(issue, changes, user, timestamp, options);
+    return result.embeds[0];
   }
 
-  // Extract changes - handle both array of raw changes and pre-processed changes
-  let changes = [];
-  for (const change of rawChanges) {
-    const extracted = extractChangesFromPayload(change, 'update');
-    changes.push(...extracted);
+  // Detect if this is a subtask change
+  const isSubtaskChange = rawChanges.some(
+    (c) => c.action_type === "subtask_updated",
+  );
+
+  if (isSubtaskChange) {
+    return buildSubtaskEmbed(issue, rawChanges, user, timestamp, dbClient);
+  } else {
+    return buildParentIssueEmbed(issue, rawChanges, user, timestamp, dbClient);
   }
-
-  // Resolve assignee IDs to user names for display
-  changes = await resolveAssigneeNames(changes, dbClient);
-
-  // Skip if all changes were filtered out (net-zero)
-  if (changes.length === 0) {
-    return null;
-  }
-
-  // Check for created event to add description
-  const createdChange = rawChanges.find(c => c.action_type === 'issue_created');
-  if (createdChange && createdChange.description) {
-    options.description = createdChange.description;
-    options.eventType = 'issue_created';
-  }
-
-  // Build embed (returns { embeds: [embed] }, extract just the embed)
-  const result = buildEmbed(issue, changes, user, timestamp, options);
-  return result.embeds[0];
 }
 
 /**
@@ -347,8 +343,8 @@ export async function prepareNotificationPayload(notificationRow, dbClient) {
 
   // Fetch user data
   const userResult = await dbClient.execute({
-    sql: 'SELECT * FROM users WHERE id = ?',
-    args: [notificationRow.user_id]
+    sql: "SELECT * FROM users WHERE id = ?",
+    args: [notificationRow.user_id],
   });
   const user = userResult.rows[0];
 
@@ -358,13 +354,20 @@ export async function prepareNotificationPayload(notificationRow, dbClient) {
 
     // Warn if truncating (Discord limit is 10 embeds)
     if (issueIds.length > 10) {
-      console.warn(`[Discord] Truncating notification from ${issueIds.length} to 10 issues`);
+      console.warn(
+        `[Discord] Truncating notification from ${issueIds.length} to 10 issues`,
+      );
     }
 
     const embeds = [];
     for (const issueId of issueIds.slice(0, 10)) {
       const issueEntry = eventPayload.issues[issueId];
-      const embed = await buildIssueEmbed(issueEntry, user, notificationRow.scheduled_at, dbClient);
+      const embed = await buildIssueEmbed(
+        issueEntry,
+        user,
+        notificationRow.scheduled_at,
+        dbClient,
+      );
       if (embed) {
         embeds.push(embed);
       }
@@ -372,7 +375,7 @@ export async function prepareNotificationPayload(notificationRow, dbClient) {
 
     // Skip if all issues were filtered out (net-zero)
     if (embeds.length === 0) {
-      return { skip: true, reason: 'all issues net-zero' };
+      return { skip: true, reason: "all issues net-zero" };
     }
 
     return { embeds };
@@ -380,8 +383,8 @@ export async function prepareNotificationPayload(notificationRow, dbClient) {
 
   // Legacy single-issue payload fallback
   const issueResult = await dbClient.execute({
-    sql: 'SELECT * FROM issues WHERE id = ?',
-    args: [notificationRow.issue_id]
+    sql: "SELECT * FROM issues WHERE id = ?",
+    args: [notificationRow.issue_id],
   });
 
   let issue = issueResult.rows[0];
@@ -393,36 +396,54 @@ export async function prepareNotificationPayload(notificationRow, dbClient) {
       id: notificationRow.issue_id,
       key: eventPayload.issue_key,
       title: eventPayload.issue_title,
-      status: 'deleted'
+      status: "deleted",
     };
     options.deleted = true;
   }
 
   // Get subtask summary if this is a parent issue (not deleted)
   if (!options.deleted && issue.parent_id === null) {
-    const subtaskSummary = await getSubtaskSummary(notificationRow.issue_id, dbClient);
+    const subtaskSummary = await getSubtaskSummary(
+      notificationRow.issue_id,
+      dbClient,
+    );
     if (subtaskSummary) {
       options.subtaskSummary = subtaskSummary;
     }
   }
 
   // Extract changes from event payload
-  let changes = extractChangesFromPayload(eventPayload, notificationRow.event_type);
+  let changes = extractChangesFromPayload(
+    eventPayload,
+    notificationRow.event_type,
+  );
 
   // Resolve assignee IDs to user names for display
   changes = await resolveAssigneeNames(changes, dbClient);
 
-  // Skip notification if all changes were filtered out (net-zero)
+  // Filter changes to only qualifying types
+  changes = filterChangesForNotification(changes);
+
+  // Skip notification if all changes were filtered out (net-zero or non-qualifying)
   if (changes.length === 0) {
-    return { skip: true, reason: 'net-zero changes' };
+    return { skip: true, reason: "net-zero or non-qualifying changes" };
   }
 
   // Add description for created events
-  if (eventPayload.action_type === 'issue_created' && eventPayload.description) {
+  if (
+    eventPayload.action_type === "issue_created" &&
+    eventPayload.description
+  ) {
     options.description = eventPayload.description;
-    options.eventType = 'issue_created';
+    options.eventType = "issue_created";
   }
 
   // Build and return embed
-  return buildEmbed(issue, changes, user, notificationRow.scheduled_at, options);
+  return buildEmbed(
+    issue,
+    changes,
+    user,
+    notificationRow.scheduled_at,
+    options,
+  );
 }

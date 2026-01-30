@@ -267,9 +267,15 @@ export function buildEmbed(issue, changes, user, timestamp, options = {}) {
     });
   }
 
+  // Build title with optional subtask indicator
+  let title = `[${issue.key}] ${issue.title}`;
+  if (options.isSubtask) {
+    title += ' (subtask)';
+  }
+
   // Build the embed object
   const embed = {
-    title: `[${issue.key}] ${issue.title}`,
+    title: title,
     url: `${process.env.APP_URL || 'http://localhost:5173'}/issues/${issue.id}`,
     description: formatDiscordRelativeTime(timestamp),
     color: color,

@@ -1,8 +1,8 @@
 import db from '../db/connection.js';
 
 // Timing configuration for notification debouncing
-const DEBOUNCE_WINDOW = '+150 seconds';  // Sliding window - each new event resets timer
-const MAX_WAIT = '+5 minutes';          // Maximum wait from first event in batch
+const DEBOUNCE_WINDOW = '+90 seconds';  // Sliding window - each new event resets timer
+const MAX_WAIT = '+3 minutes';          // Maximum wait from first event in batch
 
 /**
  * Merge a single change into a changes array.
@@ -43,12 +43,16 @@ function mergeIssueChanges(issueEntry, newPayload) {
 
   // If newPayload has its own changes array (e.g., issue_updated events),
   // merge each inner change individually
-  if (Array.isArray(newPayload.changes)) {
+  // EXCEPT for subtask_updated - preserve the wrapper (contains issue_key/issue_title)
+  if (
+    Array.isArray(newPayload.changes) &&
+    newPayload.action_type !== "subtask_updated"
+  ) {
     for (const innerChange of newPayload.changes) {
       mergeChange(changes, innerChange);
     }
   } else {
-    // Simple event without nested changes
+    // Simple event without nested changes, or subtask_updated wrapper
     mergeChange(changes, newPayload);
   }
 
@@ -75,7 +79,11 @@ function mergePayloads(existingPayload, issueId, newPayload) {
       issue_id: legacyIssueId,
       issue_key: existingPayload.issue_key,
       issue_title: existingPayload.issue_title,
-      changes: existingPayload.changes || [existingPayload]
+      changes:
+        existingPayload.changes &&
+        existingPayload.action_type !== "subtask_updated"
+          ? existingPayload.changes
+          : [existingPayload],
     };
   }
 
@@ -86,12 +94,17 @@ function mergePayloads(existingPayload, issueId, newPayload) {
     issues[issueIdStr] = mergeIssueChanges(issues[issueIdStr], newPayload);
   } else {
     // Add new issue entry
-    const changes = Array.isArray(newPayload.changes) ? newPayload.changes : [newPayload];
+    // Preserve subtask_updated wrapper (contains issue_key/issue_title)
+    const changes =
+      Array.isArray(newPayload.changes) &&
+      newPayload.action_type !== "subtask_updated"
+        ? newPayload.changes
+        : [newPayload];
     issues[issueIdStr] = {
       issue_id: issueId,
       issue_key: newPayload.issue_key,
       issue_title: newPayload.issue_title,
-      changes
+      changes,
     };
   }
 
@@ -156,9 +169,13 @@ export async function queueNotification(issueId, userId, eventType, eventPayload
           issue_id: issueId,
           issue_key: eventPayload.issue_key,
           issue_title: eventPayload.issue_title,
-          changes: Array.isArray(eventPayload.changes) ? eventPayload.changes : [eventPayload]
-        }
-      }
+          changes:
+            Array.isArray(eventPayload.changes) &&
+            eventPayload.action_type !== "subtask_updated"
+              ? eventPayload.changes
+              : [eventPayload],
+        },
+      },
     };
 
     // First event: scheduled_at = now + DEBOUNCE_WINDOW, first_queued_at = now
