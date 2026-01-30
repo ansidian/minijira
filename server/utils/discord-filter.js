@@ -3,8 +3,9 @@
  *
  * Determines which issue changes should trigger Discord notifications.
  * Filters to only send for:
- * - Forward status progression to review/done
- * - Assignee changes
+ * - Status progression to or from review/done
+ * - Assignee changes (including new issues created with assignees)
+ * - Subtask creation
  */
 
 /**
@@ -20,7 +21,13 @@
  */
 export function shouldSendNotification(changes) {
   const hasQualifyingChange = changes.some((change) => {
+    // Assignee changes (including new issues created with assignees)
     if (change.type === "assignee") {
+      return true;
+    }
+
+    // Subtask creation
+    if (change.type === "created" && change.isSubtask) {
       return true;
     }
 
@@ -58,6 +65,11 @@ export function filterChangesForNotification(changes) {
   return changes.filter((change) => {
     // Keep assignee changes
     if (change.type === "assignee") {
+      return true;
+    }
+
+    // Keep subtask creation
+    if (change.type === "created" && change.isSubtask) {
       return true;
     }
 
