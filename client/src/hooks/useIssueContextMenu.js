@@ -1,4 +1,4 @@
-import { useContextMenu } from "mantine-contextmenu";
+import {useContextMenu} from "mantine-contextmenu";
 
 export function useIssueContextMenu({
   issue,
@@ -13,14 +13,14 @@ export function useIssueContextMenu({
   const { showContextMenu } = useContextMenu();
   const isSubtask = !!issue.parent_id;
 
-  const handleContextMenu = (e) => {
+  return (e) => {
     // Don't show context menu on touch devices (preserve mobile drag & drop)
     if (isTouchDevice) {
       e.preventDefault();
       e.stopPropagation();
       return;
-    }
 
+    }
     e.preventDefault();
     e.stopPropagation();
 
@@ -30,7 +30,7 @@ export function useIssueContextMenu({
         title: "View Details",
         onClick: () => onViewDetails(issue),
       },
-      { key: "divider-1" },
+      {key: "divider-1"},
       {
         key: "status",
         title: "Change Status",
@@ -64,17 +64,17 @@ export function useIssueContextMenu({
           {
             key: "priority-low",
             title: "Low",
-            onClick: () => onUpdateIssue(issue.id, { priority: "low" }),
+            onClick: () => onUpdateIssue(issue.id, {priority: "low"}),
           },
           {
             key: "priority-medium",
             title: "Medium",
-            onClick: () => onUpdateIssue(issue.id, { priority: "medium" }),
+            onClick: () => onUpdateIssue(issue.id, {priority: "medium"}),
           },
           {
             key: "priority-high",
             title: "High",
-            onClick: () => onUpdateIssue(issue.id, { priority: "high" }),
+            onClick: () => onUpdateIssue(issue.id, {priority: "high"}),
           },
         ],
       },
@@ -85,13 +85,13 @@ export function useIssueContextMenu({
           {
             key: "assignee-unassigned",
             title: "Unassigned",
-            onClick: () => onUpdateIssue(issue.id, { assignee_id: null }),
+            onClick: () => onUpdateIssue(issue.id, {assignee_id: null}),
           },
-          { key: "assignee-divider" },
+          {key: "assignee-divider"},
           ...users.map((user) => ({
             key: `assignee-${user.id}`,
             title: user.name,
-            onClick: () => onUpdateIssue(issue.id, { assignee_id: user.id }),
+            onClick: () => onUpdateIssue(issue.id, {assignee_id: user.id}),
           })),
         ],
       },
@@ -100,30 +100,28 @@ export function useIssueContextMenu({
     // Add "Add Subtask" option only for parent issues
     if (!isSubtask && onRequestAddSubtask) {
       menuItems.push(
-        { key: "divider-2" },
-        {
-          key: "add-subtask",
-          title: "Add Subtask",
-          onClick: () => onRequestAddSubtask(issue),
-        }
+          {key: "divider-2"},
+          {
+            key: "add-subtask",
+            title: "Add Subtask",
+            onClick: () => onRequestAddSubtask(issue),
+          }
       );
     }
 
     // Add delete option
     menuItems.push(
-      { key: "divider-3" },
-      {
-        key: "delete",
-        title: isSubtask ? "Delete Subtask" : "Delete Issue",
-        color: "red",
-        onClick: async () => {
-          await onDeleteIssue(issue.id);
-        },
-      }
+        {key: "divider-3"},
+        {
+          key: "delete",
+          title: isSubtask ? "Delete Subtask" : "Delete Issue",
+          color: "red",
+          onClick: async () => {
+            await onDeleteIssue(issue.id);
+          },
+        }
     );
 
     showContextMenu(menuItems)(e);
   };
-
-  return handleContextMenu;
 }
