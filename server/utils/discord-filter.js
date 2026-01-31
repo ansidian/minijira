@@ -3,54 +3,10 @@
  *
  * Determines which issue changes should trigger Discord notifications.
  * Filters to only send for:
- * - Status progression to or from review/done
+ * - Status changes TO review/done (any direction)
  * - Assignee changes (including new issues created with assignees)
  * - Subtask creation
  */
-
-/**
- * Check if changes should trigger a Discord notification
- *
- * Skip Notifications for:
- * - Status changes FROM 'review'/'done' to other statuses (backward progression)
- * - Priority changes
- * - Other non-qualifying change types
- *
- * @param {Array<{type: string, old: string, new: string, isSubtask?: boolean}>} changes - Changes array from extractChangesFromPayload
- * @returns {boolean} Send notification on True, else skip if False
- */
-export function shouldSendNotification(changes) {
-  const hasQualifyingChange = changes.some((change) => {
-    // Assignee changes (including new issues created with assignees)
-    if (change.type === "assignee") {
-      return true;
-    }
-
-    // Subtask creation
-    if (change.type === "created" && change.isSubtask) {
-      return true;
-    }
-
-    // Status changes: only forward progression to review/done (not backwards)
-    if (change.type === "status") {
-      const newStatus = change.new;
-      const oldStatus = change.old;
-
-      // Must be moving TO review or done
-      const isMovingToTarget = newStatus === "review" || newStatus === "done";
-
-      // Disable backward progression (Done -> Review)
-      // const isMovingFromTarget = oldStatus === "review" || oldStatus === "done";
-
-      return isMovingToTarget && !isMovingFromTarget;
-    }
-
-    // All other change types don't qualify
-    return false;
-  });
-
-  return hasQualifyingChange;
-}
 
 /**
  * Filter changes to only those that should appear in Discord notification
@@ -73,13 +29,11 @@ export function filterChangesForNotification(changes) {
       return true;
     }
 
-    // Keep qualifying status changes (forward to review/done)
+    // Keep qualifying status changes (to review/done, including backward from done to review)
     if (change.type === "status") {
       const newStatus = change.new;
-      const oldStatus = change.old;
       const isMovingToTarget = newStatus === "review" || newStatus === "done";
-      const isMovingFromTarget = oldStatus === "review" || oldStatus === "done";
-      return isMovingToTarget && !isMovingFromTarget;
+      return isMovingToTarget;
     }
 
     // Filter out all other changes (priority, etc.)

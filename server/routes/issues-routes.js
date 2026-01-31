@@ -538,53 +538,45 @@ router.patch("/:id", async (req, res) => {
           oldIssue.key,
           title !== undefined ? title : oldIssue.title
         );
-      }
 
-      // Build notification changes - use structure matching extractChangesFromPayload
-      // Each change needs action_type for the recursive parser to work correctly
-      if (status !== undefined && oldIssue.status !== status) {
-        notificationChanges.push({ action_type: 'status_changed', old_value: oldIssue.status, new_value: status });
-      }
-      if (priority !== undefined && oldIssue.priority !== priority) {
-        notificationChanges.push({ action_type: 'priority_changed', old_value: oldIssue.priority, new_value: priority });
-      }
-      if (title !== undefined && oldIssue.title !== title) {
-        notificationChanges.push({ action_type: 'title_changed', old_value: oldIssue.title, new_value: title });
-      }
-      if (description !== undefined && oldIssue.description !== description) {
-        notificationChanges.push({ action_type: 'description_changed', old_value: oldIssue.description, new_value: description });
-      }
-    }
-
-    // Track assignee changes for notifications
-    if (newAssigneeIds !== null) {
-      const sortedNewIds = [...newAssigneeIds].sort((a, b) => a - b);
-      const sortedOldIds = [...oldAssigneeIds].sort((a, b) => a - b);
-      const idsChanged = JSON.stringify(sortedNewIds) !== JSON.stringify(sortedOldIds);
-
-      if (idsChanged) {
+        // Track assignee changes for notifications
         notificationChanges.push({
           action_type: 'assignee_changed',
           old_value: oldAssigneeIds.join(','),
           new_value: newAssigneeIds.join(',')
         });
       }
+    }
 
-      // If parent was unarchived (moved out of done), unarchive its subtasks too
-      if (status !== undefined && status !== "done" && oldIssue.status === "done" && oldIssue.parent_id === null) {
-        await db.execute({
-          sql: `UPDATE issues SET archived_at = NULL WHERE parent_id = ?`,
-          args: [id]
-        });
-      }
+    // Build notification changes for all field updates
+    // Each change needs action_type for the recursive parser to work correctly
+    if (status !== undefined && oldIssue.status !== status) {
+      notificationChanges.push({ action_type: 'status_changed', old_value: oldIssue.status, new_value: status });
+    }
+    if (priority !== undefined && oldIssue.priority !== priority) {
+      notificationChanges.push({ action_type: 'priority_changed', old_value: oldIssue.priority, new_value: priority });
+    }
+    if (title !== undefined && oldIssue.title !== title) {
+      notificationChanges.push({ action_type: 'title_changed', old_value: oldIssue.title, new_value: title });
+    }
+    if (description !== undefined && oldIssue.description !== description) {
+      notificationChanges.push({ action_type: 'description_changed', old_value: oldIssue.description, new_value: description });
+    }
 
-      // Cascade archive/unarchive to subtasks when explicitly archiving/unarchiving a parent
-      if (archived_at !== undefined && oldIssue.parent_id === null) {
-        await db.execute({
-          sql: `UPDATE issues SET archived_at = ? WHERE parent_id = ?`,
-          args: [archived_at === 'now' ? new Date().toISOString() : null, id]
-        });
-      }
+    // If parent was unarchived (moved out of done), unarchive its subtasks too
+    if (status !== undefined && status !== "done" && oldIssue.status === "done" && oldIssue.parent_id === null) {
+      await db.execute({
+        sql: `UPDATE issues SET archived_at = NULL WHERE parent_id = ?`,
+        args: [id]
+      });
+    }
+
+    // Cascade archive/unarchive to subtasks when explicitly archiving/unarchiving a parent
+    if (archived_at !== undefined && oldIssue.parent_id === null) {
+      await db.execute({
+        sql: `UPDATE issues SET archived_at = ? WHERE parent_id = ?`,
+        args: [archived_at === 'now' ? new Date().toISOString() : null, id]
+      });
     }
 
     const { rows } = await db.execute({
